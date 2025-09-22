@@ -1,201 +1,131 @@
-// app/(tabs)/index.tsx
+// مسار الملف: app/(tabs)/index.tsx
 
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
-  I18nManager,
-  RefreshControl,
-  ScrollView,
+  SectionList,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
+  SafeAreaView,
+  TouchableOpacity,
+  FlatList,
 } from 'react-native';
 
-// استيراد المكونات والأنواع الجديدة الخاصة بالمطعم
-import { supabase } from '../../lib/supabase'; // تأكد من أن هذا المسار صحيح
-import { Category, MenuItem } from '../../lib/types'; // سنقوم بإنشاء هذا الملف
-import MenuItemCard from '../../components/MenuItemCard';
+import MenuItemCard from '@/components/MenuItemCard';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/useAuth';
+import FeaturedItemCard from '@/components/FeaturedItemCard';
 
-// فرض اتجاه من اليمين لليسار
-I18nManager.allowRTL(true);
-I18nManager.forceRTL(true);
+interface MenuItem { id: number; name: string; description: string | null; price: number; image_url: string | null; }
+interface CategoryWithItems { id: number; name: string; menu_items: MenuItem[] | null; }
 
 export default function HomeScreen() {
   const router = useRouter();
-
-  // --- حالات خاصة بالمطعم ---
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const { user } = useAuth();
+  const [data, setData] = useState<CategoryWithItems[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeCategoryId, setActiveCategoryId] = useState<number | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [profile, setProfile] = useState<{ fullname: string } | null>(null);
 
-  // --- دالة جلب البيانات من جداول المطعم ---
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      // 1. جلب الأقسام (Categories)
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('*')
-        .order('display_order', { ascending: true });
-      if (categoriesError) throw categoriesError;
-      setCategories(categoriesData || []);
-
-      // 2. جلب عناصر القائمة (Menu Items)
-      const { data: menuItemsData, error: menuItemsError } = await supabase
-        .from('menu_items')
-        .select('*');
-      if (menuItemsError) throw menuItemsError;
-      setMenuItems(menuItemsData || []);
-
-    } catch (error) {
-      console.error('Error loading data:', error);
-      // يمكنك إضافة رسالة خطأ للمستخدم هنا
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // --- تحميل البيانات عند فتح الشاشة ---
   useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      if (user) {
+        const { data: profileData } = await supabase.from('profiles').select('fullname').eq('id', user.id).single();
+        setProfile(profileData);
+      } else {
+        setProfile(null);
+      }
+
+      const { data: categoriesData, error } = await supabase.rpc('get_categories_with_items', {
+        item_limit: 7,
+      });
+
+      if (error) {
+        console.error('Error fetching data with RPC:', error);
+      } else {
+        setData(categoriesData || []);
+      }
+      setLoading(false);
+    };
     loadData();
-  }, [loadData]);
+  }, [user]);
 
-  // --- وظيفة التحديث عند السحب للأسفل ---
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+  const renderSectionHeader = (section: CategoryWithItems) => (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{section.name}</Text>
+      <TouchableOpacity onPress={() => router.push({ pathname: '/menu/[categoryId]', params: { categoryId: section.id.toString(), categoryName: section.name } })}>
+        <Text style={styles.seeAll}>عرض الكل</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
-  // --- فلترة عناصر القائمة بناءً على البحث والقسم المختار ---
-  const filteredMenuItems = useMemo(() => {
-    return menuItems.filter(item => {
-      const categoryMatch = activeCategoryId === 'all' || item.category_id === activeCategoryId;
-      const searchMatch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return categoryMatch && searchMatch;
-    });
-  }, [menuItems, activeCategoryId, searchQuery]);
-
-  // --- عرض مؤشر التحميل ---
-  if (loading && !refreshing) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color="#FF6347" /></View>;
+  if (loading) {
+    return <View style={styles.centered}><ActivityIndicator size="large" color="#E63946" /></View>;
   }
 
   return (
-    <View style={styles.container}>
-      {/* --- الترويسة --- */}
-      <View style={styles.titleHeaderContainer}>
-        <View>
-          <Text style={styles.title}>أهلاً بك!</Text>
-          <Text style={styles.subtitle}>اطلب وجبتك المفضلة</Text>
-        </View>
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/cart')}>
-          <Ionicons name="cart-outline" size={28} color="black" />
-        </TouchableOpacity>
-      </View>
-
-      {/* --- شريط البحث والفلترة --- */}
-      <View style={styles.searchContainer}>
-        {/* سنعيد تفعيل زر الفلاتر المتقدمة لاحقاً */}
-        {/* <TouchableOpacity style={styles.filterButton}>
-          <FontAwesome5 name="sliders-h" size={20} color="black" />
-        </TouchableOpacity> */}
-        <TextInput
-          placeholder="ابحث عن وجبة..."
-          placeholderTextColor="#888"
-          style={styles.searchInput}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
-      </View>
-
-      {/* --- شرائح الأقسام (Filter Chips) --- */}
-      <View style={{ height: 50, marginBottom: 15 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
-          {/* زر "الكل" */}
-          <TouchableOpacity
-            style={[styles.chip, activeCategoryId === 'all' && styles.activeChip]}
-            onPress={() => setActiveCategoryId('all')}
-          >
-            <Text style={[styles.chipText, activeCategoryId === 'all' && styles.activeChipText]}>الكل</Text>
-          </TouchableOpacity>
-          {/* باقي الأقسام من قاعدة البيانات */}
-          {categories.map((category) => (
-            <TouchableOpacity
-              key={category.id}
-              style={[styles.chip, activeCategoryId === category.id && styles.activeChip]}
-              onPress={() => setActiveCategoryId(category.id)}
-            >
-              <Text style={[styles.chipText, activeCategoryId === category.id && styles.activeChipText]}>{category.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      <Text style={styles.sectionTitle}>قائمة الطعام</Text>
-
-      {/* --- قائمة الوجبات --- */}
-      <FlatList
-        key={2} // <-- أضف هذا السطر
-        data={filteredMenuItems}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
-        columnWrapperStyle={{ justifyContent: 'space-between' }}
-        renderItem={({ item }) => (
-          <View style={{ width: '48%' }}>
-            <MenuItemCard
-              item={item}
-              onPress={() => {
-                console.log('Pressed on:', item.name);
-              }}
-            />
-          </View>
+    <SafeAreaView style={styles.container}>
+      <SectionList
+        sections={data.map(cat => ({ ...cat, data: [cat.menu_items || []] }))}
+        keyExtractor={(item, index) => `row-${index}`}
+        ListHeaderComponent={() => (
+          <Text style={styles.headerTitle}>
+            {profile ? `مرحباً، ${profile.fullname}` : 'قائمة الطعام'}
+          </Text>
         )}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={<Text style={styles.emptyText}>لا توجد وجبات تطابق بحثك.</Text>}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
+        renderSectionHeader={({ section }) => renderSectionHeader(section)}
+        renderItem={({ item }) => {
+          if (item.length === 0) {
+            return <Text style={styles.noItemsText}>لا توجد وجبات في هذا القسم بعد.</Text>;
+          }
+          return (
+            <FlatList
+              data={item}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(menuItem) => menuItem.id.toString()}
+              renderItem={({ item: menuItem }) => (
+                // --- هذا هو التعديل ---
+                <View style={{ width: 150, marginRight: 15 }}>
+                  <FeaturedItemCard
+                    name={menuItem.name}
+                    price={menuItem.price}
+                    imageUrl={menuItem.image_url}
+                    // --- هذا هو التعديل ---
+                    onPress={() => router.push(`/item/${menuItem.id}`)}
+                  // --------------------
+                  />
+                </View>
+              )}
+              contentContainerStyle={{ paddingHorizontal: 20 }}
+            />
+          );
+        }}
+        ListEmptyComponent={<View style={styles.centered}><Text>لا توجد أقسام متاحة حالياً.</Text></View>}
+        contentContainerStyle={{ paddingBottom: 20 }}
+
+        // --- هذا هو السطر الذي يحل المشكلة ---
+        stickySectionHeadersEnabled={false}
+      // ------------------------------------
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
-// --- التنسيقات (Styles) ---
-// لقد قمت بتبسيطها وتعديل الألوان لتناسب هوية مطعم
+// نفس الـ Styles السابقة
 const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F7F7F7' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 50, backgroundColor: '#FFF8F0' }, // لون خلفية كريمي فاتح
-  titleHeaderContainer: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#333', textAlign: 'right' },
-  subtitle: { fontSize: 24, fontWeight: '300', color: '#555', textAlign: 'right' },
-  iconButton: { padding: 10 },
-  searchContainer: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, paddingHorizontal: 15, marginBottom: 20, borderWidth: 1, borderColor: '#EFEFEF' },
-  searchInput: { flex: 1, height: 50, fontSize: 16, textAlign: 'right', marginHorizontal: 10 },
-  searchIcon: {},
-  chipsContainer: { flexDirection: 'row', paddingRight: 5, gap: 10 },
-  chip: { backgroundColor: '#FFFFFF', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: '#EFEFEF' },
-  activeChip: { backgroundColor: '#FF6347', borderColor: '#FF6347' }, // لون برتقالي/أحمر للطعام
-  chipText: { color: '#555', fontWeight: '500' },
-  activeChipText: { color: '#FFFFFF' },
-  sectionTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'right', color: '#333' },
-  emptyText: { textAlign: 'center', marginTop: 50, fontSize: 16, color: '#888' },
-  // هذا مجرد عنصر نائب مؤقت
-  cardPlaceholder: {
-    backgroundColor: 'white',
-    padding: 20,
-    margin: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
+  headerTitle: { fontSize: 32, fontWeight: 'bold', color: '#1D3557', textAlign: 'right', marginHorizontal: 20, marginTop: 20, marginBottom: 10 },
+  sectionHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 20, marginBottom: 15 },
+  sectionTitle: { fontSize: 22, fontWeight: 'bold', color: '#1D3557' },
+  seeAll: { fontSize: 16, fontWeight: '600', color: '#E63946' },
+  noItemsText: {
+    paddingHorizontal: 20,
+    color: '#888',
+    fontStyle: 'italic',
+    textAlign: 'right',
   },
 });

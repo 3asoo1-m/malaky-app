@@ -1,57 +1,74 @@
+// مسار الملف: app/(tabs)/_layout.tsx
+
+import { FontAwesome } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Platform } from 'react-native';
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
+// تعريف ألوان الهوية البصرية
+const COLORS = {
+  primary: '#E63946', // الأحمر الملكي
+  secondary: '#1D3557', // الأزرق الداكن
+  inactive: '#A8A8A8', // رمادي للأيقونات غير النشطة
+  background: '#FFFFFF', // أبيض لخلفية التاب بار
+};
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
+        tabBarActiveTintColor: COLORS.primary, // لون الأيقونة النشطة
+        tabBarInactiveTintColor: COLORS.inactive, // لون الأيقونة غير النشطة
+        tabBarShowLabel: true, // إظهار اسم التبويب تحت الأيقونة
+        headerShown: false, // إخفاء الهيدر التلقائي لكل شاشة
+        tabBarStyle: {
+          backgroundColor: COLORS.background,
+          borderTopWidth: 1,
+          borderTopColor: '#E0E0E0',
+          height: Platform.OS === 'ios' ? 90 : 70, // ارتفاع مناسب للتاب بار
+          paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+          paddingTop: 10,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+        },
       }}>
+      {/* التبويب الأول: الشاشة الرئيسية */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
+          title: 'الرئيسية',
+          tabBarIcon: ({ color }) => <FontAwesome name="home" size={26} color={color} />,
         }}
       />
+
+      {/* التبويب الثاني: قائمة الطعام الكاملة */}
       <Tabs.Screen
-        name="two"
+        name="menu"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'القائمة',
+          tabBarIcon: ({ color }) => <FontAwesome name="book" size={24} color={color} />,
+        }}
+      />
+
+      {/* التبويب الثالث: سلة المشتريات */}
+      <Tabs.Screen
+        name="cart"
+        options={{
+          title: 'السلة',
+          tabBarIcon: ({ color }) => <FontAwesome name="shopping-cart" size={24} color={color} />,
+          // يمكنك إضافة عدد المنتجات في السلة هنا لاحقاً
+          // tabBarBadge: 3, 
+        }}
+      />
+
+      {/* التبويب الرابع: الملف الشخصي */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'حسابي',
+          tabBarIcon: ({ color }) => <FontAwesome name="user" size={26} color={color} />,
         }}
       />
     </Tabs>

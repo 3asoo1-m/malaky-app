@@ -1,78 +1,99 @@
-// src/components/MenuItemCard.tsx
+// مسار الملف: components/MenuItemCard.tsx
 
-import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MenuItem } from '../lib/types'; // استيراد النوع من ملف الأنواع
+import {
+  Image,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-// تعريف الخصائص التي سيستقبلها المكون
 interface MenuItemCardProps {
-  item: MenuItem;
-  onPress: () => void; // دالة للضغط على البطاقة نفسها
+  name: string;
+  description: string | null; // <-- سنستخدم الوصف الآن
+  price: number;
+  imageUrl: string | null;
+  onPress: () => void;
 }
 
-const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onPress }) => {
-  // صورة افتراضية في حال عدم وجود صورة للوجبة
-  const imageUrl = item.image_url || 'https://via.placeholder.com/150';
+const MenuItemCard: React.FC<MenuItemCardProps> = ({
+  name,
+  description,
+  price,
+  imageUrl,
+  onPress,
+}) => {
+  const defaultImage = 'https://placehold.co/400x300/E63946/white?text=Malaky';
 
   return (
-    <TouchableOpacity style={styles.cardContainer} onPress={onPress}>
-      {/* حاوية الصورة */}
-      <Image source={{ uri: imageUrl }} style={styles.image} />
-
-      {/* حاوية التفاصيل */}
-      <View style={styles.detailsContainer}>
-        <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
-        <View style={styles.priceContainer}>
-          <Text style={styles.price}>{item.price.toFixed(2 )} شيكل</Text>
-          <TouchableOpacity style={styles.addButton}>
-            <Ionicons name="add" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+      {/* حاوية المعلومات (الآن على اليسار ) */}
+      <View style={styles.infoContainer}>
+        <Text style={styles.name} numberOfLines={1}>{name}</Text>
+        <Text style={styles.description} numberOfLines={2}>
+          {description || 'وجبة لذيذة من الدجاج الملكي بروست'}
+        </Text>
+        <Text style={styles.price}>{price.toFixed(2)} شيكل</Text>
       </View>
+
+      {/* الصورة (الآن على اليمين) */}
+      <Image source={{ uri: imageUrl || defaultImage }} style={styles.image} />
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  cardContainer: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+  card: {
+    flexDirection: 'row', // <-- أهم تغيير: يجعل الصورة على اليمين والمعلومات على اليسار
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginBottom: 20,
     overflow: 'hidden',
-    marginBottom: 15,
-    elevation: 2, // ظل خفيف للأندرويد
-    shadowColor: '#000', // ظل للـ iOS
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    height: 130, // ارتفاع مناسب للبطاقة الأفقية
+    // الظل
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
   image: {
-    width: '100%',
-    height: 120,
+    width: 130, // عرض ثابت للصورة
+    height: '100%', // تأخذ كامل ارتفاع البطاقة
+    backgroundColor: '#f0f0f0',
   },
-  detailsContainer: {
-    padding: 10,
+  infoContainer: {
+    flex: 1, // تأخذ باقي المساحة المتاحة
+    padding: 12,
+    justifyContent: 'space-between', // توزيع العناصر بشكل متساوٍ عمودياً
   },
-  title: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  name: {
+    fontSize: 18,
+    fontFamily: 'Cairo-Bold', // استخدام الخط العريض
+    color: '#1D3557',
     textAlign: 'right',
-    marginBottom: 8,
   },
-  priceContainer: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  description: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular', // استخدام الخط العادي
+    color: '#666',
+    textAlign: 'right',
+    lineHeight: 20,
   },
   price: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FF6347', // لون السعر المميز
-  },
-  addButton: {
-    backgroundColor: '#FF6347',
-    borderRadius: 20,
-    padding: 5,
+    fontSize: 17,
+    fontFamily: 'Cairo-Bold',
+    color: '#E63946',
+    textAlign: 'right',
+    marginTop: 4,
   },
 });
 
