@@ -16,20 +16,9 @@ import { FontAwesome } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '@/lib/supabase';
-import { MenuItem } from '@/lib/types';
+import { MenuItem, OptionGroup } from '@/lib/types'; // ✅ استيراد الأنواع
 
 // تعريف الأنواع للخيارات
-interface OptionValue {
-  value: string;
-  label: string;
-  priceModifier: number;
-}
-interface OptionGroup {
-  id: string;
-  label: string;
-  type: 'single-select' | 'multi-select';
-  values: OptionValue[];
-}
 
 export default function MenuItemDetailsScreen() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
@@ -37,7 +26,7 @@ export default function MenuItemDetailsScreen() {
 
   const [item, setItem] = useState<MenuItem | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   // 1. حالة لتخزين اختيارات المستخدم
   const [selectedOptions, setSelectedOptions] = useState<Record<string, any>>({});
 
@@ -54,7 +43,11 @@ export default function MenuItemDetailsScreen() {
     const fetchItemDetails = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase.from('menu_items').select('*').eq('id', itemId).single();
+        const { data, error } = await supabase
+          .from('menu_items')
+          .select('*')
+          .eq('id', itemId)
+          .single<MenuItem>();
         if (error) {
           router.back();
         } else {
@@ -116,27 +109,27 @@ export default function MenuItemDetailsScreen() {
     return <View style={styles.centered}><Text>لم يتم العثور على هذه الوجبة.</Text></View>;
   }
 
-  const defaultImage = 'https://placehold.co/600x400/E63946/white?text=Malaky';
+  const defaultImage = 'https://scontent.fjrs27-1.fna.fbcdn.net/v/t39.30808-6/347093685_1264545104456247_8195462777365390832_n.jpg?_nc_cat=101&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=Vurk9k7Yeh4Q7kNvwFMaIvw&_nc_oc=AdnLJ7bhQuIug3NeIMvRJKxx1dpZ4xT5SN5KXbUN9MnJP_foN0PuaRhHK5T5h2_mlKE&_nc_zt=23&_nc_ht=scontent.fjrs27-1.fna&_nc_gid=M1fGk0mVLfA72P9gTCQOJg&oh=00_AfY1CYuswm2dIn4EFLv-89zIfO8z1Y9NccbV_9AQZ-NI3A&oe=68DA50FC';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
-      
+
       <Image source={{ uri: item.image_url || defaultImage }} style={styles.backgroundImage} />
-      
-      <TouchableOpacity onPress={( ) => router.back()} style={styles.backButton}>
+
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <FontAwesome name="arrow-right" size={20} color="#1D3557" />
       </TouchableOpacity>
 
       <ScrollView
         style={styles.contentContainer}
         contentContainerStyle={styles.scrollContent}>
-        
+
         <Text style={styles.title}>{item.name}</Text>
-        
+
         {/* --- هذا هو الجزء الذي تم استبداله بالمنطق الديناميكي --- */}
-        {item.options && Array.isArray(item.options) && (item.options as OptionGroup[]).map(group => (
+        {item.options && item.options.map(group => (
           <View key={group.id} style={styles.optionsSection}>
             <Text style={styles.sectionTitle}>{group.label}</Text>
             <View style={styles.optionsContainer}>
@@ -179,8 +172,8 @@ export default function MenuItemDetailsScreen() {
 
 // قمت بدمج التنسيقات من الكودين معاً وإضافة ما يلزم
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
+  container: {
+    flex: 1,
     backgroundColor: '#fff',
   },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -218,20 +211,20 @@ const styles = StyleSheet.create({
   separator: { height: 1, backgroundColor: '#eee', marginVertical: 20 },
   optionsSection: { marginTop: 10 },
   sectionTitle: { fontSize: 18, fontFamily: 'Cairo-Bold', color: '#333', textAlign: 'right', marginBottom: 15 },
-  optionsContainer: { 
-    flexDirection: 'row-reverse', 
+  optionsContainer: {
+    flexDirection: 'row-reverse',
     flexWrap: 'wrap', // <-- مهم للسماح بانتقال الأزرار لسطر جديد
   },
-  optionButton: { 
-    flexDirection: 'row-reverse', 
-    borderWidth: 1.5, 
-    borderColor: '#ddd', 
-    borderRadius: 30, 
-    paddingVertical: 10, 
-    paddingHorizontal: 20, 
+  optionButton: {
+    flexDirection: 'row-reverse',
+    borderWidth: 1.5,
+    borderColor: '#ddd',
+    borderRadius: 30,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     marginEnd: 10, // <-- هام للمسافة بين الأزرار
     marginBottom: 10, // <-- هام للمسافة عند الانتقال لسطر جديد
-    alignItems: 'center' 
+    alignItems: 'center'
   },
   optionSelected: { backgroundColor: '#1D3557', borderColor: '#1D3557' },
   optionText: { fontSize: 16, fontFamily: 'Cairo-Regular', fontWeight: '600', color: '#333' },

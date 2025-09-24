@@ -1,100 +1,64 @@
-// مسار الملف: components/MenuItemCard.tsx
-
+// components/MenuItemCard.tsx
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import {
-  Image,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { GestureResponderEvent, Image, StyleSheet, Text, TouchableOpacity, View, I18nManager } from 'react-native';
+import { MenuItem } from '../lib/types';
 
-interface MenuItemCardProps {
-  name: string;
-  description: string | null; // <-- سنستخدم الوصف الآن
-  price: number;
-  imageUrl: string | null;
-  onPress: () => void;
-}
 
-const MenuItemCard: React.FC<MenuItemCardProps> = ({
-  name,
-  description,
-  price,
-  imageUrl,
-  onPress,
-}) => {
-  const defaultImage = 'https://placehold.co/400x300/E63946/white?text=Malaky';
-
-  return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-      {/* حاوية المعلومات (الآن على اليسار ) */}
-      <View style={styles.infoContainer}>
-        <Text style={styles.name} numberOfLines={1}>{name}</Text>
-        <Text style={styles.description} numberOfLines={2}>
-          {description || 'وجبة لذيذة من الدجاج الملكي بروست'}
-        </Text>
-        <Text style={styles.price}>{price.toFixed(2)} شيكل</Text>
-      </View>
-
-      {/* الصورة (الآن على اليمين) */}
-      <Image source={{ uri: imageUrl || defaultImage }} style={styles.image} />
-    </TouchableOpacity>
-  );
+type MenuItemCardProps = {
+  item: MenuItem;
+  onPress?: (event: GestureResponderEvent) => void;
 };
 
+export default function MenuItemCard({ item, onPress }: MenuItemCardProps) {
+  const defaultImage = 'https://scontent.fjrs27-1.fna.fbcdn.net/v/t39.30808-6/347093685_1264545104456247_8195462777365390832_n.jpg?_nc_cat=101&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=Vurk9k7Yeh4Q7kNvwFMaIvw&_nc_oc=AdnLJ7bhQuIug3NeIMvRJKxx1dpZ4xT5SN5KXbUN9MnJP_foN0PuaRhHK5T5h2_mlKE&_nc_zt=23&_nc_ht=scontent.fjrs27-1.fna&_nc_gid=M1fGk0mVLfA72P9gTCQOJg&oh=00_AfY1CYuswm2dIn4EFLv-89zIfO8z1Y9NccbV_9AQZ-NI3A&oe=68DA50FC';
+
+  return (
+    <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.8}>
+      <View style={[styles.heartIconContainer, { [I18nManager.isRTL ? 'left' : 'right']: 10 }]}>
+        <Ionicons name="heart-outline" size={20} color="#E53935" />
+      </View>
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: item.image_url || defaultImage }} style={styles.cardImage} />
+      </View>
+      <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
+      <Text style={styles.cardSubtitle} numberOfLines={2}>{item.description || ' '}</Text>
+      <Text style={styles.cardPrice}>{item.price.toFixed(1)} ₪</Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row', // <-- أهم تغيير: يجعل الصورة على اليمين والمعلومات على اليسار
+  cardContainer: {
+    width: 160,
     backgroundColor: '#fff',
     borderRadius: 16,
-    marginBottom: 20,
-    overflow: 'hidden',
-    height: 130, // ارتفاع مناسب للبطاقة الأفقية
-    // الظل
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 5,
-      },
-    }),
+    padding: 10,
+    marginHorizontal: 7.5,
+    elevation: 5,
+    alignItems: 'center',
+    position: 'relative',
   },
-  image: {
-    width: 130, // عرض ثابت للصورة
-    height: '100%', // تأخذ كامل ارتفاع البطاقة
-    backgroundColor: '#f0f0f0',
+  heartIconContainer: {
+    position: 'absolute',
+    top: 10,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 15,
+    padding: 4,
   },
-  infoContainer: {
-    flex: 1, // تأخذ باقي المساحة المتاحة
-    padding: 12,
-    justifyContent: 'space-between', // توزيع العناصر بشكل متساوٍ عمودياً
+  cardImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
-  name: {
-    fontSize: 18,
-    fontFamily: 'Cairo-Bold', // استخدام الخط العريض
-    color: '#1D3557',
-    textAlign: 'right',
-  },
-  description: {
-    fontSize: 14,
-    fontFamily: 'Cairo-Regular', // استخدام الخط العادي
-    color: '#666',
-    textAlign: 'right',
-    lineHeight: 20,
-  },
-  price: {
-    fontSize: 17,
-    fontFamily: 'Cairo-Bold',
-    color: '#E63946',
-    textAlign: 'right',
-    marginTop: 4,
-  },
+  imageContainer: {
+  width: '100%',
+  height: 120,          // ارتفاع ثابت للبطاقة
+  borderRadius: 10,
+  overflow: 'hidden',
+  marginBottom: 8,
+},
+  cardTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 10, textAlign: 'center' },
+  cardSubtitle: { fontSize: 12, color: '#888', marginTop: 2, textAlign: 'center' },
+  cardPrice: { fontSize: 16, fontWeight: 'bold', color: '#333', marginTop: 8 },
 });
-
-export default MenuItemCard;
