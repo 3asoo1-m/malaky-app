@@ -7,10 +7,10 @@ import { Category, ActiveCategory } from '@/lib/types';
 type Props = {
   categories: Category[];
   activeCategory: ActiveCategory;
-  setActiveCategory: (id: ActiveCategory) => void;
+  onCategorySelect: (id: ActiveCategory) => void;
 };
 
-export default function CategoryChips({ categories, activeCategory, setActiveCategory }: Props) {
+export default function CategoryChips({ categories, activeCategory, onCategorySelect  }: Props) {
   const allCategories = [{ id: 'all' as const, name: 'الكل' }, ...categories];
 
   return (
@@ -23,7 +23,7 @@ export default function CategoryChips({ categories, activeCategory, setActiveCat
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[styles.chip, activeCategory === item.id && styles.activeChip]}
-            onPress={() => setActiveCategory(item.id)}
+            onPress={() => onCategorySelect(item.id)}
           >
             <Text style={[styles.text, activeCategory === item.id && styles.activeText]}>
               {item.name}
@@ -31,11 +31,11 @@ export default function CategoryChips({ categories, activeCategory, setActiveCat
           </TouchableOpacity>
         )}
         contentContainerStyle={{ paddingHorizontal: 20 }}
-        
+
         // --- ✅ هذا هو السطر الحاسم ---
         // تأكد من وجود هذه الخاصية
         inverted
-        // -----------------------------
+      // -----------------------------
 
       />
     </View>
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 20,
     // ✅ استخدم marginHorizontal ليعمل بشكل صحيح مع inverted
-    marginHorizontal: 5, 
+    marginHorizontal: 5,
     borderWidth: 1,
     borderColor: '#E0E0E0',
     justifyContent: 'center',

@@ -33,7 +33,12 @@ export default function HomeScreen() {
   const [isChipsSticky, setIsChipsSticky] = useState(false);
   const [chipsHeight, setChipsHeight] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-
+  const handleCategorySelect = (categoryId: ActiveCategory) => {
+    // 1. مسح البحث
+    setSearchQuery('');
+    // 2. تحديد الفئة الجديدة
+    setActiveCategory(categoryId);
+  };
 
 
   // 2. ✅ إنشاء مرجع للـ FlatList
@@ -156,8 +161,15 @@ export default function HomeScreen() {
                         onChangeText={setSearchQuery}
                       />
                     </View>
-                    <TouchableOpacity style={styles.searchButton}>
-                      <Feather name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={24} color="#fff" />
+                    <TouchableOpacity
+                      style={styles.searchButton}
+                      onPress={() => setSearchQuery('')} // <-- إضافة دالة المسح
+                    >
+                      {searchQuery.length > 0 ? (
+                        <Ionicons name="close" size={24} color="#fff" /> // أيقونة المسح
+                      ) : (
+                        <Feather name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={24} color="#fff" /> // أيقونة السهم
+                      )}
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -183,7 +195,7 @@ export default function HomeScreen() {
                   <CategoryChips
                     categories={categories}
                     activeCategory={activeCategory}
-                    setActiveCategory={setActiveCategory}
+                    onCategorySelect={handleCategorySelect}
                   />
                 </View>
               );
