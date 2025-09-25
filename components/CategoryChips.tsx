@@ -45,7 +45,7 @@ export default function CategoryChips({ categories, activeCategory, setActiveCat
 // ... (بقية التنسيقات كما هي)
 const styles = StyleSheet.create({
   container: {
-    height: 50,
+    height: 60,
     marginTop: 20,
   },
   chip: {
@@ -59,6 +59,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 10,
   },
   activeChip: {
     backgroundColor: '#D32F2F',
