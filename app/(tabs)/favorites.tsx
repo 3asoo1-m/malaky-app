@@ -1,19 +1,19 @@
-// مسار الملف: app/(tabs)/profile.tsx
+// مسار الملف: app/(tabs)/favorites.tsx
 
 import React from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import CustomBottomNav from '@/components/CustomBottomNav'; // ✅ 1. استيراد المكون
 
-export default function ProfileScreen() {
+
+export default function FavoritesScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.container}>
-        <Text style={styles.title}>الملف الشخصي</Text>
-        <Text style={styles.subtitle}>سيتم عرض معلومات حسابك هنا.</Text>
+        <Text style={styles.title}>المفضلة</Text>
+        <Text style={styles.subtitle}>سيتم عرض قائمة وجباتك المفضلة هنا قريبًا.</Text>
       </View>
       <CustomBottomNav />
     </View>
-
   );
 }
 

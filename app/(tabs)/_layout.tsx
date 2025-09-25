@@ -19,7 +19,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen name="index" />
-      <Tabs.Screen name="menu" />
+      <Tabs.Screen name="favorites" />
       <Tabs.Screen name="cart" />
       <Tabs.Screen name="profile" />
     </Tabs>

@@ -21,6 +21,7 @@ import { useRouter } from 'expo-router';
 // استيراد المكونات والأنواع
 import MenuItemCard from '@/components/MenuItemCard';
 import CategoryChips from '@/components/CategoryChips';
+import CustomBottomNav from '@/components/CustomBottomNav';
 import { Category, CategoryWithItems, ActiveCategory } from '@/lib/types';
 
 export default function HomeScreen() {
@@ -130,6 +131,8 @@ export default function HomeScreen() {
             setIsChipsSticky(scrollY > HEADER_HEIGHT);
           }}
           scrollEventThrottle={16}
+          keyboardDismissMode="on-drag"
+
           renderItem={({ item }) => {
             // ... (بقية renderItem تبقى كما هي تمامًا)
             if (item.type === 'header') {
@@ -237,12 +240,8 @@ export default function HomeScreen() {
         />
       </SafeAreaView>
       {/* شريط التنقل السفلي */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navButton}><Ionicons name="home" size={28} color="#fff" /></TouchableOpacity>
-        <TouchableOpacity style={styles.navButton}><Ionicons name="person-outline" size={28} color="#fff" /></TouchableOpacity>
-        <TouchableOpacity style={styles.navButton}><Ionicons name="location-outline" size={28} color="#fff" /></TouchableOpacity>
-        <TouchableOpacity style={styles.navButton}><Ionicons name="notifications-outline" size={28} color="#fff" /></TouchableOpacity>
-      </View>
+      <CustomBottomNav />
+
     </View>
   );
 }
