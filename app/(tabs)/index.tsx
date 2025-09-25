@@ -32,6 +32,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<ActiveCategory>('all');
   const [isChipsSticky, setIsChipsSticky] = useState(false);
+  const [chipsHeight, setChipsHeight] = useState(0);
+
 
   // 2. ✅ إنشاء مرجع للـ FlatList
   const listRef = useRef<FlatList>(null);
@@ -52,26 +54,25 @@ export default function HomeScreen() {
 
   // 3. ✅ إضافة useEffect لتفعيل التمرير التلقائي
   useEffect(() => {
-    // لا تفعل شيئًا إذا كانت الفئة هي "الكل" أو إذا لم يكن المرجع جاهزًا
     if (activeCategory === 'all' || !listRef.current) {
       return;
     }
 
-    // ابحث عن فهرس القسم المطلوب في مصفوفة `sections`
     const sectionIndex = sections.findIndex(section => section.id === activeCategory);
 
-    // إذا تم العثور على القسم
     if (sectionIndex !== -1) {
-      // الفهرس الفعلي في `listData` = فهرس القسم + 2 (لأن لدينا الهيدر والفئات قبله)
-      const targetIndex = sectionIndex + 1;
+      // المعادلة الصحيحة رياضيًا هي +2
+      // جربها مع viewOffset، قد تعمل بشكل أدق الآن
+      const targetIndex = sectionIndex + 2;
 
       listRef.current.scrollToIndex({
         animated: true,
         index: targetIndex,
-        viewPosition: 0, // 0 = اجعل بداية القسم في أعلى منطقة العرض المتاحة
+        // 2. ✅ استخدام viewOffset لضمان توقف التمرير تحت الشريط المثبت
+        viewOffset: chipsHeight,
       });
     }
-  }, [activeCategory]); // يعتمد فقط على `activeCategory`
+  }, [activeCategory, chipsHeight]); // يعتمد فقط على `activeCategory`
 
   // --- إنشاء قائمة بيانات مدمجة ---
   const listData = useMemo(() => {
@@ -97,7 +98,7 @@ export default function HomeScreen() {
           stickyHeaderIndices={[1]}
           onScroll={(event) => {
             const scrollY = event.nativeEvent.contentOffset.y;
-            const HEADER_HEIGHT = 280; 
+            const HEADER_HEIGHT = 280;
             setIsChipsSticky(scrollY > HEADER_HEIGHT);
           }}
           scrollEventThrottle={16}
@@ -135,10 +136,20 @@ export default function HomeScreen() {
 
             if (item.type === 'categories') {
               return (
-                <View style={[
-                  styles.categoryChipsContainer,
-                  isChipsSticky && styles.stickyCategoryChipsContainer
-                ]}>
+                <View
+                  // 4. ✅ استخدام onLayout لقياس الارتفاع
+                  onLayout={(event) => {
+                    const { height } = event.nativeEvent.layout;
+                    // نخزن الارتفاع فقط إذا لم يتم تخزينه من قبل
+                    if (height > 0 && chipsHeight === 0) {
+                      setChipsHeight(height);
+                    }
+                  }}
+                  style={[
+                    styles.categoryChipsContainer,
+                    isChipsSticky && styles.stickyCategoryChipsContainer
+                  ]}
+                >
                   <CategoryChips
                     categories={categories}
                     activeCategory={activeCategory}
@@ -178,10 +189,10 @@ export default function HomeScreen() {
       </SafeAreaView>
       {/* شريط التنقل السفلي */}
       <View style={styles.bottomNav}>
-         <TouchableOpacity style={styles.navButton}><Ionicons name="home" size={28} color="#fff" /></TouchableOpacity>
-         <TouchableOpacity style={styles.navButton}><Ionicons name="person-outline" size={28} color="#fff" /></TouchableOpacity>
-         <TouchableOpacity style={styles.navButton}><Ionicons name="location-outline" size={28} color="#fff" /></TouchableOpacity>
-         <TouchableOpacity style={styles.navButton}><Ionicons name="notifications-outline" size={28} color="#fff" /></TouchableOpacity>
+        <TouchableOpacity style={styles.navButton}><Ionicons name="home" size={28} color="#fff" /></TouchableOpacity>
+        <TouchableOpacity style={styles.navButton}><Ionicons name="person-outline" size={28} color="#fff" /></TouchableOpacity>
+        <TouchableOpacity style={styles.navButton}><Ionicons name="location-outline" size={28} color="#fff" /></TouchableOpacity>
+        <TouchableOpacity style={styles.navButton}><Ionicons name="notifications-outline" size={28} color="#fff" /></TouchableOpacity>
       </View>
     </View>
   );
