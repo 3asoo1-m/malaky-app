@@ -1,6 +1,5 @@
 // مسار الملف: app/(tabs)/index.tsx
 
-// 1. ✅ استيراد useRef
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   StyleSheet,
@@ -33,6 +32,8 @@ export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState<ActiveCategory>('all');
   const [isChipsSticky, setIsChipsSticky] = useState(false);
   const [chipsHeight, setChipsHeight] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+
 
 
   // 2. ✅ إنشاء مرجع للـ FlatList
@@ -72,16 +73,38 @@ export default function HomeScreen() {
         viewOffset: chipsHeight,
       });
     }
-  }, [activeCategory, chipsHeight]); // يعتمد فقط على `activeCategory`
+  }, [activeCategory, chipsHeight, sections]); // يعتمد فقط على `activeCategory`
+
+  // 2. ✅ دمج منطق الفلترة والبحث في useMemo واحد
+  const filteredSections = useMemo(() => {
+    // إذا لم يكن هناك بحث، أعد جميع الأقسام
+    if (searchQuery.trim() === '') {
+      return sections;
+    }
+
+    // إذا كان هناك بحث، قم بالفلترة
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return sections
+      .map(section => {
+        if (!section.menu_items) return section;
+        const filteredItems = section.menu_items.filter(item =>
+          item.name.toLowerCase().includes(lowercasedQuery)
+        );
+        return { ...section, menu_items: filteredItems };
+      })
+      .filter(section => section.menu_items && section.menu_items.length > 0);
+  }, [sections, searchQuery]);
+
 
   // --- إنشاء قائمة بيانات مدمجة ---
   const listData = useMemo(() => {
     return [
       { type: 'header' as const, id: 'main-header' },
       { type: 'categories' as const, id: 'cat-chips' },
-      ...sections,
+      ...filteredSections, // 3. ✅ استخدام الأقسام المفلترة
     ];
-  }, [sections]);
+  }, [filteredSections]);
+
 
   if (loading) {
     return <View style={styles.loader}><ActivityIndicator size="large" color="#D32F2F" /></View>;
@@ -124,7 +147,14 @@ export default function HomeScreen() {
                   <View style={styles.searchSection}>
                     <View style={styles.searchBar}>
                       <Feather name="search" size={22} color="#888" />
-                      <TextInput placeholder="ابحث..." style={styles.searchInput} placeholderTextColor="#888" />
+                      {/* 4. ✅ ربط TextInput بالحالة */}
+                      <TextInput
+                        placeholder="ابحث..."
+                        style={styles.searchInput}
+                        placeholderTextColor="#888"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                      />
                     </View>
                     <TouchableOpacity style={styles.searchButton}>
                       <Feather name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={24} color="#fff" />
@@ -184,6 +214,13 @@ export default function HomeScreen() {
               </View>
             );
           }}
+          ListEmptyComponent={
+            // هذا المكون يظهر فقط إذا كانت `listData` فارغة تمامًا بعد الفلترة
+            // (باستثناء الهيدر والفئات)
+            <View style={styles.centered}>
+              <Text>لا توجد نتائج تطابق بحثك.</Text>
+            </View>
+          }
           ListFooterComponent={<View style={{ height: 100 }} />}
         />
       </SafeAreaView>
@@ -229,5 +266,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
+  },
+  centered: {
+    padding: 20,
+    alignItems: 'center',
+    marginTop: 50,
   },
 });
