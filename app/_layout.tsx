@@ -1,61 +1,52 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+// مسار الملف: app/_layout.tsx
 
-import { useColorScheme } from '@/components/useColorScheme';
+import React, { useEffect } from 'react';
+import { Slot, useRouter, useSegments } from 'expo-router';
+import { AuthProvider, useAuth } from '@/lib/useAuth';
+import { ActivityIndicator, View } from 'react-native';
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
-
-export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    'Cairo-Regular': require('../assets/fonts/Cairo-Regular.ttf'),
-    'Cairo-Bold': require('../assets/fonts/Cairo-Bold.ttf'),
-    ...FontAwesome.font,
-  });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+// ✅ 1. إنشاء "الحارس"
+const AuthGuard = () => {
+  const { user, initialLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    // لا تفعل شيئًا أثناء التحميل الأولي
+    if (initialLoading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    // إذا لم يكن المستخدم مسجلاً للدخول وليس في مجموعة المصادقة
+    if (!user && !inAuthGroup) {
+      // إعادة توجيه إلى شاشة تسجيل الدخول
+      router.replace('/login');
+    } 
+    // إذا كان المستخدم مسجلاً للدخول وهو في مجموعة المصادقة
+    else if (user && inAuthGroup) {
+      // إعادة توجيه إلى الشاشة الرئيسية
+      router.replace('/');
     }
-  }, [loaded]);
+  }, [user, initialLoading, segments, router]);
 
-  if (!loaded) {
-    return null;
+  // ✅ 2. عرض شاشة تحميل أثناء التحقق الأولي
+  if (initialLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
   }
 
-  return <RootLayoutNav />;
-}
+  // ✅ 3. عرض المحتوى الفعلي (الشاشة الحالية) بعد التحقق
+  return <Slot />;
+};
 
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
+// ✅ 4. إنشاء التخطيط الجذري
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <AuthProvider>
+      <AuthGuard />
+    </AuthProvider>
   );
 }
