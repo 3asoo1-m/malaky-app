@@ -1,8 +1,7 @@
-// مسار الملف: app/addresses.tsx
+// مسار الملف: app/(stack)/addresses.tsx
 
-// ✅ 1. استيراد useFocusEffect
-import { Stack, useRouter, useFocusEffect } from 'expo-router'; 
-import React, { useCallback, useState } from 'react'; // ✅ استيراد useCallback
+import { useRouter, useFocusEffect } from 'expo-router'; 
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -11,13 +10,14 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  SafeAreaView,
+  Pressable,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// ... (interface Address يبقى كما هو)
+// ... (واجهة Address تبقى كما هي)
 interface Address {
   id: number;
   address_line1: string;
@@ -26,21 +26,19 @@ interface Address {
   notes: string | null;
 }
 
+
 export default function AddressesScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ 2. استبدال useEffect بـ useFocusEffect
+  // ... (useFocusEffect و handleDelete يبقيان كما هما)
   useFocusEffect(
-    // useCallback ضروري لمنع إعادة إنشاء الدالة في كل مرة يتم فيها إعادة العرض
     useCallback(() => {
       const fetchAddresses = async () => {
-        if (!user) {
-          setLoading(false);
-          return;
-        }
+        if (!user) { setLoading(false); return; }
         setLoading(true);
         const { data, error } = await supabase
           .from('user_addresses')
@@ -48,177 +46,207 @@ export default function AddressesScreen() {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
-        if (error) {
-          Alert.alert('خطأ', 'لم نتمكن من جلب العناوين.');
-        } else {
-          setAddresses(data);
-        }
+        if (error) Alert.alert('خطأ', 'لم نتمكن من جلب العناوين.');
+        else setAddresses(data);
         setLoading(false);
       };
-
       fetchAddresses();
-    }, [user]) // يعتمد على user فقط
+    }, [user]) 
   );
 
-  // ... (بقية الدوال renderAddress, handleDelete تبقى كما هي)
   const handleDelete = (addressId: number) => {
-    Alert.alert(
-      'تأكيد الحذف',
-      'هل أنت متأكد أنك تريد حذف هذا العنوان؟',
-      [
-        { text: 'إلغاء', style: 'cancel' },
-        {
-          text: 'حذف',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase.from('user_addresses').delete().eq('id', addressId);
-            if (error) Alert.alert('خطأ', 'لم نتمكن من حذف العنوان.');
-            else setAddresses(prev => prev.filter(addr => addr.id !== addressId));
-          },
+    Alert.alert('تأكيد الحذف', 'هل أنت متأكد أنك تريد حذف هذا العنوان؟', [
+      { text: 'إلغاء', style: 'cancel' },
+      {
+        text: 'حذف', style: 'destructive',
+        onPress: async () => {
+          const { error } = await supabase.from('user_addresses').delete().eq('id', addressId);
+          if (error) Alert.alert('خطأ', 'لم نتمكن من حذف العنوان.');
+          else setAddresses(prev => prev.filter(addr => addr.id !== addressId));
         },
-      ]
-    );
+      },
+    ]);
   };
 
+
   const renderAddress = ({ item }: { item: Address }) => (
-    <View style={styles.addressCard}>
-      <View style={styles.addressIcon}>
-        <FontAwesome5 name="map-marker-alt" size={24} color="#C62828" />
+    <Pressable
+      style={({ pressed }) => [styles.addressCard, pressed && styles.cardPressed]}
+      onPress={() => router.push({
+        pathname: '/(modal)/address-form',
+        params: { address: JSON.stringify(item) }
+      })}
+    >
+      <View style={styles.cardIcon}>
+        <FontAwesome5 name="map-marker-alt" size={22} color="#C62828" />
       </View>
-      <View style={styles.addressDetails}>
-        <Text style={styles.addressLine1}>{item.address_line1}</Text>
-        <Text style={styles.addressCity}>{item.city}</Text>
-        {item.address_line2 && <Text style={styles.addressSub}>{item.address_line2}</Text>}
+      <View style={styles.cardDetails}>
+        <Text style={styles.cardTitle} numberOfLines={1}>{item.address_line1}</Text>
+        <Text style={styles.cardSubtitle}>{item.city}{item.address_line2 ? `, ${item.address_line2}` : ''}</Text>
       </View>
-      <View style={styles.addressActions}>
-        <TouchableOpacity onPress={() => handleDelete(item.id)}>
-          <Ionicons name="trash-outline" size={22} color="#E53935" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={{ marginLeft: 15 }}
-          onPress={() => router.push({
-            pathname: '/(modal)/address-form',
-            params: { address: JSON.stringify(item) }
-          })}
-        >
-          <Ionicons name="pencil-outline" size={22} color="#333" />
-        </TouchableOpacity>
-      </View>
-    </View>
+      <TouchableOpacity 
+        onPress={() => handleDelete(item.id)} 
+        style={styles.deleteButton}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Ionicons name="trash-outline" size={22} color="#E53935" />
+      </TouchableOpacity>
+    </Pressable>
   );
   
-  // ... (بقية واجهة المستخدم تبقى كما هي)
   return (
-    <SafeAreaView style={styles.container}>
+    // ✅ 1. الحاوية الرئيسية تأخذ الحواف الآمنة
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       
-      {loading && addresses.length === 0 ? ( // ✅ تحسين شرط التحميل
+      {loading && addresses.length === 0 ? (
         <View style={styles.centeredContainer}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color="#C62828" />
         </View>
       ) : (
+        // ✅ 2. FlatList أصبحت هي العنصر الرئيسي الذي يملأ الشاشة
         <FlatList
           data={addresses}
           renderItem={renderAddress}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
+          // ✅ 3. إضافة مساحة علوية كافية للهيدر العائم
+          contentContainerStyle={{ paddingTop: 80, paddingHorizontal: 16, paddingBottom: 100 }}
           ListEmptyComponent={
             <View style={styles.centeredContainer}>
-              <FontAwesome5 name="map-marked-alt" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>لا توجد عناوين محفوظة بعد</Text>
-              <Text style={styles.emptySubText}>أضف عنوانك الأول لتبدأ</Text>
+              <FontAwesome5 name="map-marked-alt" size={60} color="#ddd" />
+              <Text style={styles.emptyText}>لا توجد عناوين محفوظة</Text>
+              <Text style={styles.emptySubText}>أضف عنوانك الأول لتسهيل عملية الطلب</Text>
             </View>
-          }
-          ListFooterComponent={
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => router.push('/(modal)/address-form')}
-            >
-              <Ionicons name="add" size={24} color="#fff" />
-              <Text style={styles.addButtonText}>إضافة عنوان جديد</Text>
-            </TouchableOpacity>
           }
         />
       )}
-    </SafeAreaView>
+
+      {/* ✅ 4. الهيدر الآن عائم فوق القائمة */}
+      <View style={[styles.header, { top: insets.top }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>عناويني</Text>
+        <View style={{ width: 40 }} /> 
+      </View>
+
+      <TouchableOpacity
+        style={[styles.fab, { bottom: insets.bottom + 20 }]}
+        onPress={() => router.push('/(modal)/address-form')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="add" size={32} color="#fff" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
-// ... (التنسيقات تبقى كما هي)
+// ✅ 5. تحديث التنسيقات
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F9F9F9',
   },
+  header: {
+    // --- التغييرات الرئيسية هنا ---
+    position: 'absolute',
+    top: 0, // سيتم تحديثه ديناميكيًا بـ insets.top
+    left: 0,
+    right: 0,
+    zIndex: 10, // لضمان أنه فوق كل شيء
+    // ---
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop:12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F9F9F9', // خلفية شفافة
+  },
+  headerTitle: {
+    fontSize: 22, // تكبير الخط قليلاً
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  backButton: {
+    padding: 4,
+  },
+  // ... (بقية التنسيقات تبقى كما هي تقريبًا)
   listContainer: {
-    padding: 20,
+    padding: 16,
+    paddingBottom: 100,
     flexGrow: 1,
   },
   addressCard: {
     backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 15,
+    borderRadius: 12,
+    padding: 16,
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    marginBottom: 15,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#eee',
   },
-  addressIcon: {
-    marginRight: 15,
+  cardPressed: {
+    transform: [{ scale: 0.98 }],
+    backgroundColor: '#F5F5F5',
   },
-  addressDetails: {
+  cardIcon: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#FEECEB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  cardDetails: {
     flex: 1,
     alignItems: 'flex-end',
   },
-  addressLine1: {
+  cardTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: '#333',
   },
-  addressCity: {
+  cardSubtitle: {
     fontSize: 14,
-    color: '#555',
-  },
-  addressSub: {
-    fontSize: 13,
-    color: '#888',
+    color: '#777',
     marginTop: 4,
   },
-  addressActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  deleteButton: {
+    padding: 8,
   },
-  addButton: {
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#C62828',
-    borderRadius: 15,
-    padding: 15,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 4 },
   },
   centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 50,
+    padding: 20,
   },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
     color: '#555',
-    marginTop: 16,
+    marginTop: 20,
   },
   emptySubText: {
     fontSize: 14,
-    color: '#888',
+    color: '#999',
     marginTop: 8,
+    textAlign: 'center',
   },
 });

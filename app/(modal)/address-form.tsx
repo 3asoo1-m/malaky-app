@@ -61,12 +61,19 @@ export default function AddressFormScreen() {
   const onSubmit = async () => {
     if (!validate() || !user) return;
     setLoading(true);
-    const addressData = { user_id: user.id, addressLine1, addressLine2, city, notes };
+    const addressData = {
+      user_id: user.id,
+      address_line1: addressLine1, // كان addressLine1
+      address_line2: addressLine2, // كان addressLine2
+      city: city,
+      notes: notes,
+    };
     const { error } = isEditing
       ? await supabase.from('user_addresses').update(addressData).eq('id', existingAddress.id)
       : await supabase.from('user_addresses').insert(addressData);
-    if (error) alert(error.message);
-    else router.back();
+    if (error) {
+      alert(`حدث خطأ: ${error.message}`);
+    } else router.back();
     setLoading(false);
   };
 
@@ -84,7 +91,7 @@ export default function AddressFormScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
-      >      
+      >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* ... (مكونات FormInput تبقى كما هي) */}
           <FormInput icon="map-outline" label="الشارع / المنطقة" value={addressLine1} onChangeText={setAddressLine1} placeholder="مثال: شارع القدس" error={errors.addressLine1} />
