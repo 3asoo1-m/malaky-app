@@ -64,10 +64,6 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         {/* --- معلومات المستخدم --- */}
         <View style={styles.profileHeader}>
-          <Image
-            source={{ uri: `https://i.pravatar.cc/150?u=${user.email}` }}
-            style={styles.avatar}
-          />
           <Text style={styles.userName}>{firstName} {lastName}</Text>
           <Text style={styles.userEmail}>{user.email}</Text>
         </View>
@@ -137,6 +133,7 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
   },
   userName: {
+    marginTop: 50,
     fontSize: 22,
     fontWeight: 'bold',
     color: '#333',

@@ -2,6 +2,8 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { I18nManager } from 'react-native';
+import { FavoritesProvider } from '@/lib/useFavorites'; // ✅ 1. استيراد
+
 
 // ضبط RTL فقط عند التشغيل لأول مرة
 if (!I18nManager.isRTL) {
@@ -12,16 +14,18 @@ if (!I18nManager.isRTL) {
 
 export default function TabLayout() {
   return (
-    <Tabs
-      tabBar={() => null} // لإخفاء شريط التبويبات الافتراضي
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="favorites" />
-      <Tabs.Screen name="cart" />
-      <Tabs.Screen name="profile" />
-    </Tabs>
+    <FavoritesProvider>
+      <Tabs
+        tabBar={() => null} // لإخفاء شريط التبويبات الافتراضي
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="favorites" />
+        <Tabs.Screen name="cart" />
+        <Tabs.Screen name="profile" />
+      </Tabs>
+    </FavoritesProvider>
   );
 }

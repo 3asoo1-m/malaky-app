@@ -62,8 +62,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   activeChip: {
-    backgroundColor: '#D32F2F',
-    borderColor: '#D32F2F',
+    backgroundColor: '#D32128',
+    borderColor: '#D32128',
   },
   text: {
     fontSize: 14,
