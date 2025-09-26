@@ -84,13 +84,12 @@ export default function ProfileScreen() {
           <ProfileListItem
             icon={<Ionicons name="person-outline" size={22} color="#555" />}
             text="تعديل الملف الشخصي"
-            onPress={( ) => { /* لاحقًا: سننشئ شاشة تعديل الملف الشخصي */ }}
+            onPress={() => { /* لاحقًا: سننشئ شاشة تعديل الملف الشخصي */ }}
           />
           <ProfileListItem
             icon={<Ionicons name="location-outline" size={22} color="#555" />}
             text="عناويني"
-            onPress={() => { /* لاحقًا: سننشئ شاشة العناوين */ }}
-          />
+            onPress={() => router.push('/addresses')} />
           <ProfileListItem
             icon={<Ionicons name="heart-outline" size={22} color="#555" />}
             text="المفضلة"

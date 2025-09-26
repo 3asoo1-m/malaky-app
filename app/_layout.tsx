@@ -4,6 +4,8 @@ import React, { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '@/lib/useAuth';
 import { ActivityIndicator, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context'; // ✅ 1. استيراد المزود
+import { FavoritesProvider } from '@/lib/useFavorites';
 
 // ✅ 1. إنشاء "الحارس"
 const AuthGuard = () => {
@@ -21,7 +23,7 @@ const AuthGuard = () => {
     if (!user && !inAuthGroup) {
       // إعادة توجيه إلى شاشة تسجيل الدخول
       router.replace('/login');
-    } 
+    }
     // إذا كان المستخدم مسجلاً للدخول وهو في مجموعة المصادقة
     else if (user && inAuthGroup) {
       // إعادة توجيه إلى الشاشة الرئيسية
@@ -45,8 +47,13 @@ const AuthGuard = () => {
 // ✅ 4. إنشاء التخطيط الجذري
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <AuthGuard />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <FavoritesProvider>
+          <AuthGuard />
+        </FavoritesProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
+
   );
 }
