@@ -1,6 +1,6 @@
 // مسار الملف: app/(modal)/address-form.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,49 +11,100 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import { Ionicons } from '@expo/vector-icons';
-// ✅ 1. استيراد الهوك
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import RNPickerSelect from 'react-native-picker-select'; // ✅ 1. استيراد المكتبة
 
-// ... (مكون FormInput يبقى كما هو)
-const FormInput = ({ icon, label, value, onChangeText, placeholder, error, multiline = false }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: string; onChangeText: (text: string) => void; placeholder: string; error?: string; multiline?: boolean; }) => (
-  <View style={styles.inputContainer}>
-    <Text style={styles.label}>{label}</Text>
-    <View style={[styles.inputWrapper, error ? styles.inputWrapperError : null]}>
-      <Ionicons name={icon} size={22} color={error ? '#E53935' : '#888'} style={styles.inputIcon} />
-      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#aaa" style={[styles.input, multiline && styles.multilineInput]} multiline={multiline} />
-    </View>
-    {error && <Text style={styles.errorText}>{error}</Text>}
-  </View>
-);
-
+// ✅ 2. تعريف أنواع البيانات التي سنجلبها
+interface Zone {
+  id: number;
+  city: string;
+  area_name: string;
+}
 
 export default function AddressFormScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  // ✅ 2. استدعاء الهوك للحصول على قيم الحواف
   const insets = useSafeAreaInsets();
 
   const { address: addressString } = useLocalSearchParams<{ address?: string }>();
   const existingAddress = addressString ? JSON.parse(addressString) : null;
   const isEditing = !!existingAddress;
 
-  // ... (بقية الحالات والدوال تبقى كما هي)
-  const [addressLine1, setAddressLine1] = useState(existingAddress?.address_line1 || '');
-  const [addressLine2, setAddressLine2] = useState(existingAddress?.address_line2 || '');
-  const [city, setCity] = useState(existingAddress?.city || '');
+  // --- حالات النموذج ---
+  const [streetAddress, setStreetAddress] = useState(existingAddress?.street_address || '');
   const [notes, setNotes] = useState(existingAddress?.notes || '');
-  const [loading, setLoading] = useState(false);
+  
+  // ✅ 3. حالات جديدة للقوائم المنسدلة
+  const [allZones, setAllZones] = useState<Zone[]>([]);
+  const [cities, setCities] = useState<{ label: string; value: string }[]>([]);
+  const [areas, setAreas] = useState<{ label: string; value: number }[]>([]);
+  
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(existingAddress?.delivery_zone_id || null);
+
+  const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ✅ 4. جلب جميع المناطق عند تحميل الشاشة
+  useEffect(() => {
+    const fetchZones = async () => {
+      const { data, error } = await supabase
+        .from('delivery_zones')
+        .select('id, city, area_name')
+        .eq('is_active', true);
+
+      if (data) {
+        setAllZones(data);
+        // استخراج المدن الفريدة
+        const uniqueCities = [...new Set(data.map(zone => zone.city))];
+        setCities(uniqueCities.map(city => ({ label: city, value: city })));
+        
+        // إذا كنا نعدل عنوانًا، قم بتعيين المدينة والمناطق
+        if (isEditing && existingAddress) {
+          const zone = data.find(z => z.id === existingAddress.delivery_zone_id);
+          if (zone) {
+            setSelectedCity(zone.city);
+            // تحديث قائمة المناطق بناءً على المدينة المحددة
+            const filteredAreas = data
+              .filter(z => z.city === zone.city)
+              .map(z => ({ label: z.area_name, value: z.id }));
+            setAreas(filteredAreas);
+          }
+        }
+      }
+      setLoading(false);
+    };
+    fetchZones();
+  }, []);
+
+  // ✅ 5. تحديث قائمة المناطق عند تغيير المدينة
+  useEffect(() => {
+    if (selectedCity) {
+      const filteredAreas = allZones
+        .filter(zone => zone.city === selectedCity)
+        .map(zone => ({ label: zone.area_name, value: zone.id }));
+      setAreas(filteredAreas);
+      // إعادة تعيين المنطقة المختارة عند تغيير المدينة (إلا إذا كنا في وضع التعديل لأول مرة)
+      if (!isEditing || selectedCity !== allZones.find(z => z.id === selectedZoneId)?.city) {
+        setSelectedZoneId(null);
+      }
+    } else {
+      setAreas([]);
+    }
+  }, [selectedCity, allZones]);
+
+  // --- دوال التحقق والحفظ ---
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!addressLine1) newErrors.addressLine1 = 'اسم الشارع مطلوب';
-    if (!city) newErrors.city = 'المدينة مطلوبة';
+    if (!selectedCity) newErrors.city = 'الرجاء اختيار المدينة';
+    if (!selectedZoneId) newErrors.area = 'الرجاء اختيار المنطقة';
+    if (!streetAddress) newErrors.street = 'الرجاء إدخال اسم الشارع';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -63,23 +114,24 @@ export default function AddressFormScreen() {
     setLoading(true);
     const addressData = {
       user_id: user.id,
-      address_line1: addressLine1, // كان addressLine1
-      address_line2: addressLine2, // كان addressLine2
-      city: city,
+      delivery_zone_id: selectedZoneId,
+      street_address: streetAddress,
       notes: notes,
     };
+
     const { error } = isEditing
       ? await supabase.from('user_addresses').update(addressData).eq('id', existingAddress.id)
       : await supabase.from('user_addresses').insert(addressData);
+
     if (error) {
-      alert(`حدث خطأ: ${error.message}`);
-    } else router.back();
+      Alert.alert('خطأ', error.message);
+    } else {
+      router.back();
+    }
     setLoading(false);
   };
 
-
   return (
-    // ✅ 3. تطبيق الحواف الآمنة كـ padding على الحاوية الرئيسية
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{isEditing ? 'تعديل العنوان' : 'إضافة عنوان جديد'}</Text>
@@ -88,121 +140,116 @@ export default function AddressFormScreen() {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* ... (مكونات FormInput تبقى كما هي) */}
-          <FormInput icon="map-outline" label="الشارع / المنطقة" value={addressLine1} onChangeText={setAddressLine1} placeholder="مثال: شارع القدس" error={errors.addressLine1} />
-          <FormInput icon="business-outline" label="رقم المبنى / الشقة (اختياري)" value={addressLine2} onChangeText={setAddressLine2} placeholder="مثال: بناية الزهراء، شقة 5" />
-          <FormInput icon="location-outline" label="المدينة" value={city} onChangeText={setCity} placeholder="مثال: رام الله" error={errors.city} />
-          <FormInput icon="chatbubble-ellipses-outline" label="ملاحظات للسائق (اختياري)" value={notes} onChangeText={setNotes} placeholder="مثال: المدخل بجانب السوبر ماركت" multiline />
+          {loading ? (
+            <ActivityIndicator size="large" />
+          ) : (
+            <>
+              {/* ✅ 6. استخدام RNPickerSelect للمدينة */}
+              <Text style={styles.label}>المدينة</Text>
+              <RNPickerSelect
+                onValueChange={(value) => setSelectedCity(value)}
+                items={cities}
+                value={selectedCity}
+                placeholder={{ label: 'اختر مدينتك...', value: null }}
+                style={pickerSelectStyles}
+                useNativeAndroidPickerStyle={false}
+                Icon={() => <Ionicons name="chevron-down" size={20} color="#888" />}
+              />
+              {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
 
-          <TouchableOpacity style={styles.button} onPress={onSubmit} disabled={loading} activeOpacity={0.8}>
-            {loading ? <ActivityIndicator color="#fff" /> : (
-              <>
-                <Ionicons name="save-outline" size={22} color="#fff" />
-                <Text style={styles.buttonText}>{isEditing ? 'حفظ التعديلات' : 'إضافة العنوان'}</Text>
-              </>
-            )}
-          </TouchableOpacity>
+              {/* ✅ 7. استخدام RNPickerSelect للمنطقة */}
+              <Text style={styles.label}>المنطقة</Text>
+              <RNPickerSelect
+                onValueChange={(value) => setSelectedZoneId(value)}
+                items={areas}
+                value={selectedZoneId}
+                placeholder={{ label: 'اختر منطقتك...', value: null }}
+                style={pickerSelectStyles}
+                disabled={!selectedCity} // تعطيل حتى يتم اختيار مدينة
+                useNativeAndroidPickerStyle={false}
+                Icon={() => <Ionicons name="chevron-down" size={20} color="#888" />}
+              />
+              {errors.area && <Text style={styles.errorText}>{errors.area}</Text>}
+
+              <Text style={styles.label}>اسم الشارع ورقم المبنى</Text>
+              <TextInput
+                value={streetAddress}
+                onChangeText={setStreetAddress}
+                placeholder="مثال: شارع الإرسال، عمارة النجمة"
+                style={styles.input}
+              />
+              {errors.street && <Text style={styles.errorText}>{errors.street}</Text>}
+
+              <Text style={styles.label}>ملاحظات للسائق (اختياري)</Text>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="مثال: المدخل خلفي، الطابق الثالث"
+                style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+                multiline
+              />
+
+              <TouchableOpacity style={styles.button} onPress={onSubmit} disabled={loading}>
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isEditing ? 'حفظ التعديلات' : 'إضافة العنوان'}</Text>}
+              </TouchableOpacity>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-// ✅ 4. تعديل التنسيقات
+// --- التنسيقات ---
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    position: 'relative',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  closeButton: {
-    position: 'absolute',
-    left: 16,
-  },
-  scrollContainer: {
-    padding: 24,
-    paddingBottom: 50,
-  },
-  // ... (بقية التنسيقات تبقى كما هي)
-  inputContainer: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#666',
-    marginBottom: 8,
-    textAlign: 'right',
-  },
-  inputWrapper: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    paddingHorizontal: 12,
-  },
-  inputWrapperError: {
-    borderColor: '#E53935',
-  },
-  inputIcon: {
-    marginLeft: 8,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 14,
+  container: { flex: 1, backgroundColor: '#F9F9F9' },
+  header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', backgroundColor: '#fff' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  closeButton: { position: 'absolute', left: 16 },
+  scrollContainer: { padding: 24, paddingBottom: 50 },
+  label: { fontSize: 15, fontWeight: '600', color: '#555', marginBottom: 8, textAlign: 'right' },
+  input: { backgroundColor: '#fff', padding: 15, borderRadius: 10, fontSize: 16, textAlign: 'right', borderWidth: 1, borderColor: '#ddd', marginBottom: 20 },
+  button: { backgroundColor: '#C62828', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 16 },
+  buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  errorText: { color: '#E53935', marginTop: -10, marginBottom: 10, textAlign: 'right', fontSize: 13 },
+});
+
+// ✅ 8. تنسيقات خاصة بمكتبة RNPickerSelect
+const pickerSelectStyles = StyleSheet.create({
+  inputIOS: {
     fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    color: 'black',
+    paddingRight: 30, // to ensure the text is never behind the icon
+    backgroundColor: '#fff',
+    marginBottom: 20,
     textAlign: 'right',
-    color: '#333',
   },
-  multilineInput: {
-    minHeight: 120,
-    textAlignVertical: 'top',
-    paddingTop: 14,
-  },
-  button: {
-    backgroundColor: '#C62828',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row-reverse',
-    marginTop: 16,
-    elevation: 3,
-    shadowColor: '#C62828',
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  errorText: {
-    color: '#E53935',
-    marginTop: 6,
+  inputAndroid: {
+    fontSize: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    color: 'black',
+    paddingRight: 30, // to ensure the text is never behind the icon
+    backgroundColor: '#fff',
+    marginBottom: 20,
     textAlign: 'right',
-    fontSize: 13,
+  },
+  iconContainer: {
+    top: 15,
+    left: 15,
+  },
+  placeholder: {
+    color: '#9EA0A4',
+    textAlign: 'right',
   },
 });
