@@ -69,7 +69,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* --- بطاقة طلباتي الأخيرة --- */}
-        <TouchableOpacity style={styles.mainCard}>
+        <TouchableOpacity style={styles.mainCard} onPress={() => router.push('/(tabs)/orders')}>
           <View style={styles.mainCardIconContainer}>
             <MaterialCommunityIcons name="receipt-text-clock-outline" size={32} color="#C62828" />
           </View>

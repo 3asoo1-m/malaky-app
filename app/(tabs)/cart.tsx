@@ -29,7 +29,7 @@ export default function CartScreen() {
   const {
     items, updateQuantity, removeFromCart, subtotal, totalPrice, deliveryPrice,
     orderType, setOrderType, setDeliveryPrice, selectedAddress, setSelectedAddress,
-    selectedBranch, setSelectedBranch,
+    selectedBranch, setSelectedBranch,clearCart,
   } = useCart();
 
   const [availableAddresses, setAvailableAddresses] = useState<Address[]>([]);
@@ -39,6 +39,7 @@ export default function CartScreen() {
 
   // 2. إضافة حالة للتحكم في ظهور المودال
   const [isBranchPickerVisible, setBranchPickerVisible] = useState(false);
+  const [isPlacingOrder, setPlacingOrder] = useState(false); // <-- الإضافة الجديدة
 
   // ... (كل دوال جلب البيانات و useEffect تبقى كما هي تمامًا)
   const fetchAddresses = useCallback(async () => {
@@ -151,6 +152,76 @@ export default function CartScreen() {
     setSelectedBranch(branch);
     setBranchPickerVisible(false);
   };
+  const handleCheckout = async () => {
+    // 1. التحقق من الشروط الأساسية
+    if (!user) {
+      Alert.alert('خطأ', 'يجب عليك تسجيل الدخول أولاً لإتمام الطلب.');
+      return;
+    }
+    if (items.length === 0) {
+      Alert.alert('خطأ', 'سلتك فارغة!');
+      return;
+    }
+
+    setPlacingOrder(true); // 2. بدء التحميل
+
+    try {
+      // 3. إدراج الطلب الرئيسي في جدول 'orders'
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          total_price: totalPrice,
+          subtotal: subtotal,
+          delivery_price: deliveryPrice,
+          order_type: orderType,
+          // إذا كان توصيل، أرسل id العنوان، وإلا أرسل null
+          user_address_id: orderType === 'delivery' ? selectedAddress?.id : null,
+          // إذا كان استلام، أرسل id الفرع، وإلا أرسل null
+          branch_id: orderType === 'pickup' ? selectedBranch?.id : null,
+          // status له قيمة افتراضية 'new' في قاعدة البيانات
+        })
+        .select('id') // <-- مهم جدًا: اطلب من Supabase إعادة id الطلب الجديد
+        .single(); // لأننا نتوقع نتيجة واحدة فقط
+
+      if (orderError) {
+        throw orderError; // إذا حدث خطأ، انتقل إلى catch
+      }
+
+      const orderId = orderData.id;
+
+      // 4. تحضير بيانات 'order_items'
+      const orderItems = items.map(cartItem => ({
+        order_id: orderId,
+        menu_item_id: cartItem.product.id,
+        quantity: cartItem.quantity,
+        // ملاحظة: يجب أن يكون لديك حقل 'price' في جدول menu_items
+        unit_price: cartItem.product.price,
+        options: cartItem.options,
+        notes: cartItem.notes,
+      }));
+
+      // 5. إدراج كل منتجات الطلب في جدول 'order_items'
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+
+      if (itemsError) {
+        throw itemsError; // إذا حدث خطأ، انتقل إلى catch
+      }
+
+      // 6. كل شيء تم بنجاح!
+      Alert.alert('نجاح!', 'تم استلام طلبك بنجاح.');
+      clearCart();
+      // TODO: تفريغ السلة وتوجيه المستخدم
+      // clearCart(); // ستحتاج إلى إضافة هذه الدالة في useCart
+      router.push('/'); // توجيه مؤقت إلى الرئيسية
+
+    } catch (error: any) {
+      console.error('Error placing order:', error);
+      Alert.alert('خطأ فادح', 'حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setPlacingOrder(false); // 7. إيقاف التحميل في كل الحالات
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -204,10 +275,18 @@ export default function CartScreen() {
             <View style={[styles.priceRow, styles.totalRow]}><Text style={styles.totalLabel}>المجموع الكلي</Text><Text style={styles.totalPrice}>{totalPrice.toFixed(2)} ₪</Text></View>
           </View>
           <TouchableOpacity
-            style={[styles.checkoutButton, (orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch) && styles.disabledButton]}
-            disabled={orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch}
+            style={[
+              styles.checkoutButton,
+              (orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch || isPlacingOrder) && styles.disabledButton
+            ]}
+            disabled={orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch || isPlacingOrder}
+            onPress={handleCheckout} // <-- الربط هنا
           >
-            <Text style={styles.checkoutButtonText}>إتمام الطلب</Text>
+            {isPlacingOrder ? (
+              <ActivityIndicator color="#fff" /> // <-- إظهار مؤشر التحميل
+            ) : (
+              <Text style={styles.checkoutButtonText}>إتمام الطلب</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -220,7 +299,7 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
   // ... (كل التنسيقات الأخرى تبقى كما هي)
   disabledButton: { backgroundColor: '#BDBDBD' },
-  
+
   // --- تنسيقات المودال ---
   modalBackdrop: {
     flex: 1,

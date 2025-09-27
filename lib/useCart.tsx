@@ -52,6 +52,8 @@ interface CartContextType {
   setSelectedAddress: (address: Address | null) => void;
   selectedBranch: Branch | null; // <-- جديد
   setSelectedBranch: (branch: Branch | null) => void; // <-- جديد
+  clearCart: () => void; // <-- الإضافة الجديدة هنا
+
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -113,12 +115,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setSelectedAddressState(address);
   };
 
-  // 4. إضافة دالة تحديث الفرع
   const setSelectedBranch = (branch: Branch | null) => {
     setSelectedBranchState(branch);
   };
 
-  // 5. دالة ذكية لتغيير نوع الطلب
   const setOrderType = (type: OrderType) => {
     if (type === 'delivery') {
       setSelectedBranchState(null); // إذا اختار توصيل، ألغِ اختيار الفرع
@@ -128,6 +128,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setDeliveryPriceState(0); // سعر التوصيل صفر دائمًا في حالة الاستلام
     }
     setOrderTypeState(type);
+  };
+
+  const clearCart = () => {
+    setItems([]); // ببساطة، قم بتفريغ مصفوفة المنتجات
+    setSelectedAddressState(null);
+    setSelectedBranchState(null);
+    setOrderTypeState('pickup');
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -149,6 +156,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setSelectedAddress,
     selectedBranch, // <-- تمرير حالة الفرع
     setSelectedBranch, // <-- تمرير دالة تحديث الفرع
+    clearCart,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
