@@ -4,7 +4,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 import { MenuItem } from './types';
 import { randomUUID } from 'expo-crypto';
 
-// ✅ 1. تعريف أنواع جديدة
+// 1. تعريف الأنواع (تبقى كما هي)
 export type OrderType = 'delivery' | 'pickup';
 
 export interface CartItem {
@@ -16,6 +16,19 @@ export interface CartItem {
   totalPrice: number;
 }
 
+export interface Address {
+  id: number;
+  street_address: string;
+  notes: string | null;
+  created_at: string;
+  delivery_zones: {
+    city: string;
+    area_name: string;
+    delivery_price: number;
+  } | null;
+}
+
+// 2. تحديث واجهة السياق لإضافة دالة الحذف
 interface CartContextType {
   items: CartItem[];
   addToCart: (
@@ -25,25 +38,25 @@ interface CartContextType {
     notes?: string
   ) => void;
   updateQuantity: (cartItemId: string, amount: -1 | 1) => void;
-  
-  // ✅ 2. إضافة حالات ودوال جديدة
+  removeFromCart: (cartItemId: string) => void; // <-- الإضافة الجديدة هنا
   orderType: OrderType;
   setOrderType: (type: OrderType) => void;
   deliveryPrice: number;
-  subtotal: number; // السعر قبل التوصيل
-  totalPrice: number; // السعر الإجمالي
+  setDeliveryPrice: (price: number) => void;
+  subtotal: number;
+  totalPrice: number;
+  selectedAddress: Address | null;
+  setSelectedAddress: (address: Address | null) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// ✅ 3. سعر توصيل ثابت (يمكنك جلبه من قاعدة البيانات لاحقًا)
-const DELIVERY_PRICE = 10.0;
-
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [orderType, setOrderType] = useState<OrderType>('pickup'); // ✅ القيمة الافتراضية هي استلام
+  const [orderType, setOrderType] = useState<OrderType>('pickup');
+  const [deliveryPrice, setDeliveryPriceState] = useState(0);
+  const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null);
 
-  // ... (دوال addToCart و updateQuantity تبقى كما هي)
   const addToCart = (
     product: MenuItem,
     quantity: number,
@@ -71,36 +84,54 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems(currentItems => [...currentItems, newCartItem]);
   };
 
+  // 3. تعديل دالة updateQuantity لمنع الحذف
   const updateQuantity = (cartItemId: string, amount: -1 | 1) => {
     setItems(currentItems =>
-      currentItems
-        .map(item => {
-          if (item.id === cartItemId) {
-            const newQuantity = item.quantity + amount;
-            const singleItemPrice = item.totalPrice / item.quantity;
-            return { ...item, quantity: newQuantity, totalPrice: singleItemPrice * newQuantity };
+      currentItems.map(item => {
+        if (item.id === cartItemId) {
+          // إذا كانت الكمية 1 والمستخدم يحاول الإنقاص، لا تفعل شيئًا
+          if (item.quantity === 1 && amount === -1) {
+            return item;
           }
-          return item;
-        })
-        .filter(item => item.quantity > 0)
+          const newQuantity = item.quantity + amount;
+          const singleItemPrice = item.totalPrice / item.quantity;
+          return { ...item, quantity: newQuantity, totalPrice: singleItemPrice * newQuantity };
+        }
+        return item;
+      })
     );
   };
 
+  // 4. إضافة دالة الحذف الصريحة
+  const removeFromCart = (cartItemId: string) => {
+    setItems(currentItems => currentItems.filter(item => item.id !== cartItemId));
+  };
 
-  // ✅ 4. تحديث حسابات الأسعار
+  const setDeliveryPrice = (price: number) => {
+    setDeliveryPriceState(price >= 0 ? price : 0);
+  };
+
+  const setSelectedAddress = (address: Address | null) => {
+    setSelectedAddressState(address);
+  };
+
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-  const deliveryPrice = orderType === 'delivery' ? DELIVERY_PRICE : 0;
   const totalPrice = subtotal + deliveryPrice;
 
+  // 5. تجميع كل القيم في كائن واحد
   const value = {
     items,
     addToCart,
     updateQuantity,
+    removeFromCart, // <-- تمرير الدالة الجديدة
     orderType,
     setOrderType,
     deliveryPrice,
+    setDeliveryPrice,
     subtotal,
     totalPrice,
+    selectedAddress,
+    setSelectedAddress,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
