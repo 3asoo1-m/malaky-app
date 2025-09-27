@@ -63,25 +63,52 @@ export function CartProvider({ children }: { children: ReactNode }) {
     options: Record<string, any>,
     notes?: string
   ) => {
-    let itemPrice = product.price;
-    if (product.options) {
-      Object.keys(options).forEach(optionId => {
-        const group = product.options?.find(g => g.id === optionId);
-        const value = group?.values.find(v => v.value === options[optionId]);
-        if (value) {
-          itemPrice += value.priceModifier;
+    setItems(currentItems => {
+      // 1. ابحث عن منتج مطابق (نفس ID ونفس الخيارات)
+      const existingItem = currentItems.find(
+        item =>
+          item.product.id === product.id &&
+          JSON.stringify(item.options) === JSON.stringify(options)
+      );
+
+      // 2. إذا تم العثور على منتج مطابق
+      if (existingItem) {
+        // قم بتحديث كمية المنتج الموجود
+        return currentItems.map(item =>
+          item.id === existingItem.id
+            ? {
+              ...item,
+              quantity: item.quantity + quantity, // زد الكمية
+              totalPrice: (item.totalPrice / item.quantity) * (item.quantity + quantity), // أعد حساب السعر الإجمالي
+            }
+            : item
+        );
+      }
+      // 3. إذا لم يتم العثور على منتج، أضف منتجًا جديدًا (السلوك القديم)
+      else {
+        // حساب سعر المنتج مع الخيارات
+        let itemPrice = product.price;
+        if (product.options) {
+          Object.keys(options).forEach(optionId => {
+            const group = product.options?.find(g => g.id === optionId);
+            const value = group?.values.find(v => v.value === options[optionId]);
+            if (value) {
+              itemPrice += value.priceModifier;
+            }
+          });
         }
-      });
-    }
-    const newCartItem: CartItem = {
-      id: randomUUID(),
-      product,
-      quantity,
-      options,
-      notes,
-      totalPrice: itemPrice * quantity,
-    };
-    setItems(currentItems => [...currentItems, newCartItem]);
+
+        const newCartItem: CartItem = {
+          id: randomUUID(),
+          product,
+          quantity,
+          options,
+          notes,
+          totalPrice: itemPrice * quantity,
+        };
+        return [...currentItems, newCartItem];
+      }
+    });
   };
 
   // 3. تعديل دالة updateQuantity لمنع الحذف
