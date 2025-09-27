@@ -55,7 +55,10 @@ export default function OrdersScreen() {
         <TouchableOpacity
             style={styles.orderCard}
             // --- التعديل هنا ---
-            onPress={() => router.push(`/order/${item.id}`)}
+            onPress={() => router.push({
+                pathname: '/order/[orderId]', // <-- استخدم اسم الملف الفعلي كقالب
+                params: { orderId: item.id }, // <-- مرر المعلمات هنا
+            })}
         >
             <View style={styles.cardHeader}>
                 <Text style={styles.orderId}>طلب #{item.id}</Text>

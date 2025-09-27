@@ -30,10 +30,11 @@ interface OrderDetails {
     order_items: {
         quantity: number;
         notes: string | null;
-        options: any;
+        options: any; // الخيارات المحددة من قبل المستخدم
         menu_items: {
             name: string;
             image_url: string;
+            options: any; // <-- الإضافة هنا: خيارات المنتج الأصلية من القائمة
         } | null;
     }[];
 }
@@ -56,7 +57,7 @@ export default function OrderDetailsScreen() {
         id, created_at, total_price, subtotal, delivery_price, status, order_type,
         user_addresses ( street_address, delivery_zones ( city, area_name ) ),
         branches ( name, address ),
-        order_items ( quantity, notes, options, menu_items ( name, image_url ) )
+        order_items ( quantity, notes, options, menu_items ( name, image_url, options ) )
       `)
                 .eq('id', orderId)
                 .single();
@@ -140,15 +141,37 @@ export default function OrderDetailsScreen() {
     const renderItems = () => (
         <View style={styles.infoSection}>
             <Text style={styles.sectionTitle}>المنتجات</Text>
-            {order.order_items.map((item, index) => (
-                <View key={index} style={styles.itemBox}>
-                    <Text style={styles.itemQuantity}>{item.quantity}x</Text>
-                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <Text style={styles.infoTextBold}>{item.menu_items?.name}</Text>
-                        {/* يمكنك إضافة منطق لعرض الخيارات هنا بنفس طريقة السلة */}
+            {order.order_items.map((item, index) => {
+                // --- المنطق الجديد هنا ---
+                const optionLabels = item.options ? Object.entries(item.options).map(([groupId, value]) => {
+                    // ابحث عن مجموعة الخيارات الأصلية في المنتج
+                    const group = item.menu_items?.options?.find((g: any) => g.id === groupId);
+                    // ابحث عن القيمة المحددة داخل المجموعة
+                    const optionValue = group?.values.find((v: any) => v.value === value);
+                    // أرجع الـ label إذا وجد
+                    return optionValue ? optionValue.label : null;
+                }).filter(Boolean).join('، ') : '';
+                // --- نهاية المنطق الجديد ---
+
+                return (
+                    <View key={index} style={styles.itemBox}>
+                        <Text style={styles.itemQuantity}>{item.quantity}x</Text>
+                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                            <Text style={styles.infoTextBold}>{item.menu_items?.name}</Text>
+
+                            {/* --- عرض الخيارات والملاحظات --- */}
+                            {optionLabels.length > 0 && (
+                                <Text style={styles.optionsText}>{optionLabels}</Text>
+                            )}
+                            {item.notes && (
+                                <Text style={styles.notesText}>ملاحظات: {item.notes}</Text>
+                            )}
+                            {/* --- نهاية العرض --- */}
+
+                        </View>
                     </View>
-                </View>
-            ))}
+                );
+            })}
         </View>
     );
 
@@ -208,4 +231,17 @@ const styles = StyleSheet.create({
     totalRow: { borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 10, marginTop: 6 },
     totalLabel: { fontSize: 18, fontWeight: 'bold', color: '#1A1A1A' },
     totalPrice: { fontSize: 20, fontWeight: 'bold', color: '#C62828' },
+    optionsText: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'right',
+        marginTop: 4,
+    },
+    notesText: {
+        fontSize: 14,
+        color: '#888',
+        fontStyle: 'italic',
+        textAlign: 'right',
+        marginTop: 4,
+    },
 });

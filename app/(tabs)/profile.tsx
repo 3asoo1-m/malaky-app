@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '@/lib/useAuth'; // ✅ المصدر الوحيد للبيانات
