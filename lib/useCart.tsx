@@ -4,7 +4,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 import { MenuItem } from './types';
 import { randomUUID } from 'expo-crypto';
 
-// 1. تعريف الأنواع (تبقى كما هي)
+// 1. تعريف الأنواع الأساسية
 export type OrderType = 'delivery' | 'pickup';
 
 export interface CartItem {
@@ -28,17 +28,20 @@ export interface Address {
   } | null;
 }
 
-// 2. تحديث واجهة السياق لإضافة دالة الحذف
+// 2. إضافة واجهة Branch
+export interface Branch {
+  id: number;
+  name: string;
+  address: string;
+  // يمكنك إضافة حقول أخرى هنا في المستقبل
+}
+
+// 3. تحديث واجهة السياق لتشمل الفرع
 interface CartContextType {
   items: CartItem[];
-  addToCart: (
-    product: MenuItem,
-    quantity: number,
-    options: Record<string, any>,
-    notes?: string
-  ) => void;
+  addToCart: (product: MenuItem, quantity: number, options: Record<string, any>, notes?: string) => void;
   updateQuantity: (cartItemId: string, amount: -1 | 1) => void;
-  removeFromCart: (cartItemId: string) => void; // <-- الإضافة الجديدة هنا
+  removeFromCart: (cartItemId: string) => void;
   orderType: OrderType;
   setOrderType: (type: OrderType) => void;
   deliveryPrice: number;
@@ -47,79 +50,48 @@ interface CartContextType {
   totalPrice: number;
   selectedAddress: Address | null;
   setSelectedAddress: (address: Address | null) => void;
+  selectedBranch: Branch | null; // <-- جديد
+  setSelectedBranch: (branch: Branch | null) => void; // <-- جديد
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [orderType, setOrderType] = useState<OrderType>('pickup');
+  const [orderType, setOrderTypeState] = useState<OrderType>('pickup'); // <-- تم تغيير الاسم
   const [deliveryPrice, setDeliveryPriceState] = useState(0);
   const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null);
+  const [selectedBranch, setSelectedBranchState] = useState<Branch | null>(null); // <-- حالة جديدة
 
-  const addToCart = (
-    product: MenuItem,
-    quantity: number,
-    options: Record<string, any>,
-    notes?: string
-  ) => {
+  const addToCart = (product: MenuItem, quantity: number, options: Record<string, any>, notes?: string) => {
     setItems(currentItems => {
-      // 1. ابحث عن منتج مطابق (نفس ID ونفس الخيارات)
-      const existingItem = currentItems.find(
-        item =>
-          item.product.id === product.id &&
-          JSON.stringify(item.options) === JSON.stringify(options)
-      );
-
-      // 2. إذا تم العثور على منتج مطابق
+      const existingItem = currentItems.find(item => item.product.id === product.id && JSON.stringify(item.options) === JSON.stringify(options));
       if (existingItem) {
-        // قم بتحديث كمية المنتج الموجود
         return currentItems.map(item =>
           item.id === existingItem.id
-            ? {
-              ...item,
-              quantity: item.quantity + quantity, // زد الكمية
-              totalPrice: (item.totalPrice / item.quantity) * (item.quantity + quantity), // أعد حساب السعر الإجمالي
-            }
+            ? { ...item, quantity: item.quantity + quantity, totalPrice: (item.totalPrice / item.quantity) * (item.quantity + quantity) }
             : item
         );
-      }
-      // 3. إذا لم يتم العثور على منتج، أضف منتجًا جديدًا (السلوك القديم)
-      else {
-        // حساب سعر المنتج مع الخيارات
+      } else {
         let itemPrice = product.price;
         if (product.options) {
           Object.keys(options).forEach(optionId => {
             const group = product.options?.find(g => g.id === optionId);
             const value = group?.values.find(v => v.value === options[optionId]);
-            if (value) {
-              itemPrice += value.priceModifier;
-            }
+            if (value) { itemPrice += value.priceModifier; }
           });
         }
-
-        const newCartItem: CartItem = {
-          id: randomUUID(),
-          product,
-          quantity,
-          options,
-          notes,
-          totalPrice: itemPrice * quantity,
-        };
+        const newCartItem: CartItem = { id: randomUUID(), product, quantity, options, notes, totalPrice: itemPrice * quantity };
         return [...currentItems, newCartItem];
       }
     });
   };
 
-  // 3. تعديل دالة updateQuantity لمنع الحذف
   const updateQuantity = (cartItemId: string, amount: -1 | 1) => {
     setItems(currentItems =>
       currentItems.map(item => {
         if (item.id === cartItemId) {
-          // إذا كانت الكمية 1 والمستخدم يحاول الإنقاص، لا تفعل شيئًا
-          if (item.quantity === 1 && amount === -1) {
-            return item;
-          }
+          if (item.quantity === 1 && amount === -1) { return item; }
           const newQuantity = item.quantity + amount;
           const singleItemPrice = item.totalPrice / item.quantity;
           return { ...item, quantity: newQuantity, totalPrice: singleItemPrice * newQuantity };
@@ -129,7 +101,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  // 4. إضافة دالة الحذف الصريحة
   const removeFromCart = (cartItemId: string) => {
     setItems(currentItems => currentItems.filter(item => item.id !== cartItemId));
   };
@@ -142,23 +113,42 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setSelectedAddressState(address);
   };
 
+  // 4. إضافة دالة تحديث الفرع
+  const setSelectedBranch = (branch: Branch | null) => {
+    setSelectedBranchState(branch);
+  };
+
+  // 5. دالة ذكية لتغيير نوع الطلب
+  const setOrderType = (type: OrderType) => {
+    if (type === 'delivery') {
+      setSelectedBranchState(null); // إذا اختار توصيل، ألغِ اختيار الفرع
+    }
+    if (type === 'pickup') {
+      setSelectedAddressState(null); // إذا اختار استلام، ألغِ اختيار العنوان
+      setDeliveryPriceState(0); // سعر التوصيل صفر دائمًا في حالة الاستلام
+    }
+    setOrderTypeState(type);
+  };
+
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const totalPrice = subtotal + deliveryPrice;
 
-  // 5. تجميع كل القيم في كائن واحد
+  // 6. تجميع كل القيم في كائن واحد، بما في ذلك الفرع
   const value = {
     items,
     addToCart,
     updateQuantity,
-    removeFromCart, // <-- تمرير الدالة الجديدة
+    removeFromCart,
     orderType,
-    setOrderType,
+    setOrderType, // <-- تمرير الدالة الذكية الجديدة
     deliveryPrice,
     setDeliveryPrice,
     subtotal,
     totalPrice,
     selectedAddress,
     setSelectedAddress,
+    selectedBranch, // <-- تمرير حالة الفرع
+    setSelectedBranch, // <-- تمرير دالة تحديث الفرع
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
