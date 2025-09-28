@@ -9,11 +9,14 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useAuth } from '@/lib/useAuth'; // ✅ المصدر الوحيد للبيانات
+import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
 import CustomBottomNav from '@/components/CustomBottomNav';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+
+// 1. استيراد دوال التصميم المتجاوب
+import { scale, fontScale } from '@/lib/responsive';
 
 // مكون مساعد لإنشاء أزرار القائمة
 const ProfileListItem = ({ icon, text, onPress, color = '#333' }: { icon: React.ReactNode; text: string; onPress: () => void; color?: string }) => (
@@ -22,19 +25,18 @@ const ProfileListItem = ({ icon, text, onPress, color = '#333' }: { icon: React.
       {icon}
       <Text style={[styles.listItemText, { color }]}>{text}</Text>
     </View>
-    <Ionicons name="chevron-back-outline" size={20} color="#A0A0A0" />
+    {/* 2. جعل حجم أيقونة السهم متجاوبًا */}
+    <Ionicons name="chevron-back-outline" size={scale(20)} color="#A0A0A0" />
   </TouchableOpacity>
 );
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, initialLoading } = useAuth(); // ✅ نستخدم loading من useAuth مباشرة
+  const { user, initialLoading } = useAuth();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
-
-  // ✅ لا حاجة لـ useEffect لجلب البيانات، كل شيء موجود في 'user'
 
   if (initialLoading) {
     return (
@@ -45,8 +47,6 @@ export default function ProfileScreen() {
   }
 
   if (!user) {
-    // يجب ألا يصل المستخدم إلى هنا إذا كان AuthProvider يعمل بشكل صحيح،
-    // ولكنها حماية إضافية.
     return (
       <View style={styles.centered}>
         <Text>الرجاء تسجيل الدخول لعرض ملفك الشخصي.</Text>
@@ -54,7 +54,6 @@ export default function ProfileScreen() {
     );
   }
 
-  // ✅ قراءة البيانات مباشرة من user_metadata
   const firstName = user.user_metadata?.first_name || '';
   const lastName = user.user_metadata?.last_name || '';
 
@@ -70,7 +69,8 @@ export default function ProfileScreen() {
         {/* --- بطاقة طلباتي الأخيرة --- */}
         <TouchableOpacity style={styles.mainCard} onPress={() => router.push('/(tabs)/orders')}>
           <View style={styles.mainCardIconContainer}>
-            <MaterialCommunityIcons name="receipt-text-clock-outline" size={32} color="#C62828" />
+            {/* 3. جعل حجم أيقونة البطاقة متجاوبًا */}
+            <MaterialCommunityIcons name="receipt-text-clock-outline" size={scale(32)} color="#C62828" />
           </View>
           <View>
             <Text style={styles.mainCardTitle}>طلباتي الأخيرة</Text>
@@ -81,16 +81,16 @@ export default function ProfileScreen() {
         {/* --- قائمة الخيارات --- */}
         <View style={styles.menuSection}>
           <ProfileListItem
-            icon={<Ionicons name="person-outline" size={22} color="#555" />}
+            icon={<Ionicons name="person-outline" size={scale(22)} color="#555" />}
             text="تعديل الملف الشخصي"
-            onPress={() => { /* لاحقًا: سننشئ شاشة تعديل الملف الشخصي */ }}
+            onPress={() => { /* لاحقًا */ }}
           />
           <ProfileListItem
-            icon={<Ionicons name="location-outline" size={22} color="#555" />}
+            icon={<Ionicons name="location-outline" size={scale(22)} color="#555" />}
             text="عناويني"
             onPress={() => router.push('/addresses')} />
           <ProfileListItem
-            icon={<Ionicons name="heart-outline" size={22} color="#555" />}
+            icon={<Ionicons name="heart-outline" size={scale(22)} color="#555" />}
             text="المفضلة"
             onPress={() => router.push('/(tabs)/favorites')}
           />
@@ -99,7 +99,7 @@ export default function ProfileScreen() {
         {/* --- تسجيل الخروج --- */}
         <View style={styles.logoutSection}>
           <ProfileListItem
-            icon={<Ionicons name="log-out-outline" size={22} color="#C62828" />}
+            icon={<Ionicons name="log-out-outline" size={scale(22)} color="#C62828" />}
             text="تسجيل الخروج"
             onPress={handleLogout}
             color="#C62828"
@@ -111,89 +111,89 @@ export default function ProfileScreen() {
   );
 }
 
-// التنسيقات تبقى كما هي من المرة السابقة
+// 4. تحديث كل التنسيقات لتكون متجاوبة
 const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: {
-    padding: 20,
-    paddingBottom: 120,
+    padding: scale(20),
+    paddingBottom: scale(120),
   },
   profileHeader: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: scale(30),
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 15,
-    borderWidth: 3,
+  avatar: { // هذا التنسيق لم يكن مستخدمًا في الكود الأصلي، لكن سأجعله متجاوبًا للاحتياط
+    width: scale(100),
+    height: scale(100),
+    borderRadius: scale(50),
+    marginBottom: scale(15),
+    borderWidth: scale(3),
     borderColor: '#fff',
   },
   userName: {
-    marginTop: 50,
-    fontSize: 22,
+    marginTop: scale(50),
+    fontSize: fontScale(22),
     fontWeight: 'bold',
     color: '#333',
   },
   userEmail: {
-    fontSize: 16,
+    fontSize: fontScale(16),
     color: '#888',
   },
   mainCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: scale(16),
+    padding: scale(20),
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: scale(30),
     elevation: 3,
     shadowColor: '#000',
     shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowRadius: scale(10),
   },
   mainCardIconContainer: {
     backgroundColor: '#FEE2E2',
-    borderRadius: 12,
-    padding: 12,
-    marginLeft: 15,
+    borderRadius: scale(12),
+    padding: scale(12),
+    marginLeft: scale(15),
   },
   mainCardTitle: {
-    fontSize: 18,
+    fontSize: fontScale(18),
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'right',
   },
   mainCardSubtitle: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     color: '#888',
     textAlign: 'right',
   },
   menuSection: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingVertical: 10,
-    marginBottom: 30,
+    borderRadius: scale(16),
+    paddingVertical: scale(10),
+    marginBottom: scale(30),
   },
   logoutSection: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingVertical: 10,
+    borderRadius: scale(16),
+    paddingVertical: scale(10),
   },
   listItem: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    paddingVertical: scale(15),
+    paddingHorizontal: scale(20),
   },
   listItemContent: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
   },
   listItemText: {
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontWeight: '500',
-    marginRight: 15,
+    marginRight: scale(15),
   },
 });
