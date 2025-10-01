@@ -5,18 +5,17 @@ import {
   StyleSheet,
   Text,
   View,
-  SafeAreaView,
   TouchableOpacity,
   FlatList,
   TextInput,
   ActivityIndicator,
-  I18nManager, // I18nManager لا يزال مفيداً للتحقق من بعض الحالات
   Image,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // استيراد المكونات والأنواع
 import MenuItemCard from '@/components/MenuItemCard';
@@ -122,7 +121,7 @@ export default function HomeScreen() {
                   </View>
                   <View style={styles.header}>
                     <Text style={styles.headerText}>اختر</Text>
-                    <Text style={styles.headerText}>طعامك <Text style={{ color: '#D32F2F' }}>المفضل</Text></Text>
+                    <Text style={styles.headerText}>طعامك <Text style={{ color: '#c02626ff' }}>المفضل</Text></Text>
                   </View>
                   <View style={styles.searchSection}>
                     <View style={styles.searchBar}>
@@ -188,7 +187,7 @@ export default function HomeScreen() {
                         onPress={() => router.push(`/item/${menuItem.id}`)}
                       />
                     )}
-                    contentContainerStyle={{ paddingHorizontal: 12.5 }}
+                    contentContainerStyle={{ paddingHorizontal: 20 }}
                     
                   />
                 ) : (
@@ -249,13 +248,12 @@ const styles = StyleSheet.create({
   header: { 
     paddingHorizontal: 20, 
     marginTop: 20, 
-    alignItems: 'flex-end' 
   },
   // ✅ تم التعديل: أزلنا textAlign، سيعتمد على اتجاه اللغة
   headerText: { 
     fontSize: 28, 
     fontWeight: 'bold', 
-    color: '#333' 
+    color: '#333', 
   },
   
   // ✅ تم التعديل: flexDirection: 'row'
