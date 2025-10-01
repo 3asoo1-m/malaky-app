@@ -1,0 +1,26 @@
+[33ma178fff[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m APK Build done successfully localy on kali, add .gitignore and project files
+[33m7066201[m APK BUILD DONE SUCCESSFULLY
+[33m2daae2f[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m starting local build on linux
+[33m174e8b1[m fixing rtl and build a apk
+[33m40d2e51[m backup just in case
+[33m8cc4bfb[m App 90%
+[33m4cd0f63[m Ordering is done successfully and connect to supabase
+[33ma3c1662[m Cart is ready, Start working on odering
+[33m44a0462[m cart is now done (delivey) one
+[33ma9064fa[m everything almost good rn, trying to improve adding items to cart
+[33m400e224[m Fixing address choosing in cart
+[33mc25abff[m Working on Cart and ordering, address screen problem
+[33m51aa439[m Improving addresses screens
+[33m0694bf5[m Working on addresses
+[33mff61912[m Activating favorites feature
+[33mfb75415[m Add Auth for users to signup/signin, and uses thier data in profile screen
+[33mfabe726[m Make BottomNavBar an independent component, adding screens( profile, favorites, and cart
+[33md569a5a[m Fixing scrollToIndex out of range bug
+[33m66203ae[m Search Bar enabled
+[33m21e3ca9[m V2 of CategoreyChipset
+[33m1986a5a[m Improving CategoreyChips and activat it
+[33m2b0bdad[m Improving Type safty and Restoring meals details screen
+[33m2a0f4be[m Change the UI in home screen
+[33mefd174c[m Improving meals deatils screen
+[33m455d1a1[m Inital commit
+[33m2cd60c4[m Created a new Expo app

@@ -1,13 +1,13 @@
 {
   "cli": {
-    "version": ">= 7.6.0", 
+    "version": ">= 7.6.0",
     "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development" 
+      "channel": "development"
     },
     "development-simulator": {
       "developmentClient": true,
@@ -15,15 +15,21 @@
       "ios": {
         "simulator": true
       },
-      "channel": "development" 
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "android": {
+        "gradleCommand": ":app:assembleRelease --no-daemon --rerun-tasks"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production" 
+      "channel": "production",
+      "android": {
+        "gradleCommand": ":app:bundleRelease --no-daemon --rerun-tasks"
+      }
     }
   },
   "submit": {

@@ -6,23 +6,21 @@
     "orientation": "portrait",
     "scheme": "malakyapp",
     "userInterfaceStyle": "light",
-    "icon": "./assets/images/icon.jpg",
+    "icon": "./assets/images/icon.png",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.jpg",
+      "image": "./assets/images/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#D32F2F"
     },
     "ios": {
       "supportsTablet": true,
-      "supportsRTL": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.jpg",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#D32F2F"
       },
-      "supportsRtl": true,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.x3asoo1.malakyapp"
@@ -34,7 +32,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-localization"
+      "expo-localization",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

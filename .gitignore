@@ -3,6 +3,18 @@
 # dependencies
 node_modules/
 
+
+#Builds
+/build-*
+*.apk
+*.aab
+
+#Temporary files
+/android
+/ios
+*.jks
+*.keystore
+
 # Expo
 .expo/
 dist/
