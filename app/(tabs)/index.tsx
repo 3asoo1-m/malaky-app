@@ -10,7 +10,7 @@ import {
   FlatList,
   TextInput,
   ActivityIndicator,
-  I18nManager,
+  I18nManager, // I18nManager لا يزال مفيداً للتحقق من بعض الحالات
   Image,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -34,18 +34,13 @@ export default function HomeScreen() {
   const [isChipsSticky, setIsChipsSticky] = useState(false);
   const [chipsHeight, setChipsHeight] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const listRef = useRef<FlatList>(null);
+
   const handleCategorySelect = (categoryId: ActiveCategory) => {
-    // 1. مسح البحث
     setSearchQuery('');
-    // 2. تحديد الفئة الجديدة
     setActiveCategory(categoryId);
   };
 
-
-  // 2. ✅ إنشاء مرجع للـ FlatList
-  const listRef = useRef<FlatList>(null);
-
-  // --- جلب البيانات ---
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -59,36 +54,21 @@ export default function HomeScreen() {
     loadData();
   }, [user]);
 
-  // 3. ✅ إضافة useEffect لتفعيل التمرير التلقائي
   useEffect(() => {
-    if (activeCategory === 'all' || !listRef.current) {
-      return;
-    }
-
+    if (activeCategory === 'all' || !listRef.current) return;
     const sectionIndex = sections.findIndex(section => section.id === activeCategory);
-
     if (sectionIndex !== -1) {
-      // المعادلة الصحيحة رياضيًا هي +2
-      // جربها مع viewOffset، قد تعمل بشكل أدق الآن
       const targetIndex = sectionIndex + 2;
-
       listRef.current.scrollToIndex({
         animated: true,
         index: targetIndex,
-        // 2. ✅ استخدام viewOffset لضمان توقف التمرير تحت الشريط المثبت
         viewOffset: chipsHeight,
       });
     }
-  }, [activeCategory, chipsHeight, sections]); // يعتمد فقط على `activeCategory`
+  }, [activeCategory, chipsHeight, sections]);
 
-  // 2. ✅ دمج منطق الفلترة والبحث في useMemo واحد
   const filteredSections = useMemo(() => {
-    // إذا لم يكن هناك بحث، أعد جميع الأقسام
-    if (searchQuery.trim() === '') {
-      return sections;
-    }
-
-    // إذا كان هناك بحث، قم بالفلترة
+    if (searchQuery.trim() === '') return sections;
     const lowercasedQuery = searchQuery.toLowerCase();
     return sections
       .map(section => {
@@ -101,16 +81,11 @@ export default function HomeScreen() {
       .filter(section => section.menu_items && section.menu_items.length > 0);
   }, [sections, searchQuery]);
 
-
-  // --- إنشاء قائمة بيانات مدمجة ---
-  const listData = useMemo(() => {
-    return [
-      { type: 'header' as const, id: 'main-header' },
-      { type: 'categories' as const, id: 'cat-chips' },
-      ...filteredSections, // 3. ✅ استخدام الأقسام المفلترة
-    ];
-  }, [filteredSections]);
-
+  const listData = useMemo(() => [
+    { type: 'header' as const, id: 'main-header' },
+    { type: 'categories' as const, id: 'cat-chips' },
+    ...filteredSections,
+  ], [filteredSections]);
 
   if (loading) {
     return <View style={styles.loader}><ActivityIndicator size="large" color="#D32F2F" /></View>;
@@ -120,21 +95,18 @@ export default function HomeScreen() {
     <View style={styles.fullScreen}>
       <SafeAreaView style={styles.container}>
         <FlatList
-          // 4. ✅ ربط المرجع بالـ FlatList
           ref={listRef}
           data={listData}
           keyExtractor={(item) => item.id.toString()}
           stickyHeaderIndices={[1]}
           onScroll={(event) => {
             const scrollY = event.nativeEvent.contentOffset.y;
-            const HEADER_HEIGHT = 280;
+            const HEADER_HEIGHT = 280; // قد تحتاج لتعديل هذا الرقم بناءً على التصميم النهائي
             setIsChipsSticky(scrollY > HEADER_HEIGHT);
           }}
           scrollEventThrottle={16}
           keyboardDismissMode="on-drag"
-
           renderItem={({ item }) => {
-            // ... (بقية renderItem تبقى كما هي تمامًا)
             if (item.type === 'header') {
               return (
                 <View>
@@ -155,7 +127,6 @@ export default function HomeScreen() {
                   <View style={styles.searchSection}>
                     <View style={styles.searchBar}>
                       <Feather name="search" size={22} color="#888" />
-                      {/* 4. ✅ ربط TextInput بالحالة */}
                       <TextInput
                         placeholder="ابحث..."
                         style={styles.searchInput}
@@ -166,12 +137,13 @@ export default function HomeScreen() {
                     </View>
                     <TouchableOpacity
                       style={styles.searchButton}
-                      onPress={() => setSearchQuery('')} // <-- إضافة دالة المسح
+                      onPress={() => setSearchQuery('')}
                     >
                       {searchQuery.length > 0 ? (
-                        <Ionicons name="close" size={24} color="#fff" /> // أيقونة المسح
+                        <Ionicons name="close" size={24} color="#fff" />
                       ) : (
-                        <Feather name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={24} color="#fff" /> // أيقونة السهم
+                        // ✅ تم التبسيط: السهم الآن ثابت لأنه في واجهة RTL دائماً
+                        <Feather name="arrow-left" size={24} color="#fff" />
                       )}
                     </TouchableOpacity>
                   </View>
@@ -182,13 +154,9 @@ export default function HomeScreen() {
             if (item.type === 'categories') {
               return (
                 <View
-                  // 4. ✅ استخدام onLayout لقياس الارتفاع
                   onLayout={(event) => {
                     const { height } = event.nativeEvent.layout;
-                    // نخزن الارتفاع فقط إذا لم يتم تخزينه من قبل
-                    if (height > 0 && chipsHeight === 0) {
-                      setChipsHeight(height);
-                    }
+                    if (height > 0 && chipsHeight === 0) setChipsHeight(height);
                   }}
                   style={[
                     styles.categoryChipsContainer,
@@ -221,7 +189,7 @@ export default function HomeScreen() {
                       />
                     )}
                     contentContainerStyle={{ paddingHorizontal: 12.5 }}
-                    inverted
+                    
                   />
                 ) : (
                   <Text style={styles.noItemsText}>لا توجد وجبات في هذا القسم حالياً.</Text>
@@ -230,8 +198,6 @@ export default function HomeScreen() {
             );
           }}
           ListEmptyComponent={
-            // هذا المكون يظهر فقط إذا كانت `listData` فارغة تمامًا بعد الفلترة
-            // (باستثناء الهيدر والفئات)
             <View style={styles.centered}>
               <Text>لا توجد نتائج تطابق بحثك.</Text>
             </View>
@@ -239,35 +205,110 @@ export default function HomeScreen() {
           ListFooterComponent={<View style={{ height: 100 }} />}
         />
       </SafeAreaView>
-      {/* شريط التنقل السفلي */}
       <CustomBottomNav />
-
     </View>
   );
 }
 
-// --- التنسيقات (تبقى كما هي) ---
+// --- التنسيقات بعد التعديل لدعم RTL ---
 const styles = StyleSheet.create({
   fullScreen: { flex: 1, backgroundColor: '#F5F5F5' },
   container: { flex: 1 },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5' },
-  topBar: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10 },
-  logoContainer: { flexDirection: 'row-reverse', alignItems: 'center' },
+  
+  // ✅ تم التعديل: flexDirection: 'row' ستنعكس تلقائياً في RTL
+  topBar: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 20, 
+    paddingTop: 10 
+  },
+  logoContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
   logoImage: { width: 80, height: 80, resizeMode: 'contain' },
   logoText: { fontFamily: 'Cairo-Bold', fontSize: 18, marginHorizontal: 8, marginTop: 4 },
   notificationButton: { position: 'relative' },
-  notificationDot: { position: 'absolute', top: 2, right: 2, width: 10, height: 10, borderRadius: 5, backgroundColor: '#D32F2F', borderWidth: 1.5, borderColor: '#fff' },
-  header: { paddingHorizontal: 20, marginTop: 20, alignItems: 'flex-end' },
-  headerText: { fontSize: 28, fontWeight: 'bold', color: '#333', textAlign: 'right' },
-  searchSection: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 20, marginTop: 20 },
-  searchBar: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', borderRadius: 25, paddingHorizontal: 15, height: 50, elevation: 5 },
-  searchInput: { flex: 1, fontSize: 16, textAlign: 'right', marginHorizontal: 5 },
-  searchButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#D32F2F', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  
+  // ✅ تم التعديل: خاصية 'end' هي النسخة المنطقية من 'right'
+  notificationDot: { 
+    position: 'absolute', 
+    top: 2, 
+    end: 2, // <-- 'right' أصبحت 'end'
+    width: 10, 
+    height: 10, 
+    borderRadius: 5, 
+    backgroundColor: '#D32F2F', 
+    borderWidth: 1.5, 
+    borderColor: '#fff' 
+  },
+  
+  // ✅ تم التعديل: 'flex-end' صحيحة لـ RTL
+  header: { 
+    paddingHorizontal: 20, 
+    marginTop: 20, 
+    alignItems: 'flex-end' 
+  },
+  // ✅ تم التعديل: أزلنا textAlign، سيعتمد على اتجاه اللغة
+  headerText: { 
+    fontSize: 28, 
+    fontWeight: 'bold', 
+    color: '#333' 
+  },
+  
+  // ✅ تم التعديل: flexDirection: 'row'
+  searchSection: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 20, 
+    marginTop: 20 
+  },
+  searchBar: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#fff', 
+    borderRadius: 25, 
+    paddingHorizontal: 15, 
+    height: 50, 
+    elevation: 5 
+  },
+  // ✅ تم التعديل: أزلنا textAlign
+  searchInput: { 
+    flex: 1, 
+    fontSize: 16, 
+    marginHorizontal: 5 
+  },
+  // ✅✅ أهم تعديل: استخدمنا marginStart
+  searchButton: { 
+    width: 50, 
+    height: 50, 
+    borderRadius: 25, 
+    backgroundColor: '#D32F2F', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginStart: 10 // <-- 'marginRight' أصبحت 'marginStart'
+  },
+  
   section: { marginTop: 25, backgroundColor: '#F5F5F5' },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15, paddingHorizontal: 20, textAlign: 'right' },
-  noItemsText: { paddingHorizontal: 20, textAlign: 'right', color: '#888' },
-  bottomNav: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', height: 85, backgroundColor: '#C62828', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingBottom: 20, position: 'absolute', bottom: 0, left: 0, right: 0 },
-  navButton: { padding: 10 },
+  // ✅ تم التعديل: أزلنا textAlign
+  sectionTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: '#333', 
+    marginBottom: 15, 
+    paddingHorizontal: 20 
+  },
+  // ✅ تم التعديل: أزلنا textAlign
+  noItemsText: { 
+    paddingHorizontal: 20, 
+    color: '#888' 
+  },
+  
+  // CustomBottomNav سيتولى تنسيقاته بنفسه
+  
   categoryChipsContainer: {
     backgroundColor: '#F5F5F5',
   },

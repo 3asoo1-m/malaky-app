@@ -3,16 +3,17 @@
 import React, { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '@/lib/useAuth';
-import { ActivityIndicator, View, I18nManager  } from 'react-native';
+import { ActivityIndicator, View, I18nManager, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { FavoritesProvider } from '@/lib/useFavorites';
 import { CartProvider } from '@/lib/useCart'; // ✅ 1. استيراد مزود السلة
+import { reloadAsync } from 'expo-updates';
 
 try {
-  // فرض اتجاه اليمين إلى اليسار
+  // فقط قم بفرض RTL. لا تقم بإعادة التحميل.
   I18nManager.forceRTL(true);
-  // السماح بالتقليب (مهم لبعض المكونات)
   I18nManager.allowRTL(true);
+  console.log('RTL force attempted. isRTL is now:', I18nManager.isRTL);
 } catch (e) {
   console.error('Failed to force RTL:', e);
 }

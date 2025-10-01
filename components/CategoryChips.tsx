@@ -31,18 +31,11 @@ export default function CategoryChips({ categories, activeCategory, onCategorySe
           </TouchableOpacity>
         )}
         contentContainerStyle={{ paddingHorizontal: 20 }}
-
-        // --- ✅ هذا هو السطر الحاسم ---
-        // تأكد من وجود هذه الخاصية
-        inverted
-      // -----------------------------
-
       />
     </View>
   );
 }
 
-// ... (بقية التنسيقات كما هي)
 const styles = StyleSheet.create({
   container: {
     height: 60,
@@ -53,7 +46,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 20,
-    // ✅ استخدم marginHorizontal ليعمل بشكل صحيح مع inverted
     marginHorizontal: 5,
     borderWidth: 1,
     borderColor: '#E0E0E0',

@@ -11,25 +11,23 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StatusBar,
-  TextInput, // ✅ استيراد TextInput
+  TextInput,
 } from 'react-native';
-import { FontAwesome, Ionicons } from '@expo/vector-icons'; // ✅ استيراد Ionicons
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '@/lib/supabase';
-import { MenuItem, OptionGroup } from '@/lib/types';
-import { useCart } from '@/lib/useCart'; // ✅ استيراد هوك السلة
+import { MenuItem } from '@/lib/types';
+import { useCart } from '@/lib/useCart';
 
 export default function MenuItemDetailsScreen() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const router = useRouter();
-  const { addToCart } = useCart(); // ✅ استدعاء هوك السلة
+  const { addToCart } = useCart();
 
   const [item, setItem] = useState<MenuItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, any>>({});
-  
-  // ✅ 1. إضافة حالات جديدة للكمية والملاحظات
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
 
@@ -39,7 +37,7 @@ export default function MenuItemDetailsScreen() {
       setLoading(true);
       try {
         const { data, error } = await supabase.from('menu_items').select('*').eq('id', itemId).single<MenuItem>();
-        if (error) { router.back(); } 
+        if (error) { router.back(); }
         else {
           setItem(data);
           if (data?.options) {
@@ -52,7 +50,7 @@ export default function MenuItemDetailsScreen() {
             setSelectedOptions(defaultOptions);
           }
         }
-      } catch (e) { console.error(e); } 
+      } catch (e) { console.error(e); }
       finally { setLoading(false); }
     };
     fetchItemDetails();
@@ -62,7 +60,6 @@ export default function MenuItemDetailsScreen() {
     setSelectedOptions(prev => ({ ...prev, [optionId]: value }));
   };
 
-  // ✅ 2. تحديث حساب السعر الإجمالي ليشمل الكمية
   const totalPrice = useMemo(() => {
     if (!item) return 0;
     let singleItemPrice = item.price;
@@ -78,7 +75,6 @@ export default function MenuItemDetailsScreen() {
     return singleItemPrice * quantity;
   }, [item, selectedOptions, quantity]);
 
-  // ✅ 3. تحديث دالة الإضافة إلى السلة
   const handleAddToCart = () => {
     if (!item) return;
     addToCart(item, quantity, selectedOptions, notes);
@@ -97,31 +93,39 @@ export default function MenuItemDetailsScreen() {
       <StatusBar barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
       <Image source={{ uri: item.image_url || defaultImage }} style={styles.backgroundImage} />
+      
+      {/* ✅ تم التعديل: أيقونة السهم لليسار للعودة في واجهة RTL */}
       <TouchableOpacity onPress={( ) => router.back()} style={styles.backButton}>
-        <FontAwesome name="arrow-right" size={20} color="#1D3557" />
+        <FontAwesome name="arrow-left" size={20} color="#1D3557" />
       </TouchableOpacity>
 
       <ScrollView style={styles.contentContainer} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>{item.name}</Text>
-        
-        {item.options && item.options.map(group => (
-          <View key={group.id} style={styles.optionsSection}>
-            <Text style={styles.sectionTitle}>{group.label}</Text>
-            <View style={styles.optionsContainer}>
-              {group.values.map(option => {
-                const isSelected = selectedOptions[group.id] === option.value;
-                return (
-                  <TouchableOpacity key={option.value} style={[styles.optionButton, isSelected && styles.optionSelected]} onPress={() => handleOptionSelect(group.id, option.value)}>
-                    <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>{option.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <View style={styles.separator} />
-          </View>
-        ))}
 
-        {/* ✅ 4. إضافة قسم الملاحظات */}
+        {Array.isArray(item.options) && item.options.map(group => {
+          if (!group || !Array.isArray(group.values)) return null;
+          return (
+            <View key={group.id} style={styles.optionsSection}>
+              <Text style={styles.sectionTitle}>{group.label}</Text>
+              <View style={styles.optionsContainer}>
+                {group.values.map(option => {
+                  const isSelected = selectedOptions[group.id] === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[styles.optionButton, isSelected && styles.optionSelected]}
+                      onPress={() => handleOptionSelect(group.id, option.value)}
+                    >
+                      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>{option.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={styles.separator} />
+            </View>
+          );
+        })}
+
         <Text style={styles.sectionTitle}>ملاحظات خاصة</Text>
         <TextInput
           value={notes}
@@ -135,7 +139,6 @@ export default function MenuItemDetailsScreen() {
         <Text style={styles.description}>{item.description || 'لا يوجد وصف لهذه الوجبة.'}</Text>
       </ScrollView>
 
-      {/* ✅ 5. تحديث الشريط السفلي ليشمل الكمية */}
       <View style={styles.footer}>
         <View style={styles.quantitySelector}>
           <TouchableOpacity onPress={() => setQuantity(q => Math.max(1, q - 1))} style={styles.quantityButton}>
@@ -154,24 +157,53 @@ export default function MenuItemDetailsScreen() {
   );
 }
 
-// ✅ 6. تحديث التنسيقات
+// --- التنسيقات بعد التعديل الكامل لدعم RTL ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   backgroundImage: { width: '100%', height: 400, position: 'absolute', top: 0 },
   contentContainer: { flex: 1, marginTop: 300, backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30 },
   scrollContent: { padding: 20, paddingBottom: 120 },
-  backButton: { position: 'absolute', top: StatusBar.currentHeight ? StatusBar.currentHeight + 10 : 60, right: 20, backgroundColor: 'rgba(255, 255, 255, 0.8)', padding: 10, borderRadius: 20, zIndex: 10 },
-  title: { fontSize: 28, fontFamily: 'Cairo-Bold', color: '#1D3557', textAlign: 'right', marginBottom: 20 },
-  description: { fontSize: 16, fontFamily: 'Cairo-Regular', lineHeight: 24, color: '#444', textAlign: 'right', marginTop: 10 },
+  
+  // ✅ تم التعديل: 'right' أصبحت 'start' لتحديد الموضع بشكل منطقي
+  backButton: { 
+    position: 'absolute', 
+    top: StatusBar.currentHeight ? StatusBar.currentHeight + 10 : 60, 
+    start: 20, // <-- التغيير هنا
+    backgroundColor: 'rgba(255, 255, 255, 0.8)', 
+    padding: 10, 
+    borderRadius: 20, 
+    zIndex: 10 
+  },
+  
+  // ✅ تم التعديل: أزلنا textAlign، سيعتمد على اتجاه اللغة
+  title: { fontSize: 28, fontFamily: 'Cairo-Bold', color: '#1D3557', marginBottom: 20 },
+  description: { fontSize: 16, fontFamily: 'Cairo-Regular', lineHeight: 24, color: '#444', marginTop: 10 },
   separator: { height: 1, backgroundColor: '#eee', marginVertical: 20 },
   optionsSection: { marginTop: 10 },
-  sectionTitle: { fontSize: 18, fontFamily: 'Cairo-Bold', color: '#333', textAlign: 'right', marginBottom: 15 },
-  optionsContainer: { flexDirection: 'row-reverse', flexWrap: 'wrap' },
-  optionButton: { borderWidth: 1.5, borderColor: '#ddd', borderRadius: 30, paddingVertical: 10, paddingHorizontal: 20, marginEnd: 10, marginBottom: 10 },
+  sectionTitle: { fontSize: 18, fontFamily: 'Cairo-Bold', color: '#333', marginBottom: 15 },
+  
+  // ✅ تم التعديل: 'row-reverse' أصبحت 'row'
+  optionsContainer: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap' 
+  },
+  
+  // ✅ تم التعديل: 'marginEnd' هي النسخة المنطقية من 'marginRight'
+  optionButton: { 
+    borderWidth: 1.5, 
+    borderColor: '#ddd', 
+    borderRadius: 30, 
+    paddingVertical: 10, 
+    paddingHorizontal: 20, 
+    marginEnd: 10, // <-- التغيير هنا
+    marginBottom: 10 
+  },
   optionSelected: { backgroundColor: '#1D3557', borderColor: '#1D3557' },
   optionText: { fontSize: 16, fontFamily: 'Cairo-Regular', fontWeight: '600', color: '#333' },
   optionTextSelected: { color: '#fff' },
+  
+  // ✅ تم التعديل: أزلنا textAlign
   notesInput: {
     backgroundColor: '#F5F5F5',
     borderRadius: 10,
@@ -179,14 +211,15 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
     fontSize: 16,
-    textAlign: 'right',
   },
+  
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row-reverse',
+    // ✅ تم التعديل: 'row-reverse' أصبحت 'row'
+    flexDirection: 'row', 
     alignItems: 'center',
     padding: 16,
     paddingBottom: 30,
@@ -194,8 +227,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
+  
+  // ✅ تم التعديل: 'row-reverse' أصبحت 'row'
   quantitySelector: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row', 
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
     borderRadius: 30,
@@ -215,6 +250,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginHorizontal: 20,
   },
+  
+  // ✅ تم التعديل: 'marginRight' أصبحت 'marginStart'
   addToCartButton: {
     flex: 1,
     backgroundColor: '#C62828',
@@ -222,7 +259,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginStart: 16, // <-- التغيير هنا
   },
   addToCartButtonText: {
     color: '#fff',
