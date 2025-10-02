@@ -15,7 +15,7 @@ import CustomBottomNav from '@/components/CustomBottomNav';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-// 1. استيراد دوال التصميم المتجاوب
+// دوال التصميم المتجاوب (تبقى كما هي)
 import { scale, fontScale } from '@/lib/responsive';
 
 // مكون مساعد لإنشاء أزرار القائمة
@@ -25,8 +25,8 @@ const ProfileListItem = ({ icon, text, onPress, color = '#333' }: { icon: React.
       {icon}
       <Text style={[styles.listItemText, { color }]}>{text}</Text>
     </View>
-    {/* 2. جعل حجم أيقونة السهم متجاوبًا */}
-    <Ionicons name="chevron-back-outline" size={scale(20)} color="#A0A0A0" />
+    {/* ✅ تم التعديل: أيقونة السهم لليسار هي الأنسب في واجهة RTL */}
+    <Ionicons name="chevron-forward-outline" size={scale(20)} color="#A0A0A0" />
   </TouchableOpacity>
 );
 
@@ -69,7 +69,6 @@ export default function ProfileScreen() {
         {/* --- بطاقة طلباتي الأخيرة --- */}
         <TouchableOpacity style={styles.mainCard} onPress={() => router.push('/(tabs)/orders')}>
           <View style={styles.mainCardIconContainer}>
-            {/* 3. جعل حجم أيقونة البطاقة متجاوبًا */}
             <MaterialCommunityIcons name="receipt-text-clock-outline" size={scale(32)} color="#C62828" />
           </View>
           <View>
@@ -111,7 +110,7 @@ export default function ProfileScreen() {
   );
 }
 
-// 4. تحديث كل التنسيقات لتكون متجاوبة
+// --- التنسيقات بعد التعديل الكامل لدعم RTL ---
 const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: {
@@ -121,14 +120,6 @@ const styles = StyleSheet.create({
   profileHeader: {
     alignItems: 'center',
     marginBottom: scale(30),
-  },
-  avatar: { // هذا التنسيق لم يكن مستخدمًا في الكود الأصلي، لكن سأجعله متجاوبًا للاحتياط
-    width: scale(100),
-    height: scale(100),
-    borderRadius: scale(50),
-    marginBottom: scale(15),
-    borderWidth: scale(3),
-    borderColor: '#fff',
   },
   userName: {
     marginTop: scale(50),
@@ -144,7 +135,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: scale(16),
     padding: scale(20),
-    flexDirection: 'row-reverse',
+    flexDirection: 'row', // ✅ تم التعديل: 'row-reverse' أصبحت 'row'
     alignItems: 'center',
     marginBottom: scale(30),
     elevation: 3,
@@ -156,18 +147,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
     borderRadius: scale(12),
     padding: scale(12),
-    marginLeft: scale(15),
+    marginEnd: scale(15), // ✅ تم التعديل: 'marginLeft' أصبحت 'marginEnd'
   },
   mainCardTitle: {
     fontSize: fontScale(18),
     fontWeight: 'bold',
     color: '#333',
-    textAlign: 'right',
+    // textAlign: 'right', // ❌ أزل هذه، النص العربي سيحاذي لليمين تلقائياً
   },
   mainCardSubtitle: {
     fontSize: fontScale(14),
     color: '#888',
-    textAlign: 'right',
+    // textAlign: 'right', // ❌ أزل هذه أيضاً
   },
   menuSection: {
     backgroundColor: '#fff',
@@ -181,19 +172,19 @@ const styles = StyleSheet.create({
     paddingVertical: scale(10),
   },
   listItem: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row', // ✅ تم التعديل: 'row-reverse' أصبحت 'row'
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: scale(15),
     paddingHorizontal: scale(20),
   },
   listItemContent: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row', // ✅ تم التعديل: 'row-reverse' أصبحت 'row'
     alignItems: 'center',
   },
   listItemText: {
     fontSize: fontScale(16),
     fontWeight: '500',
-    marginRight: scale(15),
+    marginStart: scale(15), // ✅ تم التعديل: 'marginRight' أصبحت 'marginStart'
   },
 });

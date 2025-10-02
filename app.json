@@ -14,7 +14,7 @@
       "backgroundColor": "#D32F2F"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
@@ -43,6 +43,12 @@
       "eas": {
         "projectId": "b83c8c0f-913e-41a4-b35a-ce1f29aa4eef"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b83c8c0f-913e-41a4-b35a-ce1f29aa4eef"
     }
   }
 }

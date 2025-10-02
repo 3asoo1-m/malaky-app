@@ -1,90 +1,141 @@
 // مسار الملف: app/(tabs)/orders.tsx
 
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Animated } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-
-// 1. تعريف واجهة الطلب لتنظيم البيانات
+import { Ionicons } from '@expo/vector-icons';
+// واجهة الطلب
 interface Order {
     id: number;
     created_at: string;
     total_price: number;
     status: string;
 }
-
-export default function OrdersScreen() {
+// ... (واجهة Order و مكون OrderCard يبقيان كما هما تماماً)
+interface Order { /* ... */ }
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+const OrderCard = ({ item, index }: { item: Order; index: number }) => {
     const router = useRouter();
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(20)).current;
+
+    useFocusEffect(
+        useCallback(() => {
+            Animated.timing(fadeAnim, { toValue: 1, duration: 500, delay: index * 100, useNativeDriver: true }).start();
+            Animated.timing(slideAnim, { toValue: 0, duration: 500, delay: index * 100, useNativeDriver: true }).start();
+        }, [fadeAnim, slideAnim, index])
+    );
+
+    const translateStatus = (status: string): string => {
+        const translations: { [key: string]: string } = {
+            'new': 'جديد',
+            'processing': 'قيد التحضير',
+            'delivered': 'تم التوصيل',
+            'ready': 'جاهز',
+            'cancelled': 'ملغي'
+        };
+        return translations[status.toLowerCase()] || status;
+    };
+
+    const getStatusStyle = (status: string): { icon: IoniconName; color: string; backgroundColor: string; borderColor: string } => {
+        switch (status.toLowerCase()) {
+            case 'processing':
+                return { icon: 'hourglass-outline', color: '#D97706', backgroundColor: '#FEF3C7', borderColor: '#FBBF24' };
+            case 'delivered':
+                return { icon: 'bicycle-outline', color: '#2563EB', backgroundColor: '#DBEAFE', borderColor: '#93C5FD' };
+            case 'ready':
+                return { icon: 'checkmark-circle-outline', color: '#16A34A', backgroundColor: '#DCFCE7', borderColor: '#86EFAC' };
+            case 'cancelled':
+                return { icon: 'close-circle-outline', color: '#DC2626', backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' };
+            case 'new':
+            default:
+                return { icon: 'receipt-outline', color: '#4B5563', backgroundColor: '#F3F4F6', borderColor: '#D1D5DB' };
+        }
+    };
+
+    const statusStyle = getStatusStyle(item.status);
+
+    return (
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+            <TouchableOpacity
+                style={styles.orderCard}
+                onPress={() => router.push({ pathname: '/order/[orderId]', params: { orderId: item.id } })}
+            >
+                <View style={styles.cardTopSection}>
+                    <View style={styles.orderInfo}>
+                        <Text style={styles.orderId}>طلب #{item.id}</Text>
+                        <Text style={styles.orderDate}>
+                            {new Date(item.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                    </View>
+                    <View style={[styles.statusContainer, { backgroundColor: statusStyle.backgroundColor, borderColor: statusStyle.borderColor }]}>
+                        <Ionicons name={statusStyle.icon} size={16} color={statusStyle.color} />
+                        <Text style={[styles.statusText, { color: statusStyle.color }]}>{translateStatus(item.status)}</Text>
+                    </View>
+                </View>
+                <View style={styles.separator} />
+                <View style={styles.cardBottomSection}>
+                    <Text style={styles.orderTotal}>{item.total_price.toFixed(2)} ₪</Text>
+                    <View style={styles.detailsButton}>
+                        <Text style={styles.detailsButtonText}>عرض التفاصيل</Text>
+                        <Ionicons name="chevron-forward-outline" size={16} color="#C62828" />
+                    </View>
+                </View>
+            </TouchableOpacity>
+        </Animated.View>
+    );
+};
+
+
+// =================================================================
+// ✅ التعديل الرئيسي هنا في المكون الأساسي
+// =================================================================
+export default function OrdersScreen() {
+    const router = useRouter(); // استدعاء useRouter
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // 2. جلب الطلبات عند الدخول إلى الشاشة
     useFocusEffect(
         useCallback(() => {
             const fetchOrders = async () => {
-                if (!user) {
-                    setLoading(false);
-                    return;
-                }
+                if (!user) { setLoading(false); return; }
                 setLoading(true);
                 const { data, error } = await supabase
                     .from('orders')
                     .select('id, created_at, total_price, status')
                     .eq('user_id', user.id)
-                    .order('created_at', { ascending: false }); // الأحدث أولاً
+                    .order('created_at', { ascending: false });
 
-                if (error) {
-                    console.error('Error fetching orders:', error.message);
-                } else {
-                    setOrders(data);
-                }
+                if (error) { console.error('Error fetching orders:', error.message); }
+                else { setOrders(data); }
                 setLoading(false);
             };
-
             fetchOrders();
         }, [user])
     );
 
-    // 3. تصميم بطاقة الطلب
-    const renderOrder = ({ item }: { item: Order }) => (
-        <TouchableOpacity
-            style={styles.orderCard}
-            // --- التعديل هنا ---
-            onPress={() => router.push({
-                pathname: '/order/[orderId]', // <-- استخدم اسم الملف الفعلي كقالب
-                params: { orderId: item.id }, // <-- مرر المعلمات هنا
-            })}
-        >
-            <View style={styles.cardHeader}>
-                <Text style={styles.orderId}>طلب #{item.id}</Text>
-                <Text style={styles.orderDate}>
-                    {new Date(item.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </Text>
-            </View>
-            <View style={styles.cardFooter}>
-                <View style={styles.statusContainer}>
-                    <Text style={styles.statusText}>{item.status}</Text>
-                </View>
-                <Text style={styles.orderTotal}>{item.total_price.toFixed(2)} ₪</Text>
-            </View>
-        </TouchableOpacity>
-    );
-
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            <Text style={styles.headerTitle}>طلباتي</Text>
+        <View style={styles.container}>
+            {/* 1. إضافة رأس الصفحة الجديد */}
+            <View style={[styles.header, { paddingTop: insets.top }]}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color="#1F2937" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>طلباتي</Text>
+                <View style={{ width: 40 }} />
+            </View>
 
             {loading ? (
-                <ActivityIndicator style={{ marginTop: 50 }} size="large" color="#C62828" />
+                <ActivityIndicator style={{ flex: 1 }} size="large" color="#C62828" />
             ) : (
                 <FlatList
                     data={orders}
-                    renderItem={renderOrder}
+                    renderItem={({ item, index }) => <OrderCard item={item} index={index} />}
                     keyExtractor={(item) => item.id.toString()}
                     contentContainerStyle={styles.listContainer}
                     ListEmptyComponent={
@@ -92,9 +143,6 @@ export default function OrdersScreen() {
                             <Ionicons name="receipt-outline" size={80} color="#ccc" />
                             <Text style={styles.emptyText}>لا توجد طلبات سابقة</Text>
                             <Text style={styles.emptySubText}>ابدأ أول طلب لك من قائمة الطعام!</Text>
-                            <TouchableOpacity style={styles.browseButton} onPress={() => router.push('/')}>
-                                <Text style={styles.browseButtonText}>تصفح القائمة</Text>
-                            </TouchableOpacity>
                         </View>
                     }
                 />
@@ -103,60 +151,110 @@ export default function OrdersScreen() {
     );
 }
 
-// 4. إضافة التنسيقات
+// =================================================================
+// ✅ تحديث التنسيقات لإضافة رأس الصفحة الجديد
+// =================================================================
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F9F9F9' },
-    headerTitle: { fontSize: 32, fontWeight: 'bold', textAlign: 'right', margin: 16, color: '#1A1A1A' },
-    listContainer: { paddingHorizontal: 16, paddingBottom: 20 },
+    container: { flex: 1, backgroundColor: '#F5F5F5' },
 
-    orderCard: {
-        backgroundColor: '#fff',
-        borderRadius: 15,
-        padding: 16,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#eee',
-    },
-    cardHeader: {
-        flexDirection: 'row-reverse',
+    // --- تنسيقات رأس الصفحة الجديدة ---
+    header: {
+        flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+    },
+    backButton: {
+        padding: 8,
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontFamily: 'Cairo-Bold',
+        color: '#1A1A1A',
+    },
+    // --------------------------------
+
+    listContainer: { paddingHorizontal: 16, paddingBottom: 20, paddingTop: 16 },
+
+    // ... (باقي التنسيقات تبقى كما هي تماماً)
+    orderCard: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
         marginBottom: 16,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        overflow: 'hidden',
+    },
+    cardTopSection: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+    },
+    orderInfo: {
+        alignItems: 'flex-start',
+        flex: 1,
     },
     orderId: {
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'Cairo-Bold',
         color: '#333',
     },
     orderDate: {
-        fontSize: 14,
+        fontSize: 13,
         color: '#888',
-    },
-    cardFooter: {
-        flexDirection: 'row-reverse',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        fontFamily: 'Cairo-Regular',
+        marginTop: 4,
     },
     statusContainer: {
-        backgroundColor: '#E3F2FD', // لون أزرق فاتح
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        minWidth: 100,
+        justifyContent: 'center',
+        borderWidth: 1.5,
     },
     statusText: {
-        color: '#1E88E5', // لون أزرق
-        fontWeight: '600',
-        fontSize: 13,
+        fontFamily: 'Cairo-SemiBold',
+        fontSize: 12,
+        marginStart: 6,
+    },
+    separator: {
+        height: 1,
+        backgroundColor: '#F0F0F0',
+    },
+    cardBottomSection: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#FAFAFA',
+        padding: 16,
     },
     orderTotal: {
         fontSize: 18,
-        fontWeight: 'bold',
+        fontFamily: 'Cairo-Bold',
         color: '#C62828',
     },
-
+    detailsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    detailsButtonText: {
+        color: '#333',
+        fontFamily: 'Cairo-SemiBold',
+        fontSize: 14,
+        marginEnd: 4,
+    },
     emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: '20%' },
-    emptyText: { fontSize: 20, fontWeight: '600', color: '#555', marginTop: 16 },
-    emptySubText: { fontSize: 14, color: '#999', marginTop: 8, textAlign: 'center' },
-    browseButton: { marginTop: 24, backgroundColor: '#C62828', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 30 },
-    browseButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+    emptyText: { fontSize: 20, fontFamily: 'Cairo-Bold', color: '#555', marginTop: 16 },
+    emptySubText: { fontSize: 14, color: '#999', marginTop: 8, textAlign: 'center', fontFamily: 'Cairo-Regular' },
 });
