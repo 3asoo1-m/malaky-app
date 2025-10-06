@@ -32,7 +32,17 @@ export default function FavoritesScreen() {
     }
     setLoading(true);
     const ids = Array.from(favoriteIds);
-    const { data, error } = await supabase.from('menu_items').select('*').in('id', ids);
+const { data, error } = await supabase
+  .from('menu_items')
+  .select(`
+    *,
+    images:menu_item_images (
+      id,
+      image_url,
+      alt_text
+    )
+  `)
+  .in('id', ids);
     if (error) console.error('Error fetching favorite items:', error);
     else setItems(data);
     setLoading(false);
@@ -69,13 +79,18 @@ export default function FavoritesScreen() {
           keyExtractor={(item) => item.id.toString()}
           numColumns={2}
           renderItem={({ item }) => (
-            <View style={styles.cardWrapper}>
-              <MenuItemCard
-                item={item}
-                onPress={() => router.push(`/item/${item.id}`)}
-              />
-            </View>
-          )}
+  <View style={styles.cardWrapper}>
+    <MenuItemCard
+      id={item.id}
+      name={item.name}
+      description={item.description}
+      price={item.price}
+      imageUrl={item.images && item.images.length > 0 ? item.images[0].image_url : undefined}
+      onPress={() => router.push(`/item/${item.id}`)}
+    />
+  </View>
+)}
+
           // ✅ 6. تعديل التنسيقات لإضافة مسافات
           contentContainerStyle={styles.listContainer}
           columnWrapperStyle={styles.row} // تنسيق للصف

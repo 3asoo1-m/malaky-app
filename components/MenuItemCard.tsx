@@ -11,30 +11,33 @@ import {
   I18nManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MenuItem } from '../lib/types';
-import { useFavorites } from '@/lib/useFavorites'; // ✅ 1. استيراد الهوك
+import { useFavorites } from '@/lib/useFavorites';
 
-type MenuItemCardProps = {
-  item: MenuItem;
-  onPress?: (event: GestureResponderEvent) => void;
-};
+// ✅ 1. تعريف واجهة الخصائص الجديدة
+export interface MenuItemCardProps {
+  id: number; // نحتاج إلى الـ ID لوظيفة المفضلة
+  name: string;
+  description: string | null;
+  price: number;
+  imageUrl?: string; // الصورة الآن اختيارية
+  onPress: (event: GestureResponderEvent) => void;
+}
 
-export default function MenuItemCard({ item, onPress }: MenuItemCardProps) {
-  // ✅ 2. استخدام الهوك للحصول على البيانات والدوال
+// ✅ 2. استخدام الخصائص الجديدة في تعريف المكون
+export default function MenuItemCard({ id, name, description, price, imageUrl, onPress }: MenuItemCardProps) {
   const { favoriteIds, toggleFavorite } = useFavorites();
-  const isFavorite = favoriteIds.has(item.id);
+  const isFavorite = favoriteIds.has(id);
 
+  // صورة افتراضية في حال لم يتم توفير أي صورة
   const defaultImage = 'https://scontent.fjrs27-1.fna.fbcdn.net/v/t39.30808-6/347093685_1264545104456247_8195462777365390832_n.jpg?_nc_cat=101&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=Vurk9k7Yeh4Q7kNvwFMaIvw&_nc_oc=AdnLJ7bhQuIug3NeIMvRJKxx1dpZ4xT5SN5KXbUN9MnJP_foN0PuaRhHK5T5h2_mlKE&_nc_zt=23&_nc_ht=scontent.fjrs27-1.fna&_nc_gid=M1fGk0mVLfA72P9gTCQOJg&oh=00_AfY1CYuswm2dIn4EFLv-89zIfO8z1Y9NccbV_9AQZ-NI3A&oe=68DA50FC';
 
-  // ✅ 3. دالة للتعامل مع الضغط على القلب فقط
   const handleHeartPress = (e: GestureResponderEvent ) => {
     e.stopPropagation(); // منع الضغطة من الوصول إلى البطاقة الرئيسية
-    toggleFavorite(item.id);
+    toggleFavorite(id);
   };
 
   return (
     <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.8}>
-      {/* ✅ 4. جعل أيقونة القلب قابلة للضغط وتغيير شكلها ولونها */}
       <TouchableOpacity
         style={[styles.heartIconContainer, { [I18nManager.isRTL ? 'left' : 'right']: 10 }]}
         onPress={handleHeartPress}
@@ -42,21 +45,24 @@ export default function MenuItemCard({ item, onPress }: MenuItemCardProps) {
         <Ionicons
           name={isFavorite ? 'heart' : 'heart-outline'}
           size={20}
-          color={isFavorite ? '#E53935' : '#333'} // لون أحمر إذا كانت مفضلة
+          color={isFavorite ? '#E53935' : '#333'}
         />
       </TouchableOpacity>
 
       <View style={styles.imageContainer}>
-        <Image source={{ uri: item.image_url || defaultImage }} style={styles.cardImage} />
+        {/* ✅ 3. استخدام imageUrl الجديد مع الصورة الافتراضية */}
+        <Image source={{ uri: imageUrl || defaultImage }} style={styles.cardImage} />
       </View>
-      <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
-      <Text style={styles.cardSubtitle} numberOfLines={2}>{item.description || ' '}</Text>
-      <Text style={styles.cardPrice}>{item.price.toFixed(1)} ₪</Text>
+      
+      {/* ✅ 4. استخدام الخصائص الممررة مباشرة */}
+      <Text style={styles.cardTitle} numberOfLines={1}>{name}</Text>
+      <Text style={styles.cardSubtitle} numberOfLines={2}>{description || ' '}</Text>
+      <Text style={styles.cardPrice}>{price.toFixed(1)} ₪</Text>
     </TouchableOpacity>
   );
 }
 
-// التنسيقات تبقى كما هي، مع تعديل بسيط على تنسيق أيقونة القلب
+// التنسيقات تبقى كما هي
 const styles = StyleSheet.create({
   cardContainer: {
     width: 160,
@@ -73,8 +79,8 @@ const styles = StyleSheet.create({
     top: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     borderRadius: 15,
-    padding: 5, // ✅ زيادة حجم المساحة القابلة للضغط
-    zIndex: 1, // ✅ ضمان أن تكون الأيقونة فوق الصورة
+    padding: 5,
+    zIndex: 1,
   },
   cardImage: {
     width: '100%',

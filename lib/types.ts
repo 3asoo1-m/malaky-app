@@ -1,6 +1,8 @@
 // مسار الملف: lib/types.ts
 
-
+// ===================================================================
+// أنواع الخيارات (Options) - تبقى كما هي لأنها مفيدة
+// ===================================================================
 
 export interface OptionValue {
   value: string; // القيمة المخزنة في قاعدة البيانات (e.g., 'spicy')
@@ -15,26 +17,60 @@ export interface OptionGroup {
   values: OptionValue[];
 }
 
-// نوع المنتج
+
+// ===================================================================
+// الأنواع الجديدة والمحدثة التي تتوافق مع دالة get_menu
+// ===================================================================
+
+/**
+ * يمثل صورة واحدة للوجبة، كما تأتي من جدول menu_item_images.
+ */
+export interface MenuItemImage {
+  id: number;
+  image_url: string;
+  alt_text?: string | null;
+}
+
+/**
+ * يمثل الوجبة الواحدة.
+ * التغيير الأهم: يحتوي الآن على مصفوفة 'images' بدلاً من 'image_url' واحد.
+ */
 export interface MenuItem {
   id: number;
   name: string;
   description: string | null;
   price: number;
-  image_url: string | null;
-  options?: OptionGroup[];
+  options?: OptionGroup[] | null; // الخيارات المخزنة في jsonb
+  images: MenuItemImage[]; // <-- ✅ التغيير هنا: مصفوفة من الصور
 }
 
-// نوع الفئة (الصنف)
+/**
+ * يمثل الصنف الواحد مع مصفوفة الوجبات الخاصة به.
+ * هذا هو النوع الرئيسي الذي تمثله كل عنصر في المصفوفة القادمة من دالة get_menu.
+ */
+export interface CategoryWithItems {
+  id: number;
+  name: string;
+  display_order: number;
+  image_url: string | null; // صورة الصنف نفسه
+  menu_items: MenuItem[] | null; // الوجبات التي تنتمي لهذا الصنف
+}
+
+
+// ===================================================================
+// أنواع مساعدة لواجهة المستخدم (UI Helper Types)
+// ===================================================================
+
+/**
+ * يمثل الصنف في شريط الفلاتر (CategoryChips).
+ * يتم استخلاصه من CategoryWithItems.
+ */
 export interface Category {
   id: number;
   name: string;
 }
 
-// نوع الفئة مع المنتجات الخاصة بها (للأقسام)
-export interface CategoryWithItems extends Category {
-  menu_items: MenuItem[] | null;
-}
-
-// نوع الفئة النشطة في الفلتر
+/**
+ * يمثل الفلتر النشط حاليًا في شريط الفلاتر.
+ */
 export type ActiveCategory = number | 'all';

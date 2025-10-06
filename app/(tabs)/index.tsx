@@ -10,21 +10,20 @@ import {
   TextInput,
   ActivityIndicator,
   Image,
+  Platform,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/useAuth';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// استيراد المكونات والأنواع
+// استيراد المكونات والأنواع المحدثة
 import MenuItemCard from '@/components/MenuItemCard';
 import CategoryChips from '@/components/CategoryChips';
 import CustomBottomNav from '@/components/CustomBottomNav';
 import { Category, CategoryWithItems, ActiveCategory } from '@/lib/types';
 
 export default function HomeScreen() {
-  const { user } = useAuth();
   const router = useRouter();
   const [sections, setSections] = useState<CategoryWithItems[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -43,35 +42,57 @@ export default function HomeScreen() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const { data: categoriesData } = await supabase.from('categories').select('id, name').order('display_order', { ascending: true });
-      setCategories(categoriesData || []);
+      try {
+        // استدعاء الدالة الجديدة لجلب القائمة الكاملة
+        const { data, error } = await supabase.rpc('get_menu');
+        
+        if (error) {
+          throw error;
+        }
 
-      const { data: sectionsData } = await supabase.rpc('get_categories_with_items', { item_limit: 7 });
-      setSections(sectionsData || []);
-      setLoading(false);
+        const fetchedSections: CategoryWithItems[] = data || [];
+        
+        // استخلاص الأصناف من البيانات التي تم جلبها
+        const fetchedCategories: Category[] = fetchedSections.map(s => ({ id: s.id, name: s.name }));
+
+        setSections(fetchedSections);
+        setCategories(fetchedCategories);
+
+      } catch (err) {
+        console.error("Error loading menu data:", err);
+        // يمكنك إضافة رسالة خطأ للمستخدم هنا
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (activeCategory === 'all' || !listRef.current) return;
+    if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
+    
     const sectionIndex = sections.findIndex(section => section.id === activeCategory);
+    
     if (sectionIndex !== -1) {
-      const targetIndex = sectionIndex + 2;
+      // +2 هو لحساب الهيدر وشريط الفلاتر
+      const targetIndex = sectionIndex + 2; 
       listRef.current.scrollToIndex({
         animated: true,
         index: targetIndex,
-        viewOffset: chipsHeight,
+        viewOffset: isChipsSticky ? chipsHeight : 0,
       });
     }
-  }, [activeCategory, chipsHeight, sections]);
+  }, [activeCategory, chipsHeight, sections, isChipsSticky]);
 
   const filteredSections = useMemo(() => {
     if (searchQuery.trim() === '') return sections;
+    
     const lowercasedQuery = searchQuery.toLowerCase();
+    
     return sections
       .map(section => {
-        if (!section.menu_items) return section;
+        if (!section.menu_items) return { ...section, menu_items: [] };
+        
         const filteredItems = section.menu_items.filter(item =>
           item.name.toLowerCase().includes(lowercasedQuery)
         );
@@ -100,7 +121,7 @@ export default function HomeScreen() {
           stickyHeaderIndices={[1]}
           onScroll={(event) => {
             const scrollY = event.nativeEvent.contentOffset.y;
-            const HEADER_HEIGHT = 280; // قد تحتاج لتعديل هذا الرقم بناءً على التصميم النهائي
+            const HEADER_HEIGHT = Platform.OS === 'ios' ? 260 : 280;
             setIsChipsSticky(scrollY > HEADER_HEIGHT);
           }}
           scrollEventThrottle={16}
@@ -134,14 +155,10 @@ export default function HomeScreen() {
                         onChangeText={setSearchQuery}
                       />
                     </View>
-                    <TouchableOpacity
-                      style={styles.searchButton}
-                      onPress={() => setSearchQuery('')}
-                    >
+                    <TouchableOpacity style={styles.searchButton} onPress={() => setSearchQuery('')}>
                       {searchQuery.length > 0 ? (
                         <Ionicons name="close" size={24} color="#fff" />
                       ) : (
-                        // ✅ تم التبسيط: السهم الآن ثابت لأنه في واجهة RTL دائماً
                         <Feather name="arrow-left" size={24} color="#fff" />
                       )}
                     </TouchableOpacity>
@@ -157,10 +174,7 @@ export default function HomeScreen() {
                     const { height } = event.nativeEvent.layout;
                     if (height > 0 && chipsHeight === 0) setChipsHeight(height);
                   }}
-                  style={[
-                    styles.categoryChipsContainer,
-                    isChipsSticky && styles.stickyCategoryChipsContainer
-                  ]}
+                  style={[styles.categoryChipsContainer, isChipsSticky && styles.stickyCategoryChipsContainer]}
                 >
                   <CategoryChips
                     categories={categories}
@@ -182,13 +196,21 @@ export default function HomeScreen() {
                     showsHorizontalScrollIndicator={false}
                     keyExtractor={(menuItem) => menuItem.id.toString()}
                     renderItem={({ item: menuItem }) => (
-                      <MenuItemCard
-                        item={menuItem}
-                        onPress={() => router.push(`/item/${menuItem.id}`)}
-                      />
+                      // داخل ملف app/(tabs)/index.tsx
+
+<MenuItemCard
+  // ✅ تمرير البيانات المحدثة والكاملة إلى الكرت
+  id={menuItem.id} // <-- إضافة مهمة لوظيفة المفضلة
+  name={menuItem.name}
+  description={menuItem.description} // <-- إضافة مهمة للوصف
+  price={menuItem.price}
+  // نمرر الصورة الأولى كصورة رئيسية، مع التأكد من وجودها
+  imageUrl={menuItem.images && menuItem.images.length > 0 ? menuItem.images[0].image_url : undefined}
+  onPress={() => router.push(`/item/${menuItem.id}`)}
+/>
+
                     )}
                     contentContainerStyle={{ paddingHorizontal: 20 }}
-                    
                   />
                 ) : (
                   <Text style={styles.noItemsText}>لا توجد وجبات في هذا القسم حالياً.</Text>
@@ -209,13 +231,11 @@ export default function HomeScreen() {
   );
 }
 
-// --- التنسيقات بعد التعديل لدعم RTL ---
+// التنسيقات تبقى كما هي
 const styles = StyleSheet.create({
   fullScreen: { flex: 1, backgroundColor: '#F5F5F5' },
   container: { flex: 1 },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5' },
-  
-  // ✅ تم التعديل: flexDirection: 'row' ستنعكس تلقائياً في RTL
   topBar: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
@@ -230,12 +250,10 @@ const styles = StyleSheet.create({
   logoImage: { width: 80, height: 80, resizeMode: 'contain' },
   logoText: { fontFamily: 'Cairo-Bold', fontSize: 18, marginHorizontal: 8, marginTop: 4 },
   notificationButton: { position: 'relative' },
-  
-  // ✅ تم التعديل: خاصية 'end' هي النسخة المنطقية من 'right'
   notificationDot: { 
     position: 'absolute', 
     top: 2, 
-    end: 2, // <-- 'right' أصبحت 'end'
+    end: 2,
     width: 10, 
     height: 10, 
     borderRadius: 5, 
@@ -243,20 +261,16 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, 
     borderColor: '#fff' 
   },
-  
-  // ✅ تم التعديل: 'flex-end' صحيحة لـ RTL
   header: { 
     paddingHorizontal: 20, 
     marginTop: 20, 
   },
-  // ✅ تم التعديل: أزلنا textAlign، سيعتمد على اتجاه اللغة
   headerText: { 
     fontSize: 28, 
     fontWeight: 'bold', 
     color: '#333', 
+    textAlign: 'right',
   },
-  
-  // ✅ تم التعديل: flexDirection: 'row'
   searchSection: { 
     flexDirection: 'row', 
     alignItems: 'center', 
@@ -273,13 +287,12 @@ const styles = StyleSheet.create({
     height: 50, 
     elevation: 5 
   },
-  // ✅ تم التعديل: أزلنا textAlign
   searchInput: { 
     flex: 1, 
     fontSize: 16, 
-    marginHorizontal: 5 
+    marginHorizontal: 5,
+    textAlign: 'right',
   },
-  // ✅✅ أهم تعديل: استخدمنا marginStart
   searchButton: { 
     width: 50, 
     height: 50, 
@@ -287,28 +300,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#D32F2F', 
     justifyContent: 'center', 
     alignItems: 'center', 
-    marginStart: 10 // <-- 'marginRight' أصبحت 'marginStart'
+    marginStart: 10
   },
-  
   section: { marginTop: 25, backgroundColor: '#F5F5F5' },
-  // ✅ تم التعديل: أزلنا textAlign
   sectionTitle: { 
     fontSize: 18, 
     fontWeight: 'bold', 
     color: '#333', 
     marginBottom: 15, 
-    paddingHorizontal: 20 
+    paddingHorizontal: 20,
+    textAlign: 'right',
   },
-  // ✅ تم التعديل: أزلنا textAlign
   noItemsText: { 
     paddingHorizontal: 20, 
-    color: '#888' 
+    color: '#888',
+    textAlign: 'right',
   },
-  
-  // CustomBottomNav سيتولى تنسيقاته بنفسه
-  
   categoryChipsContainer: {
     backgroundColor: '#F5F5F5',
+    paddingVertical: 10,
   },
   stickyCategoryChipsContainer: {
     elevation: 4,
