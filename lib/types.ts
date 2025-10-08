@@ -26,6 +26,7 @@ export interface OptionGroup {
  * يمثل صورة واحدة للوجبة، كما تأتي من جدول menu_item_images.
  */
 export interface MenuItemImage {
+  display_order: number;
   id: number;
   image_url: string;
   alt_text?: string | null;
@@ -74,3 +75,16 @@ export interface Category {
  * يمثل الفلتر النشط حاليًا في شريط الفلاتر.
  */
 export type ActiveCategory = number | 'all';
+
+
+export interface Promotion {
+  id: number;
+  created_at: string;
+  title: string;
+  description: string | null;
+  image_url: string;
+  action_type: 'navigate_to_item' | 'open_url' | 'no_action';
+  action_value: string | null;
+  is_active: boolean;
+  display_order: number;
+}
