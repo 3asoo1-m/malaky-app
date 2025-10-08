@@ -272,7 +272,7 @@ export default function HomeScreen() {
                         onPress={() => router.push(`/item/${menuItem.id}`)}
                       />
                     )}
-                    contentContainerStyle={{ paddingHorizontal: 10 }}
+                    contentContainerStyle={{ paddingHorizontal: 10, overflow: 'visible',paddingVertical:10}}
                   />
                 ) : (
                   <Text style={styles.noItemsText}>لا توجد وجبات في هذا القسم حالياً.</Text>
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   promoImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'contain', // ✅ يمكن استخدام 'cover' الآن بأمان
+    resizeMode: 'cover', // ✅ يمكن استخدام 'cover' الآن بأمان
   },
   promoTextContainer: {
     paddingVertical: 10,
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
 
   categoryChipsContainer: { backgroundColor: '#F5F5F5', paddingVertical: 10 },
   stickyCategoryChipsContainer: { elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 },
-  section: { marginTop: 25, backgroundColor: '#F5F5F5' },
+  section: { marginTop: 25, backgroundColor: '#F5F5F5', overflow: 'visible'},
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15, paddingHorizontal: 20, textAlign: 'left' },
   noItemsText: { paddingHorizontal: 20, color: '#888', textAlign: 'right' },
   centered: { padding: 20, alignItems: 'center', marginTop: 50 },
