@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   logoText: { fontFamily: 'Cairo-Bold', fontSize: 18, marginHorizontal: 8, marginTop: 4 },
   notificationButton: { position: 'relative' },
   notificationDot: { position: 'absolute', top: 2, end: 2, width: 10, height: 10, borderRadius: 5, backgroundColor: '#D32F2F', borderWidth: 1.5, borderColor: '#fff' },
-  header: { paddingHorizontal: 20, marginTop: 20 },
+  header: { paddingHorizontal: 20, marginTop: 20, alignItems: 'flex-start'},
   headerText: { fontSize: 28, fontWeight: 'bold', color: '#333', textAlign: 'right' },
   searchSection: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 20 },
   searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 25, paddingHorizontal: 15, height: 50, elevation: 5 },
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   promoImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover', // ✅ يمكن استخدام 'cover' الآن بأمان
+    resizeMode: 'contain', // ✅ يمكن استخدام 'cover' الآن بأمان
   },
   promoTextContainer: {
     paddingVertical: 10,
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   categoryChipsContainer: { backgroundColor: '#F5F5F5', paddingVertical: 10 },
   stickyCategoryChipsContainer: { elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 },
   section: { marginTop: 25, backgroundColor: '#F5F5F5' },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15, paddingHorizontal: 20, textAlign: 'right' },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15, paddingHorizontal: 20, textAlign: 'left' },
   noItemsText: { paddingHorizontal: 20, color: '#888', textAlign: 'right' },
   centered: { padding: 20, alignItems: 'center', marginTop: 50 },
 });
