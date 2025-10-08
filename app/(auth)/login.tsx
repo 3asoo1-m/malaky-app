@@ -210,12 +210,12 @@ const styles = StyleSheet.create({
     scrollContainer: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 25, paddingVertical: 20 },
     header: { alignItems: 'center', marginBottom: 30 },
     logo: { width: 180, height: 180, resizeMode: 'contain' },
-    title: { fontSize: 26, fontWeight: 'bold', color: COLORS.darkGray, textAlign: 'right', marginBottom: 8 },
-    subtitle: { fontSize: 16, color: COLORS.gray, textAlign: 'right', marginBottom: 20 },
+    title: { fontSize: 26, fontWeight: 'bold', color: COLORS.darkGray, textAlign: 'left', marginBottom: 8 },
+    subtitle: { fontSize: 16, color: COLORS.gray, textAlign: 'left', marginBottom: 20 },
 
     // --- تنسيقات المبدل ---
     switcherContainer: {
-        flexDirection: 'row-reverse',
+        flexDirection: 'row',
         backgroundColor: COLORS.lightGray,
         borderRadius: 30,
         padding: 4,
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     switcherActiveText: {
         color: COLORS.primary,
     },errorContainer: {
-        flexDirection: 'row-reverse',
+        flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 15,
         marginTop: -10,
@@ -254,14 +254,14 @@ const styles = StyleSheet.create({
         color: COLORS.secondary, // اللون الأحمر
         fontSize: 14,
         fontWeight: '500',
-        marginRight: 8,
+        marginLeft: 8,
     },
     // --- نهاية تنسيقات المبدل ---
 
     inputContainer: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: COLORS.lightGray, borderRadius: 10, paddingHorizontal: 15, marginBottom: 20, height: 55 },
-    inputIcon: { marginLeft: 10 },
-    inputField: { flex: 1, fontSize: 16, textAlign: 'right', color: COLORS.darkGray },
-    forgotPasswordContainer: { alignItems: 'flex-start', marginBottom: 25 },
+    inputIcon: { marginRight: 10 },
+    inputField: { flex: 1, fontSize: 16, textAlign: 'left', color: COLORS.darkGray },
+    forgotPasswordContainer: { alignItems: 'center', marginBottom: 25 },
     forgotPasswordText: { color: COLORS.primary, fontWeight: '600', fontSize: 15 },
     button: { backgroundColor: COLORS.primary, paddingVertical: 15, borderRadius: 10, alignItems: 'center', marginBottom: 25, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 8 },
     buttonText: { color: COLORS.white, fontSize: 18, fontWeight: 'bold' },
