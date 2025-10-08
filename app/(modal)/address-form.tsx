@@ -205,15 +205,15 @@ export default function AddressFormScreen() {
 // --- التنسيقات ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9F9F9' },
-  header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', backgroundColor: '#fff' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', backgroundColor: '#fff' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   closeButton: { position: 'absolute', left: 16 },
   scrollContainer: { padding: 24, paddingBottom: 50 },
-  label: { fontSize: 15, fontWeight: '600', color: '#555', marginBottom: 8, textAlign: 'right' },
+  label: { fontSize: 15, fontWeight: '600', color: '#555', marginBottom: 8, textAlign: 'left' },
   input: { backgroundColor: '#fff', padding: 15, borderRadius: 10, fontSize: 16, textAlign: 'right', borderWidth: 1, borderColor: '#ddd', marginBottom: 20 },
   button: { backgroundColor: '#C62828', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 16 },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  errorText: { color: '#E53935', marginTop: -10, marginBottom: 10, textAlign: 'right', fontSize: 13 },
+  errorText: { color: '#E53935', marginTop: -10, marginBottom: 10, textAlign: 'left', fontSize: 13 },
 });
 
 // ✅ 8. تنسيقات خاصة بمكتبة RNPickerSelect
@@ -246,7 +246,7 @@ const pickerSelectStyles = StyleSheet.create({
   },
   iconContainer: {
     top: 15,
-    left: 15,
+    right: 15,
   },
   placeholder: {
     color: '#9EA0A4',

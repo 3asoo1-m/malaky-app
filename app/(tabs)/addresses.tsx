@@ -186,24 +186,24 @@ export default function AddressesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9F9F9' },
-  header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#F9F9F9' },
+  header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#F9F9F9' },
   headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#333' },
   backButton: { padding: 4 },
   listContainer: { padding: 16, paddingBottom: 100, flexGrow: 1 },
-  addressCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#eee' },
+  addressCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#eee' },
   cardPressed: { transform: [{ scale: 0.98 }], backgroundColor: '#F5F5F5' },
   cardIcon: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#FEECEB', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  cardDetails: { flex: 1, alignItems: 'flex-end' },
+  cardDetails: { flex: 1, alignItems: 'flex-start' },
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#333' },
   cardSubtitle: { fontSize: 14, color: '#777', marginTop: 4 },
   deleteButton: { padding: 8, marginLeft: 8 }, // تعديل بسيط للمسافة
-  fab: { position: 'absolute', right: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: '#C62828', justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, shadowOffset: { width: 0, height: 4 } },
+  fab: { position: 'absolute', left: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: '#C62828', justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, shadowOffset: { width: 0, height: 4 } },
   centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   emptyText: { fontSize: 18, fontWeight: '600', color: '#555', marginTop: 20 },
   emptySubText: { fontSize: 14, color: '#999', marginTop: 8, textAlign: 'center' },
   // 6. تنسيق أيقونة الاختيار
   selectionIcon: {
-    marginRight: 'auto', // لدفعها إلى أقصى اليسار
+    marginLeft: 'auto', // لدفعها إلى أقصى اليسار
     paddingLeft: 8,
   },
 });
