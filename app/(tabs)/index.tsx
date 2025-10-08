@@ -364,6 +364,6 @@ const styles = StyleSheet.create({
   stickyCategoryChipsContainer: { elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 },
   section: { marginTop: 25, backgroundColor: '#F5F5F5', overflow: 'visible'},
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15, paddingHorizontal: 20, textAlign: 'left' },
-  noItemsText: { paddingHorizontal: 20, color: '#888', textAlign: 'right' },
+  noItemsText: { paddingHorizontal: 20, color: '#888', textAlign: 'left' },
   centered: { padding: 20, alignItems: 'center', marginTop: 50 },
 });
