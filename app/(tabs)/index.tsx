@@ -205,7 +205,7 @@ useEffect(() => {
                       // داخل ملف app/(tabs)/index.tsx
 
 <MenuItemCard
-  // ✅✅✅ الحل: تمرير الكائن 'menuItem' بالكامل تحت خاصية 'item' ✅✅✅
+  // ✅✅ الحل: تمرير الكائن 'menuItem' بالكامل تحت خاصية 'item' ✅✅✅
   item={menuItem}
   onPress={() => router.push(`/item/${menuItem.id}`)}
 />
