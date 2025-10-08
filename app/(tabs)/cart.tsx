@@ -10,40 +10,36 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Modal,      // <-- 1. استيراد Modal
-  Pressable,  // <-- 1. استيراد Pressable
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCart, CartItem, OrderType, Address, Branch } from '@/lib/useCart';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import CustomBottomNav from '@/components/CustomBottomNav';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 
 export default function CartScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
   const {
     items, updateQuantity, removeFromCart, subtotal, totalPrice, deliveryPrice,
     orderType, setOrderType, setDeliveryPrice, selectedAddress, setSelectedAddress,
-    selectedBranch, setSelectedBranch,clearCart,
+    selectedBranch, setSelectedBranch, clearCart,
   } = useCart();
 
   const [availableAddresses, setAvailableAddresses] = useState<Address[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [availableBranches, setAvailableBranches] = useState<Branch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
-
-  // 2. إضافة حالة للتحكم في ظهور المودال
   const [isBranchPickerVisible, setBranchPickerVisible] = useState(false);
-  const [isPlacingOrder, setPlacingOrder] = useState(false); // <-- الإضافة الجديدة
+  const [isPlacingOrder, setPlacingOrder] = useState(false);
 
-  // ... (كل دوال جلب البيانات و useEffect تبقى كما هي تمامًا)
   const fetchAddresses = useCallback(async () => {
-    if (!user) return; setLoadingAddresses(true);
+    if (!user) return;
+    setLoadingAddresses(true);
     const { data: rawData, error } = await supabase.from('user_addresses').select(`id, street_address, notes, created_at, delivery_zones (city, area_name, delivery_price)`).eq('user_id', user.id).order('created_at', { ascending: false });
     if (error) { console.error('Error fetching addresses:', error.message); }
     else if (rawData) {
@@ -76,17 +72,84 @@ export default function CartScreen() {
     else { setDeliveryPrice(0); }
   }, [selectedAddress, orderType, setDeliveryPrice]);
 
-  // ... (renderItem و OrderTypeSelector و AddressSection تبقى كما هي)
+  const handleSelectBranch = (branch: Branch) => {
+    setSelectedBranch(branch);
+    setBranchPickerVisible(false);
+  };
+
+  const handleCheckout = async () => {
+    if (!user) {
+      Alert.alert('خطأ', 'يجب عليك تسجيل الدخول أولاً لإتمام الطلب.');
+      return;
+    }
+    if (items.length === 0) {
+      Alert.alert('خطأ', 'سلتك فارغة!');
+      return;
+    }
+
+    setPlacingOrder(true);
+
+    try {
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          total_price: totalPrice,
+          subtotal: subtotal,
+          delivery_price: deliveryPrice,
+          order_type: orderType,
+          user_address_id: orderType === 'delivery' ? selectedAddress?.id : null,
+          branch_id: orderType === 'pickup' ? selectedBranch?.id : null,
+        })
+        .select('id')
+        .single();
+
+      if (orderError) throw orderError;
+
+      const orderId = orderData.id;
+
+      const orderItems = items.map(cartItem => ({
+        order_id: orderId,
+        menu_item_id: cartItem.product.id,
+        quantity: cartItem.quantity,
+        unit_price: cartItem.product.price,
+        options: cartItem.options,
+        notes: cartItem.notes,
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      Alert.alert('نجاح!', 'تم استلام طلبك بنجاح.');
+      clearCart();
+      router.push('/');
+
+    } catch (error: any) {
+      console.error('Error placing order:', error);
+      Alert.alert('خطأ فادح', 'حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setPlacingOrder(false);
+    }
+  };
+
   const renderItem = ({ item }: { item: CartItem }) => {
     const optionLabels = Object.entries(item.options).map(([groupId, value]) => {
       const group = item.product.options?.find(g => g.id === groupId);
       const optionValue = group?.values.find(v => v.value === value);
       return optionValue ? optionValue.label : null;
     }).filter(Boolean).join('، ');
+
+    // ✅✅✅ التعديل الوحيد هنا ✅✅✅
+    // جلب الصورة من مصفوفة 'images' مع توفير صورة افتراضية
+    const imageUrl = item.product.images && item.product.images.length > 0
+      ? item.product.images[0].image_url
+      : 'https://dgplcadvneqpohxqlilg.supabase.co/storage/v1/object/public/menu_image/icon.png'; // رابط صورة افتراضية مؤقت
+
     return (
-      <TouchableOpacity onPress={() => router.push(`/item/${item.product.id}`)} style={styles.cartItemContainer}>
+      <TouchableOpacity onPress={( ) => router.push(`/item/${item.product.id}`)} style={styles.cartItemContainer}>
         <TouchableOpacity onPress={() => removeFromCart(item.id)} style={styles.deleteButton}><Ionicons name="close-circle" size={24} color="#999" /></TouchableOpacity>
-        <Image source={{ uri: item.product.image_url || '' }} style={styles.itemImage} />
+        <Image source={{ uri: imageUrl }} style={styles.itemImage} />
         <View style={styles.itemDetails}>
           <Text style={styles.itemName}>{item.product.name}</Text>
           {optionLabels.length > 0 && (<Text style={styles.optionsText}>{optionLabels}</Text>)}
@@ -101,12 +164,14 @@ export default function CartScreen() {
       </TouchableOpacity>
     );
   };
+
   const OrderTypeSelector = () => (
     <View style={styles.orderTypeContainer}>
       <TouchableOpacity style={[styles.orderTypeButton, orderType === 'pickup' && styles.orderTypeActive]} onPress={() => setOrderType('pickup')}><Ionicons name="storefront-outline" size={24} color={orderType === 'pickup' ? '#fff' : '#333'} /><Text style={[styles.orderTypeText, orderType === 'pickup' && styles.orderTypeTextActive]}>استلام</Text></TouchableOpacity>
       <TouchableOpacity style={[styles.orderTypeButton, orderType === 'delivery' && styles.orderTypeActive]} onPress={() => setOrderType('delivery')}><Ionicons name="bicycle-outline" size={24} color={orderType === 'delivery' ? '#fff' : '#333'} /><Text style={[styles.orderTypeText, orderType === 'delivery' && styles.orderTypeTextActive]}>توصيل</Text></TouchableOpacity>
     </View>
   );
+
   const AddressSection = () => {
     if (orderType !== 'delivery') return null;
     if (loadingAddresses) return <ActivityIndicator style={{ marginVertical: 20 }} color="#C62828" />;
@@ -125,7 +190,6 @@ export default function CartScreen() {
     );
   };
 
-  // 3. تعديل BranchSection ليفتح المودال
   const BranchSection = () => {
     if (orderType !== 'pickup') return null;
     if (loadingBranches) return <ActivityIndicator style={{ marginVertical: 20 }} color="#C62828" />;
@@ -147,85 +211,8 @@ export default function CartScreen() {
     );
   };
 
-  // 4. دالة لاختيار الفرع وإغلاق المودال
-  const handleSelectBranch = (branch: Branch) => {
-    setSelectedBranch(branch);
-    setBranchPickerVisible(false);
-  };
-  const handleCheckout = async () => {
-    // 1. التحقق من الشروط الأساسية
-    if (!user) {
-      Alert.alert('خطأ', 'يجب عليك تسجيل الدخول أولاً لإتمام الطلب.');
-      return;
-    }
-    if (items.length === 0) {
-      Alert.alert('خطأ', 'سلتك فارغة!');
-      return;
-    }
-
-    setPlacingOrder(true); // 2. بدء التحميل
-
-    try {
-      // 3. إدراج الطلب الرئيسي في جدول 'orders'
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          user_id: user.id,
-          total_price: totalPrice,
-          subtotal: subtotal,
-          delivery_price: deliveryPrice,
-          order_type: orderType,
-          // إذا كان توصيل، أرسل id العنوان، وإلا أرسل null
-          user_address_id: orderType === 'delivery' ? selectedAddress?.id : null,
-          // إذا كان استلام، أرسل id الفرع، وإلا أرسل null
-          branch_id: orderType === 'pickup' ? selectedBranch?.id : null,
-          // status له قيمة افتراضية 'new' في قاعدة البيانات
-        })
-        .select('id') // <-- مهم جدًا: اطلب من Supabase إعادة id الطلب الجديد
-        .single(); // لأننا نتوقع نتيجة واحدة فقط
-
-      if (orderError) {
-        throw orderError; // إذا حدث خطأ، انتقل إلى catch
-      }
-
-      const orderId = orderData.id;
-
-      // 4. تحضير بيانات 'order_items'
-      const orderItems = items.map(cartItem => ({
-        order_id: orderId,
-        menu_item_id: cartItem.product.id,
-        quantity: cartItem.quantity,
-        // ملاحظة: يجب أن يكون لديك حقل 'price' في جدول menu_items
-        unit_price: cartItem.product.price,
-        options: cartItem.options,
-        notes: cartItem.notes,
-      }));
-
-      // 5. إدراج كل منتجات الطلب في جدول 'order_items'
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-
-      if (itemsError) {
-        throw itemsError; // إذا حدث خطأ، انتقل إلى catch
-      }
-
-      // 6. كل شيء تم بنجاح!
-      Alert.alert('نجاح!', 'تم استلام طلبك بنجاح.');
-      clearCart();
-      // TODO: تفريغ السلة وتوجيه المستخدم
-      // clearCart(); // ستحتاج إلى إضافة هذه الدالة في useCart
-      router.push('/'); // توجيه مؤقت إلى الرئيسية
-
-    } catch (error: any) {
-      console.error('Error placing order:', error);
-      Alert.alert('خطأ فادح', 'حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى.');
-    } finally {
-      setPlacingOrder(false); // 7. إيقاف التحميل في كل الحالات
-    }
-  };
-
   return (
     <View style={styles.container}>
-      {/* 5. إضافة المودال هنا */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -280,10 +267,10 @@ export default function CartScreen() {
               (orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch || isPlacingOrder) && styles.disabledButton
             ]}
             disabled={orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch || isPlacingOrder}
-            onPress={handleCheckout} // <-- الربط هنا
+            onPress={handleCheckout}
           >
             {isPlacingOrder ? (
-              <ActivityIndicator color="#fff" /> // <-- إظهار مؤشر التحميل
+              <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.checkoutButtonText}>إتمام الطلب</Text>
             )}
@@ -295,59 +282,17 @@ export default function CartScreen() {
   );
 }
 
-// 6. إضافة تنسيقات المودال
+// التنسيقات تبقى كما هي بدون أي تغيير
 const styles = StyleSheet.create({
-  // ... (كل التنسيقات الأخرى تبقى كما هي)
   disabledButton: { backgroundColor: '#BDBDBD' },
-
-  // --- تنسيقات المودال ---
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'right',
-    marginBottom: 20,
-    color: '#333',
-  },
-  branchOption: {
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    alignItems: 'flex-end',
-  },
-  branchName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  branchAddress: {
-    fontSize: 14,
-    color: '#777',
-    marginTop: 4,
-  },
-  // --- نهاية تنسيقات المودال ---
-
-  // ... (بقية التنسيقات)
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContainer: { backgroundColor: '#fff', borderRadius: 15, padding: 20, width: '90%', maxHeight: '80%', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'right', marginBottom: 20, color: '#333' },
+  branchOption: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#eee', alignItems: 'flex-end' },
+  branchName: { fontSize: 16, fontWeight: '600', color: '#1A1A1A' },
+  branchAddress: { fontSize: 14, color: '#777', marginTop: 4 },
   container: { flex: 1, backgroundColor: '#F9F9F9' },
-  listContainer: { paddingHorizontal: 16 },
-  headerTitle: { fontSize: 32, fontWeight: 'bold', textAlign: 'right', marginBottom: 16, color: '#1A1A1A', marginTop: 16 },
+  headerTitle: { fontSize: 32, fontWeight: 'bold', textAlign: 'right', marginBottom: 16, color: '#1A1A1A', marginTop: 16, paddingHorizontal: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '600', textAlign: 'right', marginBottom: 12, marginTop: 24, color: '#333' },
   orderTypeContainer: { flexDirection: 'row-reverse', backgroundColor: '#EFEFEF', borderRadius: 30, padding: 4 },
   orderTypeButton: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 26 },

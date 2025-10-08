@@ -1,6 +1,6 @@
 // مسار الملف: app/(tabs)/favorites.tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,49 +8,48 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView, // ✅ 1. استخدام SafeAreaView
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useFavorites } from '@/lib/useFavorites';
 import { supabase } from '@/lib/supabase';
 import { MenuItem } from '@/lib/types';
 import MenuItemCard from '@/components/MenuItemCard';
-import CustomBottomNav from '@/components/CustomBottomNav';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons'; // ✅ 2. استيراد الأيقونات
+import CustomBottomNav from '@/components/CustomBottomNav'; // ✅ 1. إعادة استيراد CustomBottomNav
+import { Ionicons } from '@expo/vector-icons';
 
 export default function FavoritesScreen() {
   const router = useRouter();
   const { favoriteIds } = useFavorites();
   const [items, setItems] = useState<MenuItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const fetchFavoriteItems = async () => {
     if (favoriteIds.size === 0) {
       setItems([]);
-      setLoading(false);
       return;
     }
     setLoading(true);
     const ids = Array.from(favoriteIds);
-const { data, error } = await supabase
-  .from('menu_items')
-  .select(`
-    *,
-    images:menu_item_images (
-      id,
-      image_url,
-      alt_text
-    )
-  `)
-  .in('id', ids);
-    if (error) console.error('Error fetching favorite items:', error);
-    else setItems(data);
+    
+    const { data, error } = await supabase
+      .from('menu_items')
+      .select(`*, images:menu_item_images(id, image_url, display_order)`)
+      .in('id', ids);
+
+    if (error) {
+      console.error('Error fetching favorite items:', error);
+    } else {
+      setItems(data || []);
+    }
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchFavoriteItems();
-  }, [favoriteIds]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchFavoriteItems();
+    }, [favoriteIds])
+  );
 
   if (loading && items.length === 0) {
     return (
@@ -61,69 +60,66 @@ const { data, error } = await supabase
   }
 
   return (
-    // ✅ 3. استخدام SafeAreaView كحاوية رئيسية
-    <SafeAreaView style={styles.fullScreen}>
-      {/* ✅ 4. عنوان بسيط بدلاً من الهيدر الكامل */}
-      <Text style={styles.headerTitle}>المفضلة</Text>
+    // ✅ 2. استخدام View كحاوية رئيسية للسماح بوضع الشريط السفلي بشكل مطلق
+    <View style={styles.fullScreen}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <Text style={styles.headerTitle}>المفضلة</Text>
 
-      {items.length === 0 ? (
-        // ✅ 5. تحسين رسالة القائمة الفارغة
-        <View style={styles.centered}>
-          <Ionicons name="heart-dislike-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>قائمة المفضلة فارغة</Text>
-          <Text style={styles.emptySubText}>أضف بعض المنتجات التي تحبها لتبدأ</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id.toString()}
-          numColumns={2}
-          renderItem={({ item }) => (
-  <View style={styles.cardWrapper}>
-    <MenuItemCard
-      id={item.id}
-      name={item.name}
-      description={item.description}
-      price={item.price}
-      imageUrl={item.images && item.images.length > 0 ? item.images[0].image_url : undefined}
-      onPress={() => router.push(`/item/${item.id}`)}
-    />
-  </View>
-)}
-
-          // ✅ 6. تعديل التنسيقات لإضافة مسافات
-          contentContainerStyle={styles.listContainer}
-          columnWrapperStyle={styles.row} // تنسيق للصف
-          refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={fetchFavoriteItems} />
-          }
-        />
-      )}
-
+        {items.length === 0 ? (
+          <View style={styles.centered}>
+            <Ionicons name="heart-dislike-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>قائمة المفضلة فارغة</Text>
+            <Text style={styles.emptySubText}>أضف بعض المنتجات التي تحبها لتبدأ</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            renderItem={({ item }) => (
+              <View style={styles.cardWrapper}>
+                <MenuItemCard
+                  item={item}
+                  onPress={() => router.push(`/item/${item.id}`)}
+                />
+              </View>
+            )}
+            contentContainerStyle={styles.listContainer}
+            columnWrapperStyle={styles.row}
+            refreshControl={
+              <RefreshControl refreshing={loading} onRefresh={fetchFavoriteItems} colors={['#C62828']} />
+            }
+          />
+        )}
+      </SafeAreaView>
+      
+      {/* ✅ 3. إعادة إضافة CustomBottomNav في الأسفل */}
       <CustomBottomNav />
-    </SafeAreaView>
+    </View>
   );
 }
 
-// ✅ 7. تحديث التنسيقات بالكامل
 const styles = StyleSheet.create({
   fullScreen: {
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
+  safeArea: {
+    flex: 1,
+  },
   headerTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontFamily: 'Cairo-Bold',
     textAlign: 'right',
     paddingHorizontal: 20,
-    paddingTop: 20, // مسافة من الأعلى
+    paddingTop: 10,
     marginBottom: 10,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 80, // لرفع المحتوى فوق الشريط السفلي
+    paddingBottom: 80,
   },
   emptyText: {
     fontSize: 20,
@@ -137,14 +133,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   listContainer: {
-    paddingHorizontal: 12.5, // مسافة من الجوانب
-    paddingBottom: 120, // مساحة للشريط السفلي
+    paddingHorizontal: 12.5,
+    paddingBottom: 120, // ✅ 4. إعادة المسافة السفلية لإفساح المجال للشريط
   },
   row: {
-    justifyContent: 'space-between', // يباعد بين العنصرين في الصف
+    justifyContent: 'space-between',
   },
   cardWrapper: {
-    width: '48%', // كل عنصر يأخذ أقل من نصف العرض بقليل
-    marginBottom: 15, // مسافة بين الصفوف
+    width: '48%',
+    marginBottom: 15,
   },
 });

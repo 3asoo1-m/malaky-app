@@ -68,21 +68,27 @@ export default function HomeScreen() {
     loadData();
   }, []);
 
-  useEffect(() => {
-    if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
+useEffect(() => {
+  if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
+
+  const sectionIndex = sections.findIndex(section => section.id === activeCategory);
+
+  if (sectionIndex !== -1) {
+    const targetIndex = sectionIndex + 2;
     
-    const sectionIndex = sections.findIndex(section => section.id === activeCategory);
-    
-    if (sectionIndex !== -1) {
-      // +2 هو لحساب الهيدر وشريط الفلاتر
-      const targetIndex = sectionIndex + 2; 
-      listRef.current.scrollToIndex({
-        animated: true,
-        index: targetIndex,
-        viewOffset: isChipsSticky ? chipsHeight : 0,
-      });
-    }
-  }, [activeCategory, chipsHeight, sections, isChipsSticky]);
+    // ✅ الحل: حساب الـ offset بشكل ثابت.
+    // الفكرة هي أننا نريد دائمًا أن يكون القسم أسفل شريط الفلاتر.
+    // لذلك، الـ offset هو دائمًا ارتفاع شريط الفلاتر.
+    const offset = chipsHeight;
+
+    listRef.current.scrollToIndex({
+      animated: true,
+      index: targetIndex,
+      viewOffset: offset, // ✅ استخدام قيمة ثابتة للـ offset
+    });
+  }
+  // ✅ إزالة isChipsSticky من مصفوفة الاعتمادات
+}, [activeCategory, chipsHeight, sections]);
 
   const filteredSections = useMemo(() => {
     if (searchQuery.trim() === '') return sections;
@@ -199,13 +205,8 @@ export default function HomeScreen() {
                       // داخل ملف app/(tabs)/index.tsx
 
 <MenuItemCard
-  // ✅ تمرير البيانات المحدثة والكاملة إلى الكرت
-  id={menuItem.id} // <-- إضافة مهمة لوظيفة المفضلة
-  name={menuItem.name}
-  description={menuItem.description} // <-- إضافة مهمة للوصف
-  price={menuItem.price}
-  // نمرر الصورة الأولى كصورة رئيسية، مع التأكد من وجودها
-  imageUrl={menuItem.images && menuItem.images.length > 0 ? menuItem.images[0].image_url : undefined}
+  // ✅✅✅ الحل: تمرير الكائن 'menuItem' بالكامل تحت خاصية 'item' ✅✅✅
+  item={menuItem}
   onPress={() => router.push(`/item/${menuItem.id}`)}
 />
 
