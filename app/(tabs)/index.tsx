@@ -52,7 +52,8 @@ const PromotionsCarousel = ({ promotions }: { promotions: Promotion[] }) => {
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={{
-          paddingHorizontal: CARD_MARGIN,
+          paddingStart: CARD_MARGIN - 10,
+          paddingEnd: CARD_MARGIN,
         }}
         snapToInterval={CARD_WIDTH + 10}
         decelerationRate="fast"

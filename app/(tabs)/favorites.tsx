@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontFamily: 'Cairo-Bold',
-    textAlign: 'right',
+    textAlign: 'left',
     paddingHorizontal: 20,
     paddingTop: 10,
     marginBottom: 10,

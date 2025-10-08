@@ -55,11 +55,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    height: 85,
+    height: 95,
     backgroundColor: '#C62828', // اللون الأحمر الداكن
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    paddingBottom: 20, // مساحة للأجهزة التي لا تحتوي على زر رئيسي
+    paddingBottom: 30, // مساحة للأجهزة التي لا تحتوي على زر رئيسي
 
     // تحديد الموضع في الأسفل
     position: 'absolute',
