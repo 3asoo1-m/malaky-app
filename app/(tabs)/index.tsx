@@ -2,17 +2,8 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  FlatList,
-  TextInput,
-  ActivityIndicator,
-  Image,
-  Platform,
-  Dimensions, // ✅ 1. استيراد Dimensions
-  Linking, // ✅ 1. استيراد Linking للتعامل مع الروابط الخارجية
+  StyleSheet, Text, View, TouchableOpacity, FlatList, TextInput,
+  ActivityIndicator, Image, Platform, Dimensions, Linking,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
@@ -22,29 +13,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MenuItemCard from '@/components/MenuItemCard';
 import CategoryChips from '@/components/CategoryChips';
 import CustomBottomNav from '@/components/CustomBottomNav';
-// ✅ 2. استيراد النوع الجديد
 import { Category, CategoryWithItems, ActiveCategory, Promotion } from '@/lib/types';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 // =================================================================
-// ✅ 3. مكون عرض الإعلانات (Carousel)
+// ✅✅✅ مكون الإعلانات بالتصميم الجديد ✅✅✅
 // =================================================================
 const PromotionsCarousel = ({ promotions }: { promotions: Promotion[] }) => {
   const router = useRouter();
 
   const handlePress = (promotion: Promotion) => {
     if (!promotion.action_type || !promotion.action_value) return;
-
     switch (promotion.action_type) {
       case 'navigate_to_item':
         router.push(`/item/${promotion.action_value}`);
         break;
       case 'open_url':
-        Linking.openURL(promotion.action_value);
+        Linking.openURL(promotion.action_value).catch(err => console.error("Couldn't load page", err));
         break;
       default:
-        // لا تفعل شيئًا للأنواع الأخرى
         break;
     }
   };
@@ -53,31 +41,39 @@ const PromotionsCarousel = ({ promotions }: { promotions: Promotion[] }) => {
     return null;
   }
 
+  const CARD_WIDTH = screenWidth * 0.85;
+  const CARD_MARGIN = (screenWidth - CARD_WIDTH) / 2;
+
   return (
     <View style={styles.promoContainer}>
       <FlatList
         data={promotions}
         horizontal
-        pagingEnabled
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={{
+          paddingHorizontal: CARD_MARGIN,
+        }}
+        snapToInterval={CARD_WIDTH + 10}
+        decelerationRate="fast"
         renderItem={({ item }) => (
+          // ✅ 1. تغيير بنية البطاقة
           <TouchableOpacity
-            style={styles.promoCard}
+            style={[styles.promoCard, { width: CARD_WIDTH }]}
             onPress={() => handlePress(item)}
             activeOpacity={0.9}
           >
-            <Image source={{ uri: item.image_url }} style={styles.promoImage} />
+            {/* حاوية الصورة */}
+            <View style={styles.promoImageContainer}>
+              <Image source={{ uri: item.image_url }} style={styles.promoImage} />
+            </View>
+            {/* حاوية النص (الآن أسفل الصورة) */}
             <View style={styles.promoTextContainer}>
-              <Text style={styles.promoTitle}>{item.title}</Text>
-              {item.description && <Text style={styles.promoDescription}>{item.description}</Text>}
+              <Text style={styles.promoTitle} numberOfLines={1}>{item.title}</Text>
+              {item.description && <Text style={styles.promoDescription} numberOfLines={1}>{item.description}</Text>}
             </View>
           </TouchableOpacity>
         )}
-        // لجعل البطاقة الأولى تبدأ من الحافة اليمنى في RTL
-        contentContainerStyle={{ paddingStart: 20, paddingEnd: 20 }}
-        snapToInterval={screenWidth - 20} // عرض البطاقة + الهامش
-        decelerationRate="fast"
       />
     </View>
   );
@@ -85,8 +81,8 @@ const PromotionsCarousel = ({ promotions }: { promotions: Promotion[] }) => {
 
 
 export default function HomeScreen() {
+  // ... (كل الكود الخاص بـ HomeScreen يبقى كما هو تمامًا)
   const router = useRouter();
-  // ✅ 4. إضافة حالة جديدة للإعلانات
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [sections, setSections] = useState<CategoryWithItems[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -106,7 +102,6 @@ export default function HomeScreen() {
     const loadData = async () => {
       setLoading(true);
       try {
-        // ✅ 5. جلب البيانات بالتوازي لتحسين الأداء
         const [menuResponse, promotionsResponse] = await Promise.all([
           supabase.rpc('get_menu'),
           supabase.from('promotions').select('*').eq('is_active', true).order('display_order')
@@ -133,9 +128,8 @@ export default function HomeScreen() {
   useEffect(() => {
     if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
 
-    // ✅ 6. تحديث منطق التمرير ليأخذ الإعلانات في الحسبان
     const promoSectionExists = promotions.length > 0;
-    const baseIndex = 1 + (promoSectionExists ? 1 : 0) + 1; // 1 (header) + 1 (promos?) + 1 (categories)
+    const baseIndex = 1 + (promoSectionExists ? 1 : 0) + 1;
     const sectionIndex = sections.findIndex(section => section.id === activeCategory);
 
     if (sectionIndex !== -1) {
@@ -163,7 +157,6 @@ export default function HomeScreen() {
       .filter(section => section.menu_items && section.menu_items.length > 0);
   }, [sections, searchQuery]);
 
-  // ✅ 7. تحديث listData لإضافة عنصر الإعلانات بشكل شرطي
   const listData = useMemo(() => [
     { type: 'header' as const, id: 'main-header' },
     ...(promotions.length > 0 ? [{ type: 'promotions' as const, id: 'promo-carousel' }] : []),
@@ -182,12 +175,10 @@ export default function HomeScreen() {
           ref={listRef}
           data={listData}
           keyExtractor={(item) => item.id.toString()}
-          // ✅ 8. تحديث الفهرس اللزج ليكون ديناميكيًا
           stickyHeaderIndices={promotions.length > 0 ? [2] : [1]}
           onScroll={(event) => {
             const scrollY = event.nativeEvent.contentOffset.y;
-            // تعديل ارتفاع الهيدر ليأخذ الإعلانات في الحسبان
-            const PROMO_HEIGHT = promotions.length > 0 ? 185 : 0;
+            const PROMO_HEIGHT = promotions.length > 0 ? 240 : 0; // زيادة الارتفاع
             const HEADER_HEIGHT = (Platform.OS === 'ios' ? 260 : 280) + PROMO_HEIGHT;
             setIsChipsSticky(scrollY > HEADER_HEIGHT);
           }}
@@ -234,7 +225,6 @@ export default function HomeScreen() {
               );
             }
 
-            // ✅ 9. إضافة حالة عرض الإعلانات
             if (item.type === 'promotions') {
               return <PromotionsCarousel promotions={promotions} />;
             }
@@ -294,7 +284,7 @@ export default function HomeScreen() {
   );
 }
 
-// ✅ 10. إضافة وتحديث التنسيقات
+// ✅✅✅ التنسيقات المحدثة بالكامل للتصميم الجديد ✅✅✅
 const styles = StyleSheet.create({
   fullScreen: { flex: 1, backgroundColor: '#F5F5F5' },
   container: { flex: 1 },
@@ -312,50 +302,50 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 16, marginHorizontal: 5, textAlign: 'right' },
   searchButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#D32F2F', justifyContent: 'center', alignItems: 'center', marginStart: 10 },
   
-  // --- تنسيقات الإعلانات ---
+  // --- تنسيقات الإعلانات بالتصميم الجديد ---
   promoContainer: {
-    height: 185, // ارتفاع ثابت للحاوية
     marginTop: 25,
-    marginBottom: -15,
+    marginBottom: -5,
+    height: 240, // ✅ زيادة الارتفاع الكلي للحاوية
   },
   promoCard: {
-    width: screenWidth - 40,
-    height: 160,
+    // العرض يتم تحديده ديناميكيًا
+    height: 220, // ✅ زيادة ارتفاع البطاقة
+    marginHorizontal: 5,
     borderRadius: 16,
-    overflow: 'hidden',
-    position: 'relative',
-    elevation: 5,
+    backgroundColor: '#fff', // خلفية البطاقة
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    backgroundColor: '#fff', // خلفية في حال تأخر تحميل الصورة
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  promoImageContainer: {
+    height: 150, // ✅ تحديد ارتفاع حاوية الصورة
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#f0f0f0',
   },
   promoImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'cover', // ✅ يمكن استخدام 'cover' الآن بأمان
   },
   promoTextContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'flex-end', // ✅ محاذاة النصوص لليمين
   },
   promoTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: 'Cairo-Bold',
-    color: '#fff',
-    textAlign: 'right',
+    color: '#333', // ✅ تغيير لون النص
   },
   promoDescription: {
     fontSize: 14,
     fontFamily: 'Cairo-Regular',
-    color: '#eee',
-    textAlign: 'right',
+    color: '#777', // ✅ تغيير لون النص
     marginTop: 2,
   },
   // --- نهاية تنسيقات الإعلانات ---
