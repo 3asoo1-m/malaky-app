@@ -165,7 +165,7 @@ export default function OrderDetailsScreen() {
                     // ✅ 4. جلب الصورة من مصفوفة الصور
                     const imageUrl = item.menu_items.images && item.menu_items.images.length > 0
                         ? item.menu_items.images[0].image_url
-                        : 'https://placehold.co/100';
+                        : 'https://dgplcadvneqpohxqlilg.supabase.co/storage/v1/object/public/menu_image/icon.png';
 
                     return (
                         <View key={index} style={styles.itemContainer}>
