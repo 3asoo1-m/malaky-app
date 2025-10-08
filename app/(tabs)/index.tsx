@@ -128,12 +128,21 @@ export default function HomeScreen() {
   useEffect(() => {
     if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
 
+    // 1. تحديد ما إذا كان قسم الإعلانات موجودًا
     const promoSectionExists = promotions.length > 0;
-    const baseIndex = 1 + (promoSectionExists ? 1 : 0) + 1;
+    
+    // 2. حساب الفهرس الأساسي بشكل ديناميكي
+    // الفهرس يبدأ من 0. العناصر هي: header, (promotions?), categories, ...sections
+    // فهرس قسم categories هو 1 إذا لم تكن هناك إعلانات، و 2 إذا كانت موجودة.
+    const categoriesIndex = 1 + (promoSectionExists ? 1 : 0);
+
+    // 3. العثور على فهرس القسم المطلوب ضمن مصفوفة الأقسام فقط
     const sectionIndex = sections.findIndex(section => section.id === activeCategory);
 
     if (sectionIndex !== -1) {
-      const targetIndex = baseIndex + sectionIndex -1;
+      // 4. الفهرس النهائي هو فهرس قسم categories + فهرس القسم المطلوب + 1
+      const targetIndex = categoriesIndex + sectionIndex + 1;
+      
       const offset = chipsHeight;
       listRef.current.scrollToIndex({
         animated: true,
@@ -263,7 +272,7 @@ export default function HomeScreen() {
                         onPress={() => router.push(`/item/${menuItem.id}`)}
                       />
                     )}
-                    contentContainerStyle={{ paddingHorizontal: 20 }}
+                    contentContainerStyle={{ paddingHorizontal: 10 }}
                   />
                 ) : (
                   <Text style={styles.noItemsText}>لا توجد وجبات في هذا القسم حالياً.</Text>
