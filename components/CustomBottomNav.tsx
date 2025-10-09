@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    height: 95,
+    height: 85,
     backgroundColor: '#C62828', // اللون الأحمر الداكن
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,

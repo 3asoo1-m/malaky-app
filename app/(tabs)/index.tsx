@@ -93,6 +93,7 @@ export default function HomeScreen() {
   const [chipsHeight, setChipsHeight] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const listRef = useRef<FlatList>(null);
+  const [hasUnread, setHasUnread] = useState(false);
 
   const handleCategorySelect = (categoryId: ActiveCategory) => {
     setSearchQuery('');
@@ -103,9 +104,15 @@ export default function HomeScreen() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [menuResponse, promotionsResponse] = await Promise.all([
+         const { data: { user } } = await supabase.auth.getUser();
+           if (!user) throw new Error("User not found");
+        const [menuResponse, promotionsResponse, notificationResponse] = await Promise.all([
           supabase.rpc('get_menu'),
-          supabase.from('promotions').select('*').eq('is_active', true).order('display_order')
+          supabase.from('promotions').select('*').eq('is_active', true).order('display_order'),
+          supabase.from('notifications')
+          .select('id', { count: 'exact', head: true }) // head: true لا يجلب البيانات، فقط العدد
+          .eq('user_id', user.id)
+          .eq('is_read', false) // تحقق فقط من الإشعارات غير المقروءة
         ]);
 
         if (menuResponse.error) throw menuResponse.error;
@@ -116,6 +123,14 @@ export default function HomeScreen() {
 
         if (promotionsResponse.error) throw promotionsResponse.error;
         setPromotions(promotionsResponse.data || []);
+
+        if (notificationResponse.error) {
+  console.error("Error fetching notification status:", notificationResponse.error);
+} else {
+  // ✅ الحل: استخدم ?? لتحويل null إلى 0 قبل المقارنة
+  const unreadCount = notificationResponse.count ?? 0;
+  setHasUnread(unreadCount > 0);
+}
 
       } catch (err) {
         console.error("Error loading data:", err);
@@ -205,12 +220,19 @@ export default function HomeScreen() {
                     </View>
                     <TouchableOpacity 
   style={styles.notificationButton}
-  onPress={() => router.push('/notifications')} // ✅ الإضافة هنا
+  onPress={() => router.push('/notifications')}
 >
-  <Ionicons name="notifications-outline" size={28} color="#000" />
-  {/* يمكنك لاحقًا إضافة منطق لإظهار النقطة فقط إذا كانت هناك إشعارات غير مقروءة */}
-  {/* <View style={styles.notificationDot} /> */}
+  {/* ✅ استخدم hasUnread لتغيير اسم الأيقونة */}
+  <Ionicons 
+    name={hasUnread ? "notifications" : "notifications-outline"} 
+    size={28} 
+    color={hasUnread ? "#D32F2F" : "#000"} // ✅ تغيير اللون أيضاً لزيادة الوضوح
+  />
+  
+  {/* ✅ استخدم hasUnread لإظهار النقطة الحمراء */}
+  {hasUnread && <View style={styles.notificationDot} />}
 </TouchableOpacity>
+
                   </View>
                   <View style={styles.header}>
                     <Text style={styles.headerText}>اختر</Text>

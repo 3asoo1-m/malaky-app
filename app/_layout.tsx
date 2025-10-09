@@ -1,6 +1,6 @@
 // مسار الملف: app/_layout.tsx
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react'; // 1. استيراد useRef
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '@/lib/useAuth';
 import { ActivityIndicator, View, I18nManager } from 'react-native';
@@ -8,8 +8,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { FavoritesProvider } from '@/lib/useFavorites';
 import { CartProvider } from '@/lib/useCart';
 
-// ✅ 1. استيراد الدالة الجديدة والمباشرة
-import { registerForPushNotificationsAsync } from '@/lib/notifications'; // تأكد من أن المسار صحيح
+// 2. استيراد دالتي التسجيل والإلغاء
+import { registerForPushNotificationsAsync, unregisterForPushNotificationsAsync } from '@/lib/notifications';
 
 // --- كود RTL يبقى كما هو ---
 try {
@@ -24,29 +24,41 @@ const AuthGuard = () => {
   const segments = useSegments();
   const router = useRouter();
 
+  // 2. إنشاء متغير ref لتتبع المحاولة
+  const notificationRegistrationAttempted = useRef(false);
+
   useEffect(() => {
-    if (initialLoading) return; // انتظر حتى ينتهي التحميل الأولي
+    if (initialLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
     if (user) {
       // المستخدم مسجل دخوله
       if (inAuthGroup) {
-        // إذا كان في صفحة تسجيل الدخول، انقله للصفحة الرئيسية
         router.replace('/');
       }
-      // ✅ 2. بما أن المستخدم مسجل دخوله، قم بتسجيل توكن الإشعارات
-      console.log("User is authenticated, registering for push notifications...");
-      registerForPushNotificationsAsync();
+      
+      // 3. التحقق من العلم قبل الاستدعاء
+      if (!notificationRegistrationAttempted.current) {
+        console.log("User authenticated. Attempting to register for push notifications (ONCE)...");
+        registerForPushNotificationsAsync();
+        notificationRegistrationAttempted.current = true; // 4. رفع العلم لمنع الاستدعاء مرة أخرى
+      }
 
     } else {
       // المستخدم غير مسجل دخوله
       if (!inAuthGroup) {
-        // إذا لم يكن في مجموعة المصادقة، انقله لصفحة تسجيل الدخول
         router.replace('/(auth)/login'); 
       }
+      
+      // 5. إعادة تعيين العلم عند تسجيل الخروج
+      if (notificationRegistrationAttempted.current) {
+        console.log("User logged out. Unregistering push token...");
+        unregisterForPushNotificationsAsync();
+        notificationRegistrationAttempted.current = false; 
+      }
     }
-  }, [user, initialLoading, segments, router]);
+  }, [user, initialLoading, segments, router]); // الاعتماديات تبقى كما هي
 
   if (initialLoading) {
     return (

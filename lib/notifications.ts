@@ -1,56 +1,59 @@
-// مسار الملف: lib/notifications.ts (أو أي اسم تفضله)
+// مسار الملف: lib/notifications.ts
 
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import Constants from 'expo-constants'; // لاستيراد projectId تلقائياً
+import Constants from 'expo-constants'; // أنت تستخدم هذا لجلب projectId تلقائياً، وهذا ممتاز
 import { Platform } from 'react-native';
 import { supabase } from './supabase'; // تأكد من صحة المسار
 
 // هذا الإعداد مهم لظهور الإشعارات عندما يكون التطبيق مفتوحاً
-// الكود الجديد (مع الخصائص المضافة)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
-    // --- الخصائص الإضافية المطلوبة ---
-    // عادةً ما تكون قيمتها نفس قيمة shouldShowAlert
-    shouldShowBanner: true, // (خاص بـ Android)
-    shouldShowList: true,   // (خاص بـ Android)
+    shouldShowBanner: true, // خاص بـ Android، يظهر الإشعار كـ "بانر" في الأعلى
+    shouldShowList: true,   // خاص بـ Android، يضيف الإشعار إلى قائمة الإشعارات
   }),
 });
 
-
 /**
- * الدالة الرئيسية التي تقوم بطلب الإذن، الحصول على التوكن، وحفظه في Supabase
- * يمكن استدعاؤها من أي مكان، ويفضل بعد تسجيل دخول المستخدم.
+ * الدالة الرئيسية التي تقوم بطلب الإذن، الحصول على التوكن، وحفظه في Supabase.
  */
 export async function registerForPushNotificationsAsync() {
   // 1. التحقق من أننا على جهاز حقيقي
   if (!Device.isDevice) {
-    console.log('Push notifications are only available on physical devices.');
+    console.warn('Push notifications are only available on physical devices.');
     return;
   }
 
-  // 2. طلب الأذونات
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== 'granted') {
-    alert('فشل الحصول على إذن للإشعارات! يرجى تفعيلها من إعدادات التطبيق.');
+  // 2. طلب الأذونات (مع التحقق من الحالة الحالية أولاً)
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+  if (existingStatus !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  
+  if (finalStatus !== 'granted') {
+    console.log('User denied push notification permissions.');
+    // يمكنك إظهار تنبيه هنا إذا أردت، لكن console.log أفضل لعدم إزعاج المستخدم
+    // alert('فشل الحصول على إذن للإشعارات! لن تتمكن من استقبال تحديثات الطلبات.');
     return;
   }
 
   // 3. الحصول على التوكن
   let token;
   try {
+    // طريقتك في جلب projectId هي الأفضل والأكثر ديناميكية
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
     if (!projectId) {
-      throw new Error('Expo project ID not found in app.json/app.config.js');
+      throw new Error('Expo project ID not found. Make sure it is set in app.json under extra.eas.projectId');
     }
     token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    console.log('Expo Push Token:', token);
+    console.log('Acquired Expo Push Token:', token);
   } catch (e) {
     console.error("Failed to get Expo push token:", e);
-    return; // اخرج إذا فشل الحصول على التوكن
+    return;
   }
 
   // 4. حفظ التوكن في قاعدة بيانات Supabase
@@ -62,14 +65,14 @@ export async function registerForPushNotificationsAsync() {
     }
 
     console.log(`Saving token for user ${user.id}`);
-    // upsert: إذا كان التوكن موجوداً، لا تفعل شيئاً. إذا لم يكن، أضفه.
+    // استخدام upsert هو الخيار الأمثل هنا لتجنب التكرار وتحديث user_id إذا لزم الأمر
     const { error } = await supabase
       .from('push_tokens')
       .upsert({ 
         token: token, 
         user_id: user.id 
       }, {
-        onConflict: 'token' // افحص التعارض بناءً على عمود التوكن الفريد
+        onConflict: 'token' // افحص التعارض بناءً على عمود التوكن
       });
 
     if (error) {
@@ -87,5 +90,42 @@ export async function registerForPushNotificationsAsync() {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF231F7C',
     });
+  }
+}
+
+
+// =================================================================
+// ✅ الإضافة الجديدة: دالة لإلغاء تسجيل التوكن عند تسجيل الخروج
+// =================================================================
+export async function unregisterForPushNotificationsAsync() {
+  if (!Device.isDevice) {
+    return;
+  }
+
+  try {
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) {
+      // لا داعي لرمي خطأ هنا، فقط اخرج بهدوء
+      console.warn('Could not find project ID to unregister token.');
+      return;
+    }
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+
+    if (token) {
+      // احذف التوكن من قاعدة البيانات
+      const { error } = await supabase
+        .from('push_tokens')
+        .delete()
+        .eq('token', token);
+
+      if (error) {
+        console.error('Error removing push token from DB:', error.message);
+      } else {
+        console.log('Push token successfully removed from DB.');
+      }
+    }
+  } catch (e) {
+    // هذا الخطأ متوقع إذا لم يمنح المستخدم الإذن من الأساس
+    console.warn('Could not get push token to unregister. This is normal if permissions were never granted.');
   }
 }
