@@ -1,0 +1,24 @@
+{
+  // 1. لا تقم بتفعيل Deno بشكل عام على كل المشروع
+  "deno.enable": false,
+
+  // 2. حدد المجلدات التي يجب أن يعمل فيها Deno
+  //    هذا هو الجزء الأهم.
+  "deno.enablePaths": [
+    "supabase"
+  ],
+
+  // 3. بقية إعدادات Deno تبقى كما هي
+  "deno.lint": true,
+  "deno.unstable.enable": true,
+
+  // 4. إعداد المنسق الافتراضي (Formatter)
+  //    هذا الإعداد سيتم تطبيقه تلقائياً على الملفات
+  //    داخل المجلدات المحددة في 'deno.enablePaths'.
+  "[typescript]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  }
+}

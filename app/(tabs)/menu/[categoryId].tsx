@@ -8,11 +8,13 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
+  SafeAreaView,
+  RefreshControl,
 } from 'react-native';
 
-import MenuItemCard from '@/components/MenuItemCard'; // استيراد بطاقة الوجبة
+import MenuItemCard from '@/components/MenuItemCard';
 import { supabase } from '@/lib/supabase';
-import { MenuItem } from '@/lib/types'; // استيراد نوع الوجبة
+import { MenuItem } from '@/lib/types';
 
 export default function MenuItemsScreen() {
   const router = useRouter();
@@ -21,83 +23,87 @@ export default function MenuItemsScreen() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchMenuItems = async () => {
     if (!categoryId) return;
 
-    const fetchMenuItems = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('menu_items')
-          .select('*')
-          .eq('category_id', categoryId); // فلترة الوجبات حسب معرّف القسم
+    setLoading(true);
+    try {
+      // ✅ 1. استدعاء دالة RPC الجديدة مع تمرير categoryId
+      const { data, error } = await supabase.rpc('get_items_by_category', {
+        p_category_id: Number(categoryId),
+      });
 
-        if (error) {
-          console.error('Error fetching menu items:', error);
-        } else {
-          setMenuItems(data || []);
-        }
-      } catch (error) {
-        console.error('An unexpected error occurred:', error);
-      } finally {
-        setLoading(false);
+      if (error) {
+        console.error('Error fetching menu items:', error.message);
+      } else {
+        setMenuItems(data || []);
       }
-    };
+    } catch (error) {
+      console.error('An unexpected error occurred:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchMenuItems();
   }, [categoryId]);
 
-  if (loading) {
+  if (loading && menuItems.length === 0) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#E63946" />
+        <ActivityIndicator size="large" color="#C62828" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
           title: categoryName || 'القائمة',
-          headerStyle: { backgroundColor: '#1D3557' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#333',
+          headerTitleStyle: { fontFamily: 'Cairo-Bold' },
+          headerShadowVisible: false,
         }}
       />
 
       <FlatList
         data={menuItems}
         keyExtractor={(item) => item.id.toString()}
+        numColumns={2} // ✅ 2. عرض الوجبات في عمودين
         renderItem={({ item }) => (
-          <MenuItemCard
-            name={item.name}
-            description={item.description}
-            price={item.price}
-            imageUrl={item.image_url}
-            onPress={() => router.push(`/item/${item.id}`)}
-
-            onAddToCart={() => {
-              // هنا سنضيف الوجبة إلى سلة المشتريات لاحقاً
-              console.log('Added to cart:', item.name);
-            }}
-          />
+          <View style={styles.cardWrapper}>
+            {/* ✅ 3. تمرير كائن 'item' بالكامل */}
+            <MenuItemCard
+              item={item}
+              onPress={() => router.push(`/item/${item.id}`)}
+            />
+          </View>
         )}
         ListEmptyComponent={
-          <View style={styles.centered}>
-            <Text style={styles.emptyText}>لا توجد وجبات في هذا القسم حالياً.</Text>
-          </View>
+          !loading ? (
+            <View style={styles.centered}>
+              <Text style={styles.emptyText}>لا توجد وجبات في هذا القسم حالياً.</Text>
+            </View>
+          ) : null
         }
         contentContainerStyle={styles.listContent}
+        columnWrapperStyle={styles.row}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={fetchMenuItems} colors={['#C62828']} />
+        }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
+// ✅ 4. تحديث التنسيقات بالكامل لتناسب العرض بعمودين
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F7',
+    backgroundColor: '#fff',
   },
   centered: {
     flex: 1,
@@ -106,10 +112,19 @@ const styles = StyleSheet.create({
     paddingTop: 50,
   },
   listContent: {
-    padding: 15,
+    paddingHorizontal: 12.5,
+    paddingTop: 15,
+  },
+  row: {
+    justifyContent: 'space-between',
+  },
+  cardWrapper: {
+    width: '48%',
+    marginBottom: 15,
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
+    fontFamily: 'Cairo-Regular',
   },
 });

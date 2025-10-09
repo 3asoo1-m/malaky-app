@@ -203,10 +203,14 @@ export default function HomeScreen() {
                       <Image source={require('@/assets/images/malakylogo.png')} style={styles.logoImage} />
                       <Text style={styles.logoText}>الدجاج الملكي بروست</Text>
                     </View>
-                    <TouchableOpacity style={styles.notificationButton}>
-                      <Ionicons name="notifications-outline" size={28} color="#000" />
-                      <View style={styles.notificationDot} />
-                    </TouchableOpacity>
+                    <TouchableOpacity 
+  style={styles.notificationButton}
+  onPress={() => router.push('/notifications')} // ✅ الإضافة هنا
+>
+  <Ionicons name="notifications-outline" size={28} color="#000" />
+  {/* يمكنك لاحقًا إضافة منطق لإظهار النقطة فقط إذا كانت هناك إشعارات غير مقروءة */}
+  {/* <View style={styles.notificationDot} /> */}
+</TouchableOpacity>
                   </View>
                   <View style={styles.header}>
                     <Text style={styles.headerText}>اختر</Text>
@@ -350,7 +354,7 @@ const styles = StyleSheet.create({
   promoTitle: {
     fontSize: 17,
     fontFamily: 'Cairo-Bold',
-    color: '#333', // ✅ تغيير لون النص
+    color: '#333', // 
   },
   promoDescription: {
     fontSize: 14,
