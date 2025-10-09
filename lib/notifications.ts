@@ -45,10 +45,9 @@ export async function registerForPushNotificationsAsync() {
   let token;
   try {
     // طريقتك في جلب projectId هي الأفضل والأكثر ديناميكية
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    if (!projectId) {
-      throw new Error('Expo project ID not found. Make sure it is set in app.json under extra.eas.projectId');
-    }
+    const projectId = "b83c8c0f-913e-41a4-b35a-ce1f29aa4eef";
+    console.log('Using hardcoded projectId:', projectId);
+    
     token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     console.log('Acquired Expo Push Token:', token);
   } catch (e) {
