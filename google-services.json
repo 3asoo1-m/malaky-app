@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "614688944641",
+    "project_id": "malaky-app-notifications",
+    "storage_bucket": "malaky-app-notifications.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:614688944641:android:10b27933806019df678600",
+        "android_client_info": {
+          "package_name": "com.x3asoo1.malakyapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCuM2QzfQIDPcgo6Quca3jzuJq_0m5RpmY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
