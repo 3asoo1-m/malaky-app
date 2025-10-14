@@ -19,7 +19,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import CustomBottomNav from '@/components/CustomBottomNav';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
-
+//start working on cart.tsx
 export default function CartScreen() {
   const router = useRouter();
   const { user } = useAuth();
