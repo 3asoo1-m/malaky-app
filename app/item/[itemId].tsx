@@ -45,7 +45,7 @@ const Pagination = ({ data, scrollX, itemWidth }: { data: any[]; scrollX: Animat
 
         const backgroundColor = scrollX.interpolate({
           inputRange,
-          outputRange: ['rgba(255,255,255,0.5)', '#fff', 'rgba(255,255,255,0.5)'],
+          outputRange: ['rgba(101, 1, 1, 0.5)', '#C62828', 'rgba(91, 0, 0, 0.5)'],
           extrapolate: 'clamp',
         });
 
@@ -304,7 +304,10 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginHorizontal: 4,
-    backgroundColor: '#fff', // لون أساسي
+    // ✅✅✅ هذا هو الحل العملي ✅✅✅
+    backgroundColor: '#C62828', // اللون الداخلي للنقطة
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)', // حدود بيضاء
   },
   detailsContainer: {
     padding: 20,
