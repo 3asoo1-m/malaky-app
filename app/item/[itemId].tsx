@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   // ✅ تنسيقات Pagination المحسنة
   paginationContainer: {
     position: 'absolute',
-    bottom: 25,
+    bottom: 20,
     left: 0,
     right: 0,
     flexDirection: 'row',
