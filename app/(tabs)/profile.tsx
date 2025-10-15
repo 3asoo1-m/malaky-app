@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import CustomBottomNav from '@/components/CustomBottomNav';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { unregisterForPushNotificationsAsync } from '@/lib/notifications';
 
 // دوال التصميم المتجاوب (تبقى كما هي)
 import { scale, fontScale } from '@/lib/responsive';
@@ -34,8 +35,23 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, initialLoading } = useAuth();
 
+  // ✅✅✅ الخطوة 2: تعديل دالة تسجيل الخروج ✅✅✅
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    console.log("Logging out and unregistering push token...");
+    
+    // أولاً، قم بإلغاء تسجيل التوكن من قاعدة البيانات
+    await unregisterForPushNotificationsAsync();
+    
+    // ثانيًا، قم بتسجيل الخروج من Supabase
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
+      console.error("Error signing out:", error);
+      // يمكنك إظهار تنبيه للمستخدم هنا إذا فشلت عملية تسجيل الخروج
+      alert('حدث خطأ أثناء تسجيل الخروج.');
+    }
+    
+    // AuthGuard في _layout.tsx سيتكفل بإعادة التوجيه إلى صفحة تسجيل الدخول
   };
 
   if (initialLoading) {
@@ -100,7 +116,7 @@ export default function ProfileScreen() {
           <ProfileListItem
             icon={<Ionicons name="log-out-outline" size={scale(22)} color="#C62828" />}
             text="تسجيل الخروج"
-            onPress={handleLogout}
+            onPress={handleLogout} // <-- سيتم استدعاء الدالة الجديدة والمحسنة هنا
             color="#C62828"
           />
         </View>

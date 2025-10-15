@@ -284,11 +284,16 @@ export default function OrderDetailsScreen() {
         <View style={styles.cardContent}>
           {order.order_type === 'delivery' && order.user_addresses ? (
             <>
-              <Text style={styles.infoTextBold}>{order.user_addresses.delivery_zones?.area_name}</Text>
-              <Text style={styles.infoText}>
-                {order.user_addresses.delivery_zones?.city}, {order.user_addresses.street_address}
-              </Text>
-            </>
+      {/* ✅✅✅ السطر الأول: المدينة والمنطقة بخط عريض ✅✅✅ */}
+      <Text style={styles.infoTextBold}>
+        {`${order.user_addresses.delivery_zones?.city} - ${order.user_addresses.delivery_zones?.area_name}`}
+      </Text>
+      
+      {/* ✅✅✅ السطر الثاني: تفاصيل الشارع بخط عادي ✅✅✅ */}
+      <Text style={styles.infoText}>
+        {order.user_addresses.street_address}
+      </Text>
+    </>
           ) : order.order_type === 'pickup' && order.branches ? (
             <>
               <Text style={styles.infoTextBold}>{order.branches.name}</Text>

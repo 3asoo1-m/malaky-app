@@ -1,6 +1,6 @@
 // مسار الملف: app/_layout.tsx
 
-import React, { useEffect, useRef } from 'react'; // 1. استيراد useRef
+import React, { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '@/lib/useAuth';
 import { ActivityIndicator, View, I18nManager } from 'react-native';
@@ -8,8 +8,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { FavoritesProvider } from '@/lib/useFavorites';
 import { CartProvider } from '@/lib/useCart';
 
-// 2. استيراد دالتي التسجيل والإلغاء
-import { registerForPushNotificationsAsync, unregisterForPushNotificationsAsync } from '@/lib/notifications';
+// ✅✅✅ 1. استيراد الدوال الجديدة والمهمة ✅✅✅
+import { 
+  registerForPushNotificationsAsync, 
+  setupNotificationHandlers,
+  clearBadgeCount 
+} from '@/lib/notifications';
+import { AppState } from 'react-native';
 
 // --- كود RTL يبقى كما هو ---
 try {
@@ -24,9 +29,6 @@ const AuthGuard = () => {
   const segments = useSegments();
   const router = useRouter();
 
-  // 2. إنشاء متغير ref لتتبع المحاولة
-  const notificationRegistrationAttempted = useRef(false);
-
   useEffect(() => {
     if (initialLoading) return;
 
@@ -37,28 +39,18 @@ const AuthGuard = () => {
       if (inAuthGroup) {
         router.replace('/');
       }
-      
-      // 3. التحقق من العلم قبل الاستدعاء
-      if (!notificationRegistrationAttempted.current) {
-        console.log("User authenticated. Attempting to register for push notifications (ONCE)...");
-        registerForPushNotificationsAsync();
-        notificationRegistrationAttempted.current = true; // 4. رفع العلم لمنع الاستدعاء مرة أخرى
-      }
+      // ✅✅✅ 2. تسجيل التوكن عند تسجيل الدخول ✅✅✅
+      // لا حاجة لـ useRef، هذا سيتم استدعاؤه مرة واحدة عند تغير user من null إلى قيمة
+      console.log("User authenticated. Registering for push notifications...");
+      registerForPushNotificationsAsync();
 
     } else {
       // المستخدم غير مسجل دخوله
       if (!inAuthGroup) {
         router.replace('/(auth)/login'); 
       }
-      
-      // 5. إعادة تعيين العلم عند تسجيل الخروج
-      if (notificationRegistrationAttempted.current) {
-        console.log("User logged out. Unregistering push token...");
-        unregisterForPushNotificationsAsync();
-        notificationRegistrationAttempted.current = false; 
-      }
     }
-  }, [user, initialLoading, segments, router]); // الاعتماديات تبقى كما هي
+  }, [user, initialLoading]); // ✅ الاعتماد على user و initialLoading فقط
 
   if (initialLoading) {
     return (
@@ -72,6 +64,31 @@ const AuthGuard = () => {
 };
 
 export default function RootLayout() {
+  
+  // ✅✅✅ 3. إعداد معالجات الإشعارات والتطبيق ✅✅✅
+  useEffect(() => {
+    // --- إعداد معالجات النقر على الإشعارات ---
+    const { removeReceivedListener, removeResponseListener } = setupNotificationHandlers();
+
+    // --- التعامل مع حالة التطبيق (عندما يعود المستخدم للتطبيق) ---
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      // إذا عاد المستخدم إلى التطبيق وهو في المقدمة
+      if (nextAppState === 'active') {
+        console.log('App has come to the foreground, clearing badge count.');
+        // قم بمسح عداد الإشعارات على أيقونة التطبيق
+        clearBadgeCount();
+      }
+    });
+
+    // --- دالة التنظيف (Cleanup function) ---
+    // يتم استدعاؤها عند إغلاق المكون لتجنب تسرب الذاكرة
+    return () => {
+      removeReceivedListener();
+      removeResponseListener();
+      subscription.remove();
+    };
+  }, []); // ✅ مصفوفة فارغة تعني أن هذا الـ effect يعمل مرة واحدة فقط عند تحميل التطبيق
+
   return (
     <SafeAreaProvider>
       <AuthProvider>

@@ -2,129 +2,157 @@
 
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import Constants from 'expo-constants'; // أنت تستخدم هذا لجلب projectId تلقائياً، وهذا ممتاز
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { supabase } from './supabase'; // تأكد من صحة المسار
+import { supabase } from './supabase';
 
-// هذا الإعداد مهم لظهور الإشعارات عندما يكون التطبيق مفتوحاً
+// 1. إعداد معالج الإشعارات العام
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldSetBadge: true,
     shouldShowBanner: true, // خاص بـ Android، يظهر الإشعار كـ "بانر" في الأعلى
     shouldShowList: true,   // خاص بـ Android، يضيف الإشعار إلى قائمة الإشعارات
   }),
 });
 
 /**
- * الدالة الرئيسية التي تقوم بطلب الإذن، الحصول على التوكن، وحفظه في Supabase.
+ * 2. الدالة الرئيسية لتسجيل الإشعارات
  */
 export async function registerForPushNotificationsAsync() {
-  // 1. التحقق من أننا على جهاز حقيقي
   if (!Device.isDevice) {
     console.warn('Push notifications are only available on physical devices.');
-    return;
+    return null;
   }
 
-  // 2. طلب الأذونات (مع التحقق من الحالة الحالية أولاً)
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-  
-  if (finalStatus !== 'granted') {
-    console.log('User denied push notification permissions.');
-    // يمكنك إظهار تنبيه هنا إذا أردت، لكن console.log أفضل لعدم إزعاج المستخدم
-    // alert('فشل الحصول على إذن للإشعارات! لن تتمكن من استقبال تحديثات الطلبات.');
-    return;
-  }
-
-  // 3. الحصول على التوكن
-  let token;
   try {
-    // طريقتك في جلب projectId هي الأفضل والأكثر ديناميكية
-    const projectId = "b83c8c0f-913e-41a4-b35a-ce1f29aa4eef";
-    console.log('Using hardcoded projectId:', projectId);
-    
-    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    console.log('Acquired Expo Push Token:', token);
-  } catch (e) {
-    console.error("Failed to get Expo push token:", e);
-    return;
-  }
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      console.log('User denied push notification permissions.');
+      return null;
+    }
 
-  // 4. حفظ التوكن في قاعدة بيانات Supabase
-  if (token) {
+    // ✅ استخدام projectId الديناميكي
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) {
+      throw new Error('Project ID not found in app.json/app.config.js. Make sure you have run "eas build" at least once.');
+    }
+
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    console.log('Acquired Expo Push Token:', token);
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       console.log("User not logged in, cannot save push token.");
-      return;
+      return null;
     }
 
-    console.log(`Saving token for user ${user.id}`);
-    // استخدام upsert هو الخيار الأمثل هنا لتجنب التكرار وتحديث user_id إذا لزم الأمر
+    // ✅ استخدام upsert الآمن مع معلومات إضافية
     const { error } = await supabase
       .from('push_tokens')
       .upsert({ 
         token: token, 
-        user_id: user.id 
+        user_id: user.id,
+        device_type: Platform.OS,
       }, {
-        onConflict: 'token' // افحص التعارض بناءً على عمود التوكن
+        onConflict: 'token',
+        ignoreDuplicates: false,
       });
 
-    if (error) {
-      console.error('Error saving push token:', error);
-    } else {
-      console.log('Push token saved successfully!');
-    }
-  }
+    if (error) throw error;
 
-  // 5. إعدادات إضافية خاصة بنظام Android (مهم)
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
+    console.log('Push token saved successfully!');
+    
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'طلبات المطعم',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
+    return token;
+  } catch (error) {
+    console.error("Failed to register for push notifications:", error);
+    return null;
   }
 }
 
-
-// =================================================================
-// ✅ الإضافة الجديدة: دالة لإلغاء تسجيل التوكن عند تسجيل الخروج
-// =================================================================
+/**
+ * 3. دالة إلغاء تسجيل التوكن (النسخة الآمنة)
+ */
 export async function unregisterForPushNotificationsAsync() {
-  if (!Device.isDevice) {
-    return;
-  }
+  if (!Device.isDevice) return;
 
   try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    if (!projectId) {
-      // لا داعي لرمي خطأ هنا، فقط اخرج بهدوء
-      console.warn('Could not find project ID to unregister token.');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.log('No user logged in, skipping token removal.');
       return;
     }
-    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) return;
+
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     if (token) {
-      // احذف التوكن من قاعدة البيانات
+      // ✅ الحذف الآمن: حذف التوكن للمستخدم الحالي فقط
       const { error } = await supabase
         .from('push_tokens')
         .delete()
-        .eq('token', token);
+        .eq('token', token)
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Error removing push token from DB:', error.message);
       } else {
-        console.log('Push token successfully removed from DB.');
+        console.log('Push token successfully removed from DB for this user.');
       }
     }
   } catch (e) {
-    // هذا الخطأ متوقع إذا لم يمنح المستخدم الإذن من الأساس
-    console.warn('Could not get push token to unregister. This is normal if permissions were never granted.');
+    console.warn('Could not get push token to unregister.');
+  }
+}
+
+/**
+ * 4. دالة إعداد معالجات الإشعارات
+ */
+export function setupNotificationHandlers() {
+  const receivedSubscription = Notifications.addNotificationReceivedListener(notification => {
+    console.log('Notification received while app is foregrounded:', notification);
+  });
+
+  const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+    console.log('User tapped on notification:', response);
+    const orderId = response.notification.request.content.data?.orderId;
+    if (orderId) {
+      console.log(`Should navigate to order: ${orderId}`);
+      // في المستقبل، يمكنك استخدام مكتبة توجيه هنا للانتقال إلى الشاشة
+      // import { router } from 'expo-router';
+      // router.push(`/order/${orderId}`);
+    }
+  });
+
+  return {
+    removeReceivedListener: () => receivedSubscription.remove(),
+    removeResponseListener: () => responseSubscription.remove(),
+  };
+}
+
+/**
+ * 5. دالة مسح عداد الإشعارات
+ */
+export async function clearBadgeCount() {
+  try {
+    await Notifications.setBadgeCountAsync(0);
+    console.log('Badge count cleared.');
+  } catch (error) {
+    console.error('Error clearing badge count:', error);
   }
 }
