@@ -1,30 +1,22 @@
 // مسار الملف: lib/types.ts
 
 // ===================================================================
-// أنواع الخيارات (Options) - تبقى كما هي لأنها مفيدة
+// 1. أنواع البيانات الأساسية (من قاعدة البيانات)
 // ===================================================================
 
 export interface OptionValue {
-  value: string; // القيمة المخزنة في قاعدة البيانات (e.g., 'spicy')
-  label: string; // النص الذي يظهر للمستخدم (e.g., 'حار')
-  priceModifier: number; // تغيير السعر (e.g., 2 or -1 or 0)
+  value: string;
+  label: string;
+  priceModifier: number;
 }
 
 export interface OptionGroup {
-  id: string; // معرف فريد للمجموعة (e.g., 'size')
-  label: string; // عنوان المجموعة (e.g., 'الحجم')
-  type: 'single-select' | 'multi-select'; // نوع الاختيار
+  id: string;
+  label: string;
+  type: 'single-select' | 'multi-select';
   values: OptionValue[];
 }
 
-
-// ===================================================================
-// الأنواع الجديدة والمحدثة التي تتوافق مع دالة get_menu
-// ===================================================================
-
-/**
- * يمثل صورة واحدة للوجبة، كما تأتي من جدول menu_item_images.
- */
 export interface MenuItemImage {
   display_order: number;
   id: number;
@@ -32,50 +24,22 @@ export interface MenuItemImage {
   alt_text?: string | null;
 }
 
-/**
- * يمثل الوجبة الواحدة.
- * التغيير الأهم: يحتوي الآن على مصفوفة 'images' بدلاً من 'image_url' واحد.
- */
 export interface MenuItem {
   id: number;
   name: string;
   description: string | null;
   price: number;
-  options?: OptionGroup[] | null; // الخيارات المخزنة في jsonb
-  images: MenuItemImage[]; // <-- ✅ التغيير هنا: مصفوفة من الصور
+  options?: OptionGroup[] | null;
+  images: MenuItemImage[];
 }
 
-/**
- * يمثل الصنف الواحد مع مصفوفة الوجبات الخاصة به.
- * هذا هو النوع الرئيسي الذي تمثله كل عنصر في المصفوفة القادمة من دالة get_menu.
- */
 export interface CategoryWithItems {
   id: number;
   name: string;
   display_order: number;
-  image_url: string | null; // صورة الصنف نفسه
-  menu_items: MenuItem[] | null; // الوجبات التي تنتمي لهذا الصنف
+  image_url: string | null;
+  menu_items: MenuItem[] | null;
 }
-
-
-// ===================================================================
-// أنواع مساعدة لواجهة المستخدم (UI Helper Types)
-// ===================================================================
-
-/**
- * يمثل الصنف في شريط الفلاتر (CategoryChips).
- * يتم استخلاصه من CategoryWithItems.
- */
-export interface Category {
-  id: number;
-  name: string;
-}
-
-/**
- * يمثل الفلتر النشط حاليًا في شريط الفلاتر.
- */
-export type ActiveCategory = number | 'all';
-
 
 export interface Promotion {
   id: number;
@@ -87,4 +51,135 @@ export interface Promotion {
   action_value: string | null;
   is_active: boolean;
   display_order: number;
+}
+
+export interface Address {
+  id: string;
+  street_address: string;
+  notes: string | null;
+  created_at: string;
+  delivery_zones: {
+    city: string;
+    area_name: string;
+    delivery_price: number;
+  } | null;
+}
+
+export interface Branch {
+  id: string;
+  name: string;
+  address: string;
+  is_active: boolean;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  order_id: string | null;
+}
+
+
+// ===================================================================
+// 2. أنواع مساعدة لواجهة المستخدم (UI Helper Types)
+// ===================================================================
+
+export interface Category {
+  id: number;
+  name: string;
+}
+
+export type ActiveCategory = number | 'all';
+
+export type OrderType = 'delivery' | 'pickup';
+
+export interface CartItem {
+  id: string;
+  product: MenuItem;
+  quantity: number;
+  options: Record<string, any>;
+  notes: string | undefined;
+  totalPrice: number;
+}
+
+
+// ===================================================================
+// 3. أنواع خاصة بالـ Props للمكونات (Component Props Types)
+// ===================================================================
+
+// --- Props لشاشة السلة (CartScreen) ---
+
+export interface AddressItemProps {
+  address: Address;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+export interface BranchItemProps {
+  branch: Branch;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+export interface CartItemComponentProps {
+  item: CartItem;
+  onUpdate: (itemId: string, change: 1 | -1) => void;
+  onRemove: (itemId: string) => void;
+  onPress: () => void;
+}
+
+export interface OrderTypeSelectorProps {
+  orderType: OrderType | null;
+  onTypeChange: (type: OrderType) => void;
+}
+
+export interface AddressSectionProps {
+  orderType: OrderType | null;
+  loadingAddresses: boolean;
+  availableAddresses: Address[];
+  selectedAddress: Address | null;
+  onSelectAddress: (address: Address) => void;
+  onAddAddress: () => void;
+}
+
+export interface BranchSectionProps {
+  orderType: OrderType | null;
+  loadingBranches: boolean;
+  availableBranches: Branch[];
+  selectedBranch: Branch | null;
+  onSelectBranch: (branch: Branch) => void;
+}
+
+// --- Props لشاشة تفاصيل المنتج (MenuItemDetailsScreen) ---
+
+export interface ImageCarouselProps {
+  images: { id: number | string; source: { uri: string } | number }[];
+  activeImageIndex: number;
+  onScroll: (event: any) => void;
+}
+
+export interface OptionsSectionProps {
+  group: OptionGroup;
+  selectedOptions: Record<string, any>;
+  onOptionSelect: (groupId: string, value: string) => void;
+}
+
+export interface QuantitySelectorProps {
+  quantity: number;
+  onDecrease: () => void;
+  onIncrease: () => void;
+}
+
+// ✅✅✅ --- Props للشاشة الرئيسية (HomeScreen) --- ✅✅✅
+
+export interface PromotionsCarouselProps {
+  promotions: Promotion[];
+}
+
+export interface SectionComponentProps {
+  section: CategoryWithItems;
+  router: any; // يمكنك تحسين هذا النوع لاحقًا إذا أردت
 }

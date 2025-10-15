@@ -1,42 +1,16 @@
 // مسار الملف: lib/useCart.tsx
 
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { MenuItem } from './types';
 import { randomUUID } from 'expo-crypto';
 
-// 1. تعريف الأنواع الأساسية
-export type OrderType = 'delivery' | 'pickup';
+// ✅✅✅ الخطوة 1: استيراد كل الأنواع من مصدر الحقيقة الواحد ✅✅✅
+import { MenuItem, OrderType, CartItem, Address, Branch } from './types';
 
-export interface CartItem {
-  id: string;
-  product: MenuItem;
-  quantity: number;
-  options: Record<string, any>;
-  notes?: string;
-  totalPrice: number;
-}
+// ❌❌❌ الخطوة 2: تم حذف كل التعريفات المكررة من هنا ❌❌❌
 
-export interface Address {
-  id: number;
-  street_address: string;
-  notes: string | null;
-  created_at: string;
-  delivery_zones: {
-    city: string;
-    area_name: string;
-    delivery_price: number;
-  } | null;
-}
 
-// 2. إضافة واجهة Branch
-export interface Branch {
-  id: number;
-  name: string;
-  address: string;
-  // يمكنك إضافة حقول أخرى هنا في المستقبل
-}
-
-// 3. تحديث واجهة السياق لتشمل الفرع
+// --- واجهة السياق (Context Interface) ---
+// الآن تستخدم الأنواع المستوردة بشكل صحيح
 interface CartContextType {
   items: CartItem[];
   addToCart: (product: MenuItem, quantity: number, options: Record<string, any>, notes?: string) => void;
@@ -50,20 +24,19 @@ interface CartContextType {
   totalPrice: number;
   selectedAddress: Address | null;
   setSelectedAddress: (address: Address | null) => void;
-  selectedBranch: Branch | null; // <-- جديد
-  setSelectedBranch: (branch: Branch | null) => void; // <-- جديد
-  clearCart: () => void; // <-- الإضافة الجديدة هنا
-
+  selectedBranch: Branch | null;
+  setSelectedBranch: (branch: Branch | null) => void;
+  clearCart: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [orderType, setOrderTypeState] = useState<OrderType>('pickup'); // <-- تم تغيير الاسم
+  const [orderType, setOrderTypeState] = useState<OrderType>('pickup');
   const [deliveryPrice, setDeliveryPriceState] = useState(0);
   const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null);
-  const [selectedBranch, setSelectedBranchState] = useState<Branch | null>(null); // <-- حالة جديدة
+  const [selectedBranch, setSelectedBranchState] = useState<Branch | null>(null);
 
   const addToCart = (product: MenuItem, quantity: number, options: Record<string, any>, notes?: string) => {
     setItems(currentItems => {
@@ -121,17 +94,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const setOrderType = (type: OrderType) => {
     if (type === 'delivery') {
-      setSelectedBranchState(null); // إذا اختار توصيل، ألغِ اختيار الفرع
+      setSelectedBranchState(null);
     }
     if (type === 'pickup') {
-      setSelectedAddressState(null); // إذا اختار استلام، ألغِ اختيار العنوان
-      setDeliveryPriceState(0); // سعر التوصيل صفر دائمًا في حالة الاستلام
+      setSelectedAddressState(null);
+      setDeliveryPriceState(0);
     }
     setOrderTypeState(type);
   };
 
   const clearCart = () => {
-    setItems([]); // ببساطة، قم بتفريغ مصفوفة المنتجات
+    setItems([]);
     setSelectedAddressState(null);
     setSelectedBranchState(null);
     setOrderTypeState('pickup');
@@ -140,22 +113,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const totalPrice = subtotal + deliveryPrice;
 
-  // 6. تجميع كل القيم في كائن واحد، بما في ذلك الفرع
   const value = {
     items,
     addToCart,
     updateQuantity,
     removeFromCart,
     orderType,
-    setOrderType, // <-- تمرير الدالة الذكية الجديدة
+    setOrderType,
     deliveryPrice,
     setDeliveryPrice,
     subtotal,
     totalPrice,
     selectedAddress,
     setSelectedAddress,
-    selectedBranch, // <-- تمرير حالة الفرع
-    setSelectedBranch, // <-- تمرير دالة تحديث الفرع
+    selectedBranch,
+    setSelectedBranch,
     clearCart,
   };
 

@@ -12,52 +12,23 @@ import {
   Pressable,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCart, CartItem, OrderType, Address, Branch } from '@/lib/useCart';
+import { useCart } from '@/lib/useCart';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import CustomBottomNav from '@/components/CustomBottomNav';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
-
-interface AddressItemProps {
-  address: Address;
-  isSelected: boolean;
-  onSelect: () => void;
-}
-
-interface BranchItemProps {
-  branch: Branch;
-  isSelected: boolean;
-  onSelect: () => void;
-}
-
-interface CartItemComponentProps {
-  item: CartItem;
-  onUpdate: (itemId: string, change: 1 | -1) => void;
-  onRemove: (itemId: string) => void;
-  onPress: () => void;
-}
-
-interface OrderTypeSelectorProps {
-  orderType: OrderType | null;
-  onTypeChange: (type: OrderType) => void;
-}
-
-interface AddressSectionProps {
-  orderType: OrderType | null;
-  loadingAddresses: boolean;
-  availableAddresses: Address[];
-  selectedAddress: Address | null;
-  onSelectAddress: (address: Address) => void;
-  onAddAddress: () => void;
-}
-
-interface BranchSectionProps {
-  orderType: OrderType | null;
-  loadingBranches: boolean;
-  availableBranches: Branch[];
-  selectedBranch: Branch | null;
-  onSelectBranch: (branch: Branch) => void;
-}
+import { 
+  CartItem, 
+  OrderType, 
+  Address, 
+  Branch,
+  AddressItemProps,
+  BranchItemProps,
+  CartItemComponentProps,
+  OrderTypeSelectorProps,
+  AddressSectionProps,
+  BranchSectionProps 
+} from '@/lib/types';
 
 //------------------------
 const AddressItem = React.memo(({ address, isSelected, onSelect }: AddressItemProps) => (

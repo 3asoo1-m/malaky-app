@@ -14,12 +14,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MenuItemCard from '@/components/MenuItemCard';
 import CategoryChips from '@/components/CategoryChips';
 import CustomBottomNav from '@/components/CustomBottomNav';
-import { Category, CategoryWithItems, ActiveCategory, Promotion } from '@/lib/types';
+
+// ✅✅✅ استيراد كل الأنواع من مصدر الحقيقة الواحد ✅✅✅
+import { 
+  Category, 
+  CategoryWithItems, 
+  ActiveCategory, 
+  Promotion, 
+  MenuItem,
+  PromotionsCarouselProps,
+  SectionComponentProps
+} from '@/lib/types';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 // =================================================================
-// ✅ دوال الـ Caching
+// دوال الـ Caching المحسنة
 // =================================================================
 const CACHE_KEYS = {
   MENU_DATA: 'menu_data',
@@ -32,10 +42,7 @@ const CACHE_DURATION = 1000 * 60 * 10; // 10 دقائق
 
 const cacheData = async (key: string, data: any) => {
   try {
-    const cacheItem = {
-      data,
-      timestamp: Date.now()
-    };
+    const cacheItem = { data, timestamp: Date.now() };
     await AsyncStorage.setItem(key, JSON.stringify(cacheItem));
     console.log(`✅ Data cached for key: ${key}`);
   } catch (error) {
@@ -50,16 +57,13 @@ const getCachedData = async (key: string) => {
       console.log(`📭 No cache found for key: ${key}`);
       return null;
     }
-
     const cacheItem = JSON.parse(cached);
     const isExpired = Date.now() - cacheItem.timestamp > CACHE_DURATION;
-
     if (isExpired) {
       console.log(`🕐 Cache expired for key: ${key}`);
       await AsyncStorage.removeItem(key);
       return null;
     }
-
     console.log(`✅ Using cached data for key: ${key}`);
     return cacheItem.data;
   } catch (error) {
@@ -72,20 +76,20 @@ const clearCache = async (key?: string) => {
   try {
     if (key) {
       await AsyncStorage.removeItem(key);
-      console.log(`🗑️ Cache cleared for key: ${key}`);
     } else {
       await AsyncStorage.multiRemove(Object.values(CACHE_KEYS));
-      console.log('🗑️ All cache cleared');
     }
+    console.log(`🗑️ Cache cleared for key: ${key || 'all'}`);
   } catch (error) {
     console.error('❌ Error clearing cache:', error);
   }
 };
 
 // =================================================================
-// ✅✅✅ مكون الإعلانات بالتصميم الجديد مع التحسينات ✅✅✅
+// المكونات الفرعية المحسنة
 // =================================================================
-const PromotionsCarousel = React.memo(({ promotions }: { promotions: Promotion[] }) => {
+
+const PromotionsCarousel = React.memo(({ promotions }: PromotionsCarouselProps) => {
   const router = useRouter();
 
   const handlePress = useCallback((promotion: Promotion) => {
@@ -112,28 +116,18 @@ const PromotionsCarousel = React.memo(({ promotions }: { promotions: Promotion[]
       activeOpacity={0.9}
     >
       <View style={styles.promoImageContainer}>
-        <Image 
-          source={{ uri: item.image_url }} 
-          style={styles.promoImage} 
-          resizeMode="cover"
-        />
+        <Image source={{ uri: item.image_url }} style={styles.promoImage} resizeMode="cover" />
       </View>
       <View style={styles.promoTextContainer}>
         <Text style={styles.promoTitle} numberOfLines={1}>{item.title}</Text>
-        {item.description && (
-          <Text style={styles.promoDescription} numberOfLines={1}>
-            {item.description}
-          </Text>
-        )}
+        {item.description && <Text style={styles.promoDescription} numberOfLines={1}>{item.description}</Text>}
       </View>
     </TouchableOpacity>
   ), [CARD_WIDTH, handlePress]);
 
   const keyExtractor = useCallback((item: Promotion) => item.id.toString(), []);
 
-  if (!promotions || promotions.length === 0) {
-    return null;
-  }
+  if (!promotions || promotions.length === 0) return null;
 
   return (
     <View style={styles.promoContainer}>
@@ -142,10 +136,7 @@ const PromotionsCarousel = React.memo(({ promotions }: { promotions: Promotion[]
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={keyExtractor}
-        contentContainerStyle={{
-          paddingStart: CARD_MARGIN - 10,
-          paddingEnd: CARD_MARGIN,
-        }}
+        contentContainerStyle={{ paddingStart: CARD_MARGIN - 10, paddingEnd: CARD_MARGIN }}
         snapToInterval={CARD_WIDTH + 10}
         decelerationRate="fast"
         removeClippedSubviews={true}
@@ -159,16 +150,12 @@ const PromotionsCarousel = React.memo(({ promotions }: { promotions: Promotion[]
   );
 });
 
-// ✅ مكون منفصل للأقسام مع React.memo
-const SectionComponent = React.memo(({ section, router }: { section: CategoryWithItems, router: any }) => {
-  const renderMenuItem = useCallback(({ item }: { item: any }) => (
-    <MenuItemCard
-      item={item}
-      onPress={() => router.push(`/item/${item.id}`)}
-    />
+const SectionComponent = React.memo(({ section, router }: SectionComponentProps) => {
+  const renderMenuItem = useCallback(({ item }: { item: MenuItem }) => (
+    <MenuItemCard item={item} onPress={() => router.push(`/item/${item.id}`)} />
   ), [router]);
 
-  const keyExtractor = useCallback((menuItem: any) => menuItem.id.toString(), []);
+  const keyExtractor = useCallback((menuItem: MenuItem) => menuItem.id.toString(), []);
 
   return (
     <View style={styles.section}>
@@ -193,26 +180,26 @@ const SectionComponent = React.memo(({ section, router }: { section: CategoryWit
   );
 });
 
+// =================================================================
+// المكون الرئيسي المحسن (HomeScreen)
+// =================================================================
+
 export default function HomeScreen() {
   const router = useRouter();
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [sections, setSections] = useState<CategoryWithItems[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeCategory, setActiveCategory] = useState<ActiveCategory>('all');
   const [isChipsSticky, setIsChipsSticky] = useState(false);
   const [chipsHeight, setChipsHeight] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const listRef = useRef<FlatList>(null);
   const [hasUnread, setHasUnread] = useState(false);
-  
-  // ✅ state للـ caching
   const [searchCache, setSearchCache] = useState<{[query: string]: CategoryWithItems[]}>({});
-  const [isDataCached, setDataCached] = useState({ 
-    menu: false, 
-    promotions: false, 
-    categories: false 
-  });
+  const [isDataCached, setDataCached] = useState({ menu: false, promotions: false, categories: false });
 
   // ✅ useCallback للدوال
   const handleCategorySelect = useCallback((categoryId: ActiveCategory) => {
@@ -239,151 +226,176 @@ export default function HomeScreen() {
     router.push('/notifications');
   }, [router]);
 
-  const handleRefreshData = useCallback(async () => {
-    console.log('🔄 Manually refreshing data...');
-    await clearCache();
-    loadData();
+  // ✅ دوال مساعدة محسنة
+  const fetchFreshData = useCallback(async () => {
+    const [menuResponse, promotionsResponse] = await Promise.all([
+      supabase.rpc('get_menu'),
+      supabase.from('promotions').select('*').eq('is_active', true).order('display_order'),
+    ]);
+
+    if (menuResponse.error) throw menuResponse.error;
+    const fetchedSections: CategoryWithItems[] = menuResponse.data || [];
+    const fetchedCategories: Category[] = fetchedSections.map(s => ({ id: s.id, name: s.name }));
+    
+    setSections(fetchedSections);
+    setCategories(fetchedCategories);
+    await cacheData(CACHE_KEYS.MENU_DATA, fetchedSections);
+    await cacheData(CACHE_KEYS.CATEGORIES, fetchedCategories);
+
+    if (promotionsResponse.error) throw promotionsResponse.error;
+    const fetchedPromotions = promotionsResponse.data || [];
+    setPromotions(fetchedPromotions);
+    await cacheData(CACHE_KEYS.PROMOTIONS, fetchedPromotions);
+
+    return { fetchedSections, fetchedCategories, fetchedPromotions };
   }, []);
 
-  // ✅ تحسين الـ useEffect لتحميل البيانات مع Caching
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const checkNotifications = useCallback(async (userId: string) => {
+    const { count: unreadCount, error: notificationError } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+
+    if (notificationError) {
+      console.error("Error fetching notification status:", notificationError);
+    } else {
+      setHasUnread((unreadCount ?? 0) > 0);
+    }
+  }, []);
+
+  const handleCacheFallback = useCallback(async () => {
+    // ✅ fallback إلى البيانات المخزنة إذا كانت موجودة
+    const [cachedMenu, cachedPromotions, cachedCategories] = await Promise.all([
+      getCachedData(CACHE_KEYS.MENU_DATA),
+      getCachedData(CACHE_KEYS.PROMOTIONS),
+      getCachedData(CACHE_KEYS.CATEGORIES)
+    ]);
+
+    if (cachedMenu && cachedPromotions && cachedCategories) {
+      console.log('🔄 Using cached data as fallback');
+      setSections(cachedMenu);
+      setCategories(cachedCategories);
+      setPromotions(cachedPromotions);
+      setDataCached({ menu: true, promotions: true, categories: true });
+    }
+  }, []);
+
+  // ✅ تحسين الـ loadData مع Error Handling
+  const loadData = useCallback(async (isRefreshing = false) => {
+    setError(null);
+    
+    if (isRefreshing) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not found");
+
+      // ✅ تحسين جلب البيانات المخزنة
+      const cachePromises = isRefreshing 
+        ? [null, null, null] 
+        : [
+            getCachedData(CACHE_KEYS.MENU_DATA),
+            getCachedData(CACHE_KEYS.PROMOTIONS),
+            getCachedData(CACHE_KEYS.CATEGORIES)
+          ];
+
+      const [cachedMenu, cachedPromotions, cachedCategories] = await Promise.all(cachePromises);
       
-      // ✅ تحقق من وجود بيانات مخزنة محلياً أولاً
-      const [cachedMenu, cachedPromotions, cachedCategories] = await Promise.all([
-        getCachedData(CACHE_KEYS.MENU_DATA),
-        getCachedData(CACHE_KEYS.PROMOTIONS),
-        getCachedData(CACHE_KEYS.CATEGORIES)
-      ]);
+      let shouldFetchFromServer = true;
 
-      let shouldFetchFromServer = false;
-
-      if (cachedMenu && cachedPromotions && cachedCategories) {
-        // ✅ استخدم البيانات المخزنة
+      // ✅ استخدام البيانات المخزنة إذا كانت متاحة
+      if (cachedMenu && cachedPromotions && cachedCategories && !isRefreshing) {
         console.log('✅ Using cached data for initial render');
         setSections(cachedMenu);
         setCategories(cachedCategories);
         setPromotions(cachedPromotions);
         setDataCached({ menu: true, promotions: true, categories: true });
+        shouldFetchFromServer = false;
       } else {
-        shouldFetchFromServer = true;
         console.log('🌐 Fetching fresh data from server');
       }
 
-      const [menuResponse, promotionsResponse, notificationResponse] = await Promise.all([
-        shouldFetchFromServer ? supabase.rpc('get_menu') : Promise.resolve({ data: cachedMenu, error: null }),
-        shouldFetchFromServer ? supabase.from('promotions').select('*').eq('is_active', true).order('display_order') : Promise.resolve({ data: cachedPromotions, error: null }),
-        supabase.from('notifications')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('is_read', false)
-      ]);
-
-      if (menuResponse.error) throw menuResponse.error;
-      const fetchedSections: CategoryWithItems[] = menuResponse.data || [];
-      const fetchedCategories: Category[] = fetchedSections.map(s => ({ 
-        id: s.id, 
-        name: s.name 
-      }));
-      
-      if (shouldFetchFromServer) {
-        setSections(fetchedSections);
-        setCategories(fetchedCategories);
-        
-        // ✅ خزن البيانات بعد جلبها
-        await Promise.all([
-          cacheData(CACHE_KEYS.MENU_DATA, fetchedSections),
-          cacheData(CACHE_KEYS.CATEGORIES, fetchedCategories)
-        ]);
+      // ✅ جلب البيانات الجديدة إذا لزم الأمر
+      if (shouldFetchFromServer || isRefreshing) {
+        await fetchFreshData();
+        setDataCached({ menu: false, promotions: false, categories: false });
       }
 
-      if (promotionsResponse.error) throw promotionsResponse.error;
-      const fetchedPromotions = promotionsResponse.data || [];
-      
-      if (shouldFetchFromServer) {
-        setPromotions(fetchedPromotions);
-        await cacheData(CACHE_KEYS.PROMOTIONS, fetchedPromotions);
-      }
-
-      if (notificationResponse.error) {
-        console.error("Error fetching notification status:", notificationResponse.error);
-      } else {
-        const unreadCount = notificationResponse.count ?? 0;
-        setHasUnread(unreadCount > 0);
-      }
+      // ✅ التحقق من الإشعارات
+      await checkNotifications(user.id);
 
     } catch (err) {
+      const errorMessage = "فشل في تحميل البيانات. تأكد من اتصال الإنترنت.";
+      setError(errorMessage);
       console.error("Error loading data:", err);
-      // ✅ إذا كان هناك خطأ، حاول استخدام البيانات المخزنة
-      const cachedMenu = await getCachedData(CACHE_KEYS.MENU_DATA);
-      const cachedPromotions = await getCachedData(CACHE_KEYS.PROMOTIONS);
-      const cachedCategories = await getCachedData(CACHE_KEYS.CATEGORIES);
       
-      if (cachedMenu && cachedPromotions && cachedCategories) {
-        console.log('🔄 Using cached data as fallback due to error');
-        setSections(cachedMenu);
-        setCategories(cachedCategories);
-        setPromotions(cachedPromotions);
-      }
+      // ✅ استخدام البيانات المخزنة كـ fallback
+      await handleCacheFallback();
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, []);
+  }, [fetchFreshData, checkNotifications, handleCacheFallback]);
+
+  const handleRefreshData = useCallback(async () => {
+    console.log('🔄 Manually refreshing data...');
+    await loadData(true);
+  }, [loadData]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // ✅ تحسين scroll to category مع caching للحسابات
+  // ✅ تحسين scroll to category
   useEffect(() => {
     if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
-
+    
     const promoSectionExists = promotions.length > 0;
     const categoriesIndex = 1 + (promoSectionExists ? 1 : 0);
     const sectionIndex = sections.findIndex(section => section.id === activeCategory);
-
+    
     if (sectionIndex !== -1) {
       const targetIndex = categoriesIndex + sectionIndex + 1;
-      const offset = chipsHeight;
-      
-      // ✅ إضافة setTimeout لتحسين الأداء
       setTimeout(() => {
-        listRef.current?.scrollToIndex({
-          animated: true,
-          index: targetIndex,
-          viewOffset: offset,
+        listRef.current?.scrollToIndex({ 
+          animated: true, 
+          index: targetIndex, 
+          viewOffset: chipsHeight 
         });
       }, 50);
     }
   }, [activeCategory, chipsHeight, sections, promotions]);
 
-  // ✅ useMemo للبيانات المصفاة مع Search Caching
+  // ✅ تحسين البحث مع caching
   const filteredSections = useMemo(() => {
     if (searchQuery.trim() === '') return sections;
     
-    // ✅ تحقق من الـ cache أولاً
     const cacheKey = searchQuery.toLowerCase().trim();
+    
+    // ✅ تحقق من الـ cache أولاً
     if (searchCache[cacheKey]) {
       console.log(`✅ Using cached search results for: "${searchQuery}"`);
       return searchCache[cacheKey];
     }
 
     console.log(`🔍 Performing new search for: "${searchQuery}"`);
-    const lowercasedQuery = searchQuery.toLowerCase();
+    
+    // ✅ تحسين خوارزمية البحث
     const result = sections
-      .map(section => {
-        if (!section.menu_items) return { ...section, menu_items: [] };
-        const filteredItems = section.menu_items.filter(item =>
-          item.name.toLowerCase().includes(lowercasedQuery)
-        );
-        return { ...section, menu_items: filteredItems };
-      })
-      .filter(section => section.menu_items && section.menu_items.length > 0);
+      .map(section => ({
+        ...section,
+        menu_items: section.menu_items?.filter(item => 
+          item.name.toLowerCase().includes(cacheKey)
+        ) || []
+      }))
+      .filter(section => section.menu_items.length > 0);
 
-    // ✅ خزن نتيجة البحث في الـ cache
+    // ✅ خزن النتائج فقط إذا كانت هناك نتائج
     if (result.length > 0) {
       setSearchCache(prev => ({
         ...prev,
@@ -409,23 +421,14 @@ export default function HomeScreen() {
         <View>
           <View style={styles.topBar}>
             <View style={styles.logoContainer}>
-              <Image 
-                source={require('@/assets/images/malakylogo.png')} 
-                style={styles.logoImage} 
-              />
+              <Image source={require('@/assets/images/malakylogo.png')} style={styles.logoImage} />
               <Text style={styles.logoText}>الدجاج الملكي بروست</Text>
             </View>
             <View style={styles.headerActions}>
-              <TouchableOpacity 
-                style={styles.refreshButton}
-                onPress={handleRefreshData}
-              >
+              <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshData}>
                 <Ionicons name="refresh" size={24} color="#D32F2F" />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.notificationButton}
-                onPress={handleNotificationPress}
-              >
+              <TouchableOpacity style={styles.notificationButton} onPress={handleNotificationPress}>
                 <Ionicons 
                   name={hasUnread ? "notifications" : "notifications-outline"} 
                   size={28} 
@@ -456,11 +459,10 @@ export default function HomeScreen() {
               )}
             </View>
             <TouchableOpacity style={styles.searchButton} onPress={handleClearSearch}>
-              {searchQuery.length > 0 ? (
-                <Ionicons name="close" size={24} color="#fff" />
-              ) : (
+              {searchQuery.length > 0 ? 
+                <Ionicons name="close" size={24} color="#fff" /> : 
                 <Feather name="arrow-left" size={24} color="#fff" />
-              )}
+              }
             </TouchableOpacity>
           </View>
         </View>
@@ -480,53 +482,33 @@ export default function HomeScreen() {
           }}
           style={[styles.categoryChipsContainer, isChipsSticky && styles.stickyCategoryChipsContainer]}
         >
-          <CategoryChips
-            categories={categories}
-            activeCategory={activeCategory}
-            onCategorySelect={handleCategorySelect}
+          <CategoryChips 
+            categories={categories} 
+            activeCategory={activeCategory} 
+            onCategorySelect={handleCategorySelect} 
           />
         </View>
       );
     }
 
-    const section = item as CategoryWithItems;
-    return (
-      <SectionComponent 
-        section={section} 
-        router={router}
-      />
-    );
+    return <SectionComponent section={item as CategoryWithItems} router={router} />;
   }, [
-    searchQuery, 
-    hasUnread, 
-    promotions, 
-    categories, 
-    activeCategory, 
-    isChipsSticky, 
-    chipsHeight, 
-    filteredSections,
-    handleCategorySelect, 
-    handleSearchChange, 
-    handleClearSearch, 
-    handleNotificationPress,
-    handleRefreshData,
-    router
+    searchQuery, hasUnread, promotions, categories, activeCategory, isChipsSticky, 
+    chipsHeight, filteredSections, handleCategorySelect, handleSearchChange, 
+    handleClearSearch, handleNotificationPress, handleRefreshData, router
   ]);
 
-  // ✅ useCallback للـ keyExtractor
   const keyExtractor = useCallback((item: any) => {
     if (item.type) return item.id;
     return (item as CategoryWithItems).id.toString();
   }, []);
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color="#D32F2F" />
         <Text style={styles.loadingText}>جاري تحميل البيانات...</Text>
-        {isDataCached.menu && (
-          <Text style={styles.cachedText}>⚡ باستخدام البيانات المخزنة</Text>
-        )}
+        {isDataCached.menu && <Text style={styles.cachedText}>⚡ باستخدام البيانات المخزنة</Text>}
       </View>
     );
   }
@@ -534,6 +516,15 @@ export default function HomeScreen() {
   return (
     <View style={styles.fullScreen}>
       <SafeAreaView style={styles.container}>
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => loadData()}>
+              <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
         <FlatList
           ref={listRef}
           data={listData}
@@ -548,9 +539,13 @@ export default function HomeScreen() {
           windowSize={7}
           initialNumToRender={5}
           renderItem={renderListItem}
+          refreshing={refreshing}
+          onRefresh={() => loadData(true)}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Text>لا توجد نتائج تطابق بحثك.</Text>
+              <Text style={styles.emptyText}>
+                {searchQuery ? 'لا توجد نتائج تطابق بحثك.' : 'لا توجد وجبات متاحة حالياً.'}
+              </Text>
             </View>
           }
           ListFooterComponent={<View style={{ height: 100 }} />}
@@ -561,7 +556,7 @@ export default function HomeScreen() {
   );
 }
 
-// ✅✅✅ التنسيقات المحدثة مع تحسينات الأداء ✅✅✅
+// ✅✅✅ التنسيقات المحدثة مع تحسينات إضافية ✅✅✅
 const styles = StyleSheet.create({
   fullScreen: { 
     flex: 1, 
@@ -585,6 +580,35 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontSize: 14,
     color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  errorContainer: {
+    backgroundColor: '#FFEBEE',
+    padding: 16,
+    margin: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#D32F2F',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#D32F2F',
+    fontSize: 14,
+    flex: 1,
+    textAlign: 'right',
+  },
+  retryButton: {
+    backgroundColor: '#D32F2F',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: 'bold',
   },
   topBar: { 
@@ -758,5 +782,10 @@ const styles = StyleSheet.create({
     padding: 20, 
     alignItems: 'center', 
     marginTop: 50 
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
