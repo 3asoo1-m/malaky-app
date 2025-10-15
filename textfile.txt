@@ -17,56 +17,18 @@ import {
 } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DynamicImage from '@/components/DynamicImage';
+import DynamicImage from '@/components/DynamicImage'; // استيراد المكون
 import { supabase } from '@/lib/supabase';
 import { MenuItem } from '@/lib/types';
 import { useCart } from '@/lib/useCart';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-// ✅ مكون Pagination المتحسن
-const Pagination = ({ data, scrollX, itemWidth }: { data: any[]; scrollX: Animated.Value; itemWidth: number }) => {
-  return (
-    <View style={styles.paginationContainer}>
-      {data.map((_, idx) => {
-        const inputRange = [(idx - 1) * itemWidth, idx * itemWidth, (idx + 1) * itemWidth];
-        
-        const dotWidth = scrollX.interpolate({
-          inputRange,
-          outputRange: [8, 20, 8],
-          extrapolate: 'clamp',
-        });
-
-        const opacity = scrollX.interpolate({
-          inputRange,
-          outputRange: [0.3, 1, 0.3],
-          extrapolate: 'clamp',
-        });
-
-        const backgroundColor = scrollX.interpolate({
-          inputRange,
-          outputRange: ['rgba(255,255,255,0.5)', '#fff', 'rgba(255,255,255,0.5)'],
-          extrapolate: 'clamp',
-        });
-
-        return (
-          <Animated.View
-            key={idx.toString()}
-            style={[
-              styles.dot,
-              { 
-                width: dotWidth,
-                opacity,
-                backgroundColor
-              }
-            ]}
-          />
-        );
-      })}
-    </View>
-  );
-};
-
+interface PaginationProps {
+  data: any[]; // مصفوفة من أي نوع، لأننا لا نهتم بمحتواها، فقط بطولها
+  scrollX: Animated.Value;
+  itemWidth: number;
+}
 export default function MenuItemDetailsScreen() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const router = useRouter();
@@ -77,10 +39,40 @@ export default function MenuItemDetailsScreen() {
   const [selectedOptions, setSelectedOptions] = useState<Record<string, any>>({});
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // ✅ استخدام useRef لـ scrollX بدلاً من useState
+  // يمكنك وضع هذا المكون في نفس الملف أو في ملف منفصل
+const Pagination = ({ data, scrollX, itemWidth }: PaginationProps) => {
+  return (
+    <View style={styles.paginationContainer}>
+      {data.map((_, idx) => {
+        const inputRange = [(idx - 1) * itemWidth, idx * itemWidth, (idx + 1) * itemWidth];
+        
+        const dotWidth = scrollX.interpolate({
+          inputRange,
+          outputRange: [8, 16, 8],
+          extrapolate: 'clamp',
+        });
+
+        const opacity = scrollX.interpolate({
+          inputRange,
+          outputRange: [0.5, 1, 0.5],
+          extrapolate: 'clamp',
+        });
+
+        return (
+          <Animated.View
+            key={idx.toString()}
+            style={[styles.dot, { width: dotWidth, opacity }]}
+          />
+        );
+      })}
+    </View>
+  );
+};
   const scrollX = useRef(new Animated.Value(0)).current;
+
 
   useEffect(() => {
     if (!itemId) return;
@@ -147,10 +139,10 @@ export default function MenuItemDetailsScreen() {
     router.back();
   };
 
-  const defaultImageSource = require('@/assets/images/icon.png');
-  const imagesToShow = item?.images && item.images.length > 0 
-    ? item.images.map(img => ({ id: img.id, source: { uri: img.image_url } }))
-    : [{ id: 0, source: defaultImageSource }];
+  const onScroll = (event: any) => {
+    const newIndex = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+    setActiveImageIndex(newIndex);
+  };
 
   if (loading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color="#E63946" /></View>;
@@ -165,12 +157,16 @@ export default function MenuItemDetailsScreen() {
     );
   }
 
+   const defaultImageSource = require('@/assets/images/icon.png');
+const imagesToShow = item.images && item.images.length > 0 
+    ? item.images.map(img => ({ id: img.id, source: { uri: img.image_url } }))
+    : [{ id: 0, source: defaultImageSource }];
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar barStyle="dark-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+      <TouchableOpacity onPress={( ) => router.back()} style={styles.backButton}>
         <FontAwesome name="arrow-left" size={20} color="#1D3557" />
       </TouchableOpacity>
 
@@ -189,32 +185,28 @@ export default function MenuItemDetailsScreen() {
               showsHorizontalScrollIndicator={false}
               keyExtractor={(img) => img.id.toString()}
               renderItem={({ item: img }) => (
+                // ✅ تمرير 'source' بدلاً من 'uri'
                 <DynamicImage
                   source={img.source}
-                  style={{ width: screenWidth, height: 300 }}
+                  style={{ width: screenWidth }}
                 />
               )}
-              // ✅ استخدام Animated.event بشكل صحيح
+              // ✅ الخطوة 3: استخدم onScroll الخاص بـ Animated
               onScroll={Animated.event(
                 [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                { 
-                  useNativeDriver: false,
-                  listener: (event: any) => {
-                    // يمكنك إضافة listener إضافي إذا احتجت
-                  }
-                }
+                { useNativeDriver: false } // مهم جدًا
               )}
               scrollEventThrottle={16}
             />
-            
-            {/* ✅ استخدم Pagination الجديد فقط - احذف القديم */}
             {imagesToShow.length > 1 && (
-              <Pagination 
-                data={imagesToShow} 
-                scrollX={scrollX} 
-                itemWidth={screenWidth} 
-              />
+              <Pagination data={imagesToShow} scrollX={scrollX} itemWidth={screenWidth} />
             )}
+
+            <View style={styles.pagination}>
+              {imagesToShow.length > 1 && imagesToShow.map((_, index) => (
+                <View key={index} style={[styles.dot, index === activeImageIndex && styles.dotActive]} />
+              ))}
+            </View>
           </View>
 
           {/* --- حاوية التفاصيل --- */}
@@ -279,39 +271,31 @@ export default function MenuItemDetailsScreen() {
   );
 }
 
-// --- التنسيقات النهائية المحسنة ---
+// --- التنسيقات النهائية ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContent: { paddingBottom: 120 },
   carouselContainer: {
     backgroundColor: '#f0f0f0',
-    height: 250, // ✅ تحديد ارتفاع ثابت
-    position: 'relative',
   },
-  // ✅ تنسيقات Pagination المحسنة
-  paginationContainer: {
+  pagination: {
     position: 'absolute',
-    bottom: 25,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
+    bottom: 10,
+    alignSelf: 'center',
+    flexDirection: 'row-reverse',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
-  dot: {
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-    backgroundColor: '#fff', // لون أساسي
-  },
+  dotActive: { backgroundColor: '#fff' },
   detailsContainer: {
     padding: 20,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-    marginTop: -10,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    marginTop: -30,
     zIndex: 1,
   },
   backButton: {
@@ -402,4 +386,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Cairo-Bold',
   },
+  paginationContainer: {
+  position: 'absolute',
+  bottom: 40, // ارفعها قليلاً لتبدو أفضل
+  flexDirection: 'row',
+  width: '100%',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+dot: {
+  height: 8,
+  borderRadius: 4,
+  backgroundColor: '#fff', // لون موحد
+  marginHorizontal: 4,
+},
 });
