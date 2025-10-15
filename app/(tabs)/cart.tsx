@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,15 +18,220 @@ import CustomBottomNav from '@/components/CustomBottomNav';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 
+interface AddressItemProps {
+  address: Address;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+interface BranchItemProps {
+  branch: Branch;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+interface CartItemComponentProps {
+  item: CartItem;
+  onUpdate: (itemId: string, change: 1 | -1) => void;
+  onRemove: (itemId: string) => void;
+  onPress: () => void;
+}
+
+interface OrderTypeSelectorProps {
+  orderType: OrderType | null;
+  onTypeChange: (type: OrderType) => void;
+}
+
+interface AddressSectionProps {
+  orderType: OrderType | null;
+  loadingAddresses: boolean;
+  availableAddresses: Address[];
+  selectedAddress: Address | null;
+  onSelectAddress: (address: Address) => void;
+  onAddAddress: () => void;
+}
+
+interface BranchSectionProps {
+  orderType: OrderType | null;
+  loadingBranches: boolean;
+  availableBranches: Branch[];
+  selectedBranch: Branch | null;
+  onSelectBranch: (branch: Branch) => void;
+}
+
+//------------------------
+const AddressItem = React.memo(({ address, isSelected, onSelect }: AddressItemProps) => (
+  <TouchableOpacity
+    style={[styles.locationOption, isSelected && styles.locationOptionSelected]}
+    onPress={onSelect}
+  >
+    <FontAwesome5 name="map-marker-alt" size={20} color={isSelected ? "#C62828" : "#ccc"} style={{ marginRight: 2 }} />
+    <View style={styles.addressTextContainer}>
+      <Text style={styles.addressLine1}>{address.delivery_zones?.area_name || 'منطقة غير محددة'}</Text>
+      <Text style={styles.addressCity}>{`${address.delivery_zones?.city}, ${address.street_address}`}</Text>
+    </View>
+  </TouchableOpacity>
+));
+
+const BranchItem = React.memo(({ branch, isSelected, onSelect }: BranchItemProps) => (
+  <TouchableOpacity
+    style={[styles.locationOption, isSelected && styles.locationOptionSelected]}
+    onPress={onSelect}
+  >
+    <Ionicons name={isSelected ? "radio-button-on" : "radio-button-off"} size={22} color={isSelected ? "#C62828" : "#ccc"} />
+    <View style={styles.addressTextContainer}>
+      <Text style={styles.addressLine1}>{branch.name}</Text>
+      <Text style={styles.addressCity}>{branch.address}</Text>
+    </View>
+  </TouchableOpacity>
+));
+
+const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: CartItemComponentProps) => {
+  const optionLabels = Object.entries(item.options).map(([groupId, value]) => {
+    const group = item.product.options?.find(g => g.id === groupId);
+    const optionValue = group?.values.find(v => v.value === value);
+    return optionValue ? optionValue.label : null;
+  }).filter(Boolean).join('، ');
+
+  const imageUrl = item.product.images && item.product.images.length > 0
+    ? item.product.images[0].image_url
+    : 'https://dgplcadvneqpohxqlilg.supabase.co/storage/v1/object/public/menu_image/icon.png';
+
+  return (
+    <TouchableOpacity onPress={onPress} style={styles.cartItemContainer}>
+      <TouchableOpacity onPress={( ) => onRemove(item.id)} style={styles.deleteButton}>
+        <Ionicons name="close-circle" size={24} color="#999" />
+      </TouchableOpacity>
+      <Image source={{ uri: imageUrl }} style={styles.itemImage} />
+      <View style={styles.itemDetails}>
+        <Text style={styles.itemName}>{item.product.name}</Text>
+        {optionLabels.length > 0 && (<Text style={styles.optionsText}>{optionLabels}</Text>)}
+        {item.notes && (<Text style={styles.notesText}>ملاحظات: {item.notes}</Text>)}
+      </View>
+      <View style={styles.quantitySelector}>
+        <TouchableOpacity onPress={() => onUpdate(item.id, 1)} style={styles.quantityButton}>
+          <Ionicons name="add" size={20} color="#C62828" />
+        </TouchableOpacity>
+        <Text style={styles.quantityText}>{item.quantity}</Text>
+        <TouchableOpacity onPress={() => onUpdate(item.id, -1)} style={styles.quantityButton}>
+          <Ionicons name="remove" size={20} color="#C62828" />
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.itemPriceText}>{item.totalPrice.toFixed(2)} ₪</Text>
+    </TouchableOpacity>
+  );
+});
+
+const OrderTypeSelector = React.memo(({ orderType, onTypeChange }: OrderTypeSelectorProps) => (
+  <View style={styles.orderTypeContainer}>
+    <TouchableOpacity 
+      style={[styles.orderTypeButton, orderType === 'pickup' && styles.orderTypeActive]} 
+      onPress={() => onTypeChange('pickup')}
+    >
+      <Ionicons name="storefront-outline" size={24} color={orderType === 'pickup' ? '#fff' : '#333'} />
+      <Text style={[styles.orderTypeText, orderType === 'pickup' && styles.orderTypeTextActive]}>استلام</Text>
+    </TouchableOpacity>
+    <TouchableOpacity 
+      style={[styles.orderTypeButton, orderType === 'delivery' && styles.orderTypeActive]} 
+      onPress={() => onTypeChange('delivery')}
+    >
+      <Ionicons name="bicycle-outline" size={24} color={orderType === 'delivery' ? '#fff' : '#333'} />
+      <Text style={[styles.orderTypeText, orderType === 'delivery' && styles.orderTypeTextActive]}>توصيل</Text>
+    </TouchableOpacity>
+  </View>
+));
+
+const AddressSection = React.memo(({ 
+  orderType, 
+  loadingAddresses, 
+  availableAddresses, 
+  selectedAddress, 
+  onSelectAddress,
+  onAddAddress 
+}: AddressSectionProps) => {
+  if (orderType !== 'delivery') return null;
+  
+  if (loadingAddresses) return <ActivityIndicator style={{ marginVertical: 20 }} color="#C62828" />;
+  
+  if (availableAddresses.length === 0) {
+    return (
+      <TouchableOpacity style={styles.noAddressContainer} onPress={onAddAddress}>
+        <Ionicons name="add-circle-outline" size={24} color="#C62828" />
+        <Text style={styles.noAddressText}>لا يوجد عناوين. أضف عنوانًا للتوصيل.</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View style={styles.addressSectionContainer}>
+      <Text style={styles.sectionTitle}>اختر عنوان التوصيل</Text>
+      {availableAddresses.map(address => (
+        <AddressItem
+          key={address.id}
+          address={address}
+          isSelected={selectedAddress?.id === address.id}
+          onSelect={() => onSelectAddress(address)}
+        />
+      ))}
+      <TouchableOpacity style={styles.addAddressButton} onPress={onAddAddress}>
+        <Ionicons name="add" size={20} color="#C62828" />
+        <Text style={styles.addAddressText}>إضافة أو تعديل عنوان</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+const BranchSection = React.memo(({ 
+  orderType, 
+  loadingBranches, 
+  availableBranches, 
+  selectedBranch, 
+  onSelectBranch 
+}: BranchSectionProps) => {
+  if (orderType !== 'pickup') return null;
+  
+  if (loadingBranches) return <ActivityIndicator style={{ marginVertical: 20 }} color="#C62828" />;
+  
+  if (availableBranches.length === 0) {
+    return (
+      <View style={styles.noAddressContainer}>
+        <Text style={styles.noAddressText}>لا توجد فروع متاحة للاستلام حاليًا.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.addressSectionContainer}>
+      <Text style={styles.sectionTitle}>اختر فرع الاستلام</Text>
+      {availableBranches.map(branch => (
+        <BranchItem
+          key={branch.id}
+          branch={branch}
+          isSelected={selectedBranch?.id === branch.id}
+          onSelect={() => onSelectBranch(branch)}
+        />
+      ))}
+    </View>
+  );
+});
+
+
 export default function CartScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
   const {
-    items, updateQuantity, removeFromCart, subtotal, totalPrice, deliveryPrice,
-    orderType, setOrderType, setDeliveryPrice, selectedAddress, setSelectedAddress,
+    items, updateQuantity, removeFromCart, subtotal,
+    orderType, setOrderType, selectedAddress, setSelectedAddress,
     selectedBranch, setSelectedBranch, clearCart,
   } = useCart();
+
+  // ✅ احسب الأسعار مباشرة بدون state
+  const deliveryPrice = orderType === 'delivery' && selectedAddress?.delivery_zones 
+    ? selectedAddress.delivery_zones.delivery_price 
+    : 0;
+  
+  const totalPrice = subtotal + deliveryPrice;
 
   const [availableAddresses, setAvailableAddresses] = useState<Address[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
@@ -37,16 +242,30 @@ export default function CartScreen() {
   const [isCheckoutModalVisible, setCheckoutModalVisible] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState(1);
 
+  // ✅ إضافة caching للبيانات
+  const [isDataCached, setDataCached] = useState({ addresses: false, branches: false });
+
+  // ✅ استخدام useCallback للـ functions
   const fetchAddresses = useCallback(async () => {
     if (!user) return;
     setLoadingAddresses(true);
-    const { data: rawData, error } = await supabase.from('user_addresses').select(`id, street_address, notes, created_at, delivery_zones (city, area_name, delivery_price)`).eq('user_id', user.id).order('created_at', { ascending: false });
-    if (error) { console.error('Error fetching addresses:', error.message); }
-    else if (rawData) {
-      const formattedData: Address[] = rawData.map(addr => ({ ...addr, delivery_zones: Array.isArray(addr.delivery_zones) ? addr.delivery_zones[0] || null : addr.delivery_zones }));
+    const { data: rawData, error } = await supabase
+      .from('user_addresses')
+      .select(`id, street_address, notes, created_at, delivery_zones (city, area_name, delivery_price)`)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    
+    if (error) { 
+      console.error('Error fetching addresses:', error.message); 
+    } else if (rawData) {
+      const formattedData: Address[] = rawData.map(addr => ({ 
+        ...addr, 
+        delivery_zones: Array.isArray(addr.delivery_zones) ? addr.delivery_zones[0] || null : addr.delivery_zones 
+      }));
       setAvailableAddresses(formattedData);
-      // ✅ تم إلغاء الاختيار الافتراضي
-      if (formattedData.length === 0) { setSelectedAddress(null); }
+      if (formattedData.length === 0) { 
+        setSelectedAddress(null); 
+      }
     }
     setLoadingAddresses(false);
   }, [user, setSelectedAddress]);
@@ -54,29 +273,68 @@ export default function CartScreen() {
   const fetchBranches = useCallback(async () => {
     setLoadingBranches(true);
     const { data, error } = await supabase.from('branches').select('*').eq('is_active', true);
-    if (error) { console.error('Error fetching branches:', error.message); }
-    else if (data) {
+    if (error) { 
+      console.error('Error fetching branches:', error.message); 
+    } else if (data) {
       setAvailableBranches(data);
-      // ✅ تم إلغاء الاختيار الافتراضي
     }
     setLoadingBranches(false);
   }, []);
 
+  // ✅ تحسين useFocusEffect مع caching
   useFocusEffect(useCallback(() => {
-    if (orderType === 'delivery') { fetchAddresses(); }
-    else if (orderType === 'pickup') { fetchBranches(); }
-  }, [orderType, fetchAddresses, fetchBranches]));
+    if (orderType === 'delivery' && !isDataCached.addresses) {
+      fetchAddresses();
+      setDataCached(prev => ({...prev, addresses: true}));
+    } else if (orderType === 'pickup' && !isDataCached.branches) {
+      fetchBranches();
+      setDataCached(prev => ({...prev, branches: true}));
+    }
+  }, [orderType, fetchAddresses, fetchBranches, isDataCached]));
 
-  useEffect(() => {
-    if (orderType === 'delivery' && selectedAddress?.delivery_zones) { setDeliveryPrice(selectedAddress.delivery_zones.delivery_price); }
-    else { setDeliveryPrice(0); }
-  }, [selectedAddress, orderType, setDeliveryPrice]);
+  // ✅ useCallback لـ event handlers
+  const handleSelectAddress = useCallback((address: Address) => {
+    setSelectedAddress(address);
+  }, [setSelectedAddress]);
 
-  const handleCheckout = async () => {
+  const handleSelectBranch = useCallback((branch: Branch) => {
+    setSelectedBranch(branch);
+  }, [setSelectedBranch]);
+
+  const handleOrderTypeChange = useCallback((type: OrderType) => {
+    setOrderType(type);
+    if (type === 'pickup') {
+      setSelectedAddress(null);
+    } else {
+      setSelectedBranch(null);
+    }
+  }, [setOrderType, setSelectedAddress, setSelectedBranch]);
+
+  const handleAddAddress = useCallback(() => {
+    router.push({ pathname: '/addresses', params: { fromCart: 'true' } });
+  }, [router]);
+
+  const handleItemPress = useCallback((item: CartItem) => {
+    router.push(`/item/${item.product.id}`);
+  }, [router]);
+
+  const handleUpdateQuantity = useCallback((itemId: string, change: 1 | -1) => {
+    updateQuantity(itemId, change);
+  }, [updateQuantity]);
+
+  const handleRemoveFromCart = useCallback((itemId: string) => {
+    removeFromCart(itemId);
+  }, [removeFromCart]);
+
+  // ✅ تحسين الـ handleCheckout
+  const handleCheckout = useCallback(async () => {
+    if (isPlacingOrder) return;
+    
     if (!user) {
       Alert.alert('خطأ', 'يجب عليك تسجيل الدخول أولاً لإتمام الطلب.');
       return;
     }
+    
     if (items.length === 0) {
       Alert.alert('خطأ', 'سلتك فارغة!');
       return;
@@ -127,198 +385,160 @@ export default function CartScreen() {
     } finally {
       setPlacingOrder(false);
     }
-  };
+  }, [isPlacingOrder, user, items, totalPrice, subtotal, deliveryPrice, orderType, selectedAddress, selectedBranch, clearCart, router]);
 
-  const renderItem = ({ item }: { item: CartItem }) => {
-    const optionLabels = Object.entries(item.options).map(([groupId, value]) => {
-      const group = item.product.options?.find(g => g.id === groupId);
-      const optionValue = group?.values.find(v => v.value === value);
-      return optionValue ? optionValue.label : null;
-    }).filter(Boolean).join('، ');
+  // ✅ استخدام useMemo للـ list data
+  const renderItem = useCallback(({ item }: { item: CartItem }) => (
+    <CartItemComponent
+      item={item}
+      onUpdate={handleUpdateQuantity}
+      onRemove={handleRemoveFromCart}
+      onPress={() => handleItemPress(item)}
+    />
+  ), [handleUpdateQuantity, handleRemoveFromCart, handleItemPress]);
 
-    const imageUrl = item.product.images && item.product.images.length > 0
-      ? item.product.images[0].image_url
-      : 'https://dgplcadvneqpohxqlilg.supabase.co/storage/v1/object/public/menu_image/icon.png';
+  const keyExtractor = useCallback((item: CartItem) => item.id, []);
 
-    return (
-      <TouchableOpacity onPress={( ) => router.push(`/item/${item.product.id}`)} style={styles.cartItemContainer}>
-        <TouchableOpacity onPress={() => removeFromCart(item.id)} style={styles.deleteButton}><Ionicons name="close-circle" size={24} color="#999" /></TouchableOpacity>
-        <Image source={{ uri: imageUrl }} style={styles.itemImage} />
-        <View style={styles.itemDetails}>
-          <Text style={styles.itemName}>{item.product.name}</Text>
-          {optionLabels.length > 0 && (<Text style={styles.optionsText}>{optionLabels}</Text>)}
-          {item.notes && (<Text style={styles.notesText}>ملاحظات: {item.notes}</Text>)}
-        </View>
-        <View style={styles.quantitySelector}>
-          <TouchableOpacity onPress={() => updateQuantity(item.id, 1)} style={styles.quantityButton}><Ionicons name="add" size={20} color="#C62828" /></TouchableOpacity>
-          <Text style={styles.quantityText}>{item.quantity}</Text>
-          <TouchableOpacity onPress={() => updateQuantity(item.id, -1)} style={styles.quantityButton}><Ionicons name="remove" size={20} color="#C62828" /></TouchableOpacity>
-        </View>
-        <Text style={styles.itemPriceText}>{item.totalPrice.toFixed(2)} ₪</Text>
-      </TouchableOpacity>
-    );
-  };
+  const listHeaderComponent = useMemo(() => (
+    <>
+      <Text style={styles.headerTitle}>سلتي</Text>
+      {items.length > 0 && <Text style={styles.sectionTitle}>المنتجات</Text>}
+    </>
+  ), [items.length]);
 
-  const OrderTypeSelector = () => (
-    <View style={styles.orderTypeContainer}>
-      <TouchableOpacity style={[styles.orderTypeButton, orderType === 'pickup' && styles.orderTypeActive]} onPress={() => { setOrderType('pickup'); setSelectedAddress(null); }}>
-        <Ionicons name="storefront-outline" size={24} color={orderType === 'pickup' ? '#fff' : '#333'} />
-        <Text style={[styles.orderTypeText, orderType === 'pickup' && styles.orderTypeTextActive]}>استلام</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.orderTypeButton, orderType === 'delivery' && styles.orderTypeActive]} onPress={() => { setOrderType('delivery'); setSelectedBranch(null); }}>
-        <Ionicons name="bicycle-outline" size={24} color={orderType === 'delivery' ? '#fff' : '#333'} />
-        <Text style={[styles.orderTypeText, orderType === 'delivery' && styles.orderTypeTextActive]}>توصيل</Text>
+  const listEmptyComponent = useMemo(() => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="cart-outline" size={80} color="#ccc" />
+      <Text style={styles.emptyText}>سلّتك فارغة بعد!</Text>
+      <TouchableOpacity style={styles.browseButton} onPress={() => router.push('/')}>
+        <Text style={styles.browseButtonText}>تصفح القائمة</Text>
       </TouchableOpacity>
     </View>
-  );
-
-  const AddressSection = () => {
-    if (orderType !== 'delivery') return null;
-    if (loadingAddresses) return <ActivityIndicator style={{ marginVertical: 20 }} color="#C62828" />;
-    if (availableAddresses.length === 0) {
-      return (<TouchableOpacity style={styles.noAddressContainer} onPress={() => router.push({ pathname: '/addresses', params: { fromCart: 'true' } })}><Ionicons name="add-circle-outline" size={24} color="#C62828" /><Text style={styles.noAddressText}>لا يوجد عناوين. أضف عنوانًا للتوصيل.</Text></TouchableOpacity>);
-    }
-    return (
-      <View style={styles.addressSectionContainer}>
-        <Text style={styles.sectionTitle}>اختر عنوان التوصيل</Text>
-        {availableAddresses.map(address => (
-          <TouchableOpacity
-            key={address.id}
-            style={[styles.locationOption, selectedAddress?.id === address.id && styles.locationOptionSelected]}
-            onPress={() => setSelectedAddress(address)}
-          >
-            <FontAwesome5 name="map-marker-alt" size={20} color={selectedAddress?.id === address.id ? "#C62828" : "#ccc"} style={{ marginRight: 2 }} />
-            <View style={styles.addressTextContainer}>
-              <Text style={styles.addressLine1}>{address.delivery_zones?.area_name || 'منطقة غير محددة'}</Text>
-              <Text style={styles.addressCity}>{`${address.delivery_zones?.city}, ${address.street_address}`}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-        <TouchableOpacity style={styles.addAddressButton} onPress={() => router.push({ pathname: '/addresses', params: { fromCart: 'true' } })}>
-          <Ionicons name="add" size={20} color="#C62828" />
-          <Text style={styles.addAddressText}>إضافة أو تعديل عنوان</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const BranchSection = () => {
-    if (orderType !== 'pickup') return null;
-    if (loadingBranches) return <ActivityIndicator style={{ marginVertical: 20 }} color="#C62828" />;
-    if (availableBranches.length === 0) {
-      return (<View style={styles.noAddressContainer}><Text style={styles.noAddressText}>لا توجد فروع متاحة للاستلام حاليًا.</Text></View>);
-    }
-    return (
-      <View style={styles.addressSectionContainer}>
-        <Text style={styles.sectionTitle}>اختر فرع الاستلام</Text>
-        {availableBranches.map(branch => (
-          <TouchableOpacity
-            key={branch.id}
-            style={[styles.locationOption, selectedBranch?.id === branch.id && styles.locationOptionSelected]}
-            onPress={() => setSelectedBranch(branch)}
-          >
-            <Ionicons name={selectedBranch?.id === branch.id ? "radio-button-on" : "radio-button-off"} size={22} color={selectedBranch?.id === branch.id ? "#C62828" : "#ccc"} />
-            <View style={styles.addressTextContainer}>
-              <Text style={styles.addressLine1}>{branch.name}</Text>
-              <Text style={styles.addressCity}>{branch.address}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
+  ), [router]);
 
   return (
     <View style={styles.container}>
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isCheckoutModalVisible}
-        onRequestClose={() => setCheckoutModalVisible(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setCheckoutModalVisible(false)}>
-          <Pressable style={styles.wizardModalContainer} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.wizardHeader}>
-              <TouchableOpacity onPress={() => {
-                if (checkoutStep > 1) setCheckoutStep(checkoutStep - 1);
-                else setCheckoutModalVisible(false);
-              }}>
-                <Ionicons name="arrow-back" size={24} color="#333" />
-              </TouchableOpacity>
-              <Text style={styles.wizardTitle}>
-                {checkoutStep === 1 && 'اختر نوع الطلب'}
-                {checkoutStep === 2 && (orderType === 'delivery' ? 'اختر عنوان التوصيل' : 'اختر فرع الاستلام')}
-                {checkoutStep === 3 && 'تأكيد الطلب'}
-              </Text>
-              <View style={{ width: 24 }} />
-            </View>
+      {isCheckoutModalVisible && (
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={true}
+          onRequestClose={() => setCheckoutModalVisible(false)}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={() => setCheckoutModalVisible(false)}>
+            <Pressable style={styles.wizardModalContainer} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.wizardHeader}>
+                <TouchableOpacity onPress={() => {
+                  if (checkoutStep > 1) setCheckoutStep(checkoutStep - 1);
+                  else setCheckoutModalVisible(false);
+                }}>
+                  <Ionicons name="arrow-back" size={24} color="#333" />
+                </TouchableOpacity>
+                <Text style={styles.wizardTitle}>
+                  {checkoutStep === 1 && 'اختر نوع الطلب'}
+                  {checkoutStep === 2 && (orderType === 'delivery' ? 'اختر عنوان التوصيل' : 'اختر فرع الاستلام')}
+                  {checkoutStep === 3 && 'تأكيد الطلب'}
+                </Text>
+                <View style={{ width: 24 }} />
+              </View>
 
-            <View style={styles.wizardContent}>
-              {checkoutStep === 1 && (
-                <View>
-                  <OrderTypeSelector />
-                  <TouchableOpacity
-                    style={[styles.wizardButton, !orderType && styles.disabledButton]}
-                    disabled={!orderType}
-                    onPress={() => setCheckoutStep(2)}
-                  >
-                    <Text style={styles.checkoutButtonText}>التالي</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {checkoutStep === 2 && (
-                <View>
-                  {orderType === 'delivery' ? <AddressSection /> : <BranchSection />}
-                  <TouchableOpacity
-                    style={[
-                      styles.wizardButton,
-                      (orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch) && styles.disabledButton
-                    ]}
-                    disabled={orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch}
-                    onPress={() => setCheckoutStep(3)}
-                  >
-                    <Text style={styles.checkoutButtonText}>التالي</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {checkoutStep === 3 && (
-                <View>
-                  <View style={styles.priceSummary}>
-                    <View style={styles.priceRow}><Text style={styles.priceLabel}>المجموع الفرعي</Text><Text style={styles.priceValue}>{subtotal.toFixed(2)} ₪</Text></View>
-                    {orderType === 'delivery' && (<View style={styles.priceRow}><Text style={styles.priceLabel}>سعر التوصيل</Text><Text style={styles.priceValue}>{deliveryPrice.toFixed(2)} ₪</Text></View>)}
-                    <View style={[styles.priceRow, styles.totalRow]}><Text style={styles.totalLabel}>المجموع الكلي</Text><Text style={styles.totalPrice}>{totalPrice.toFixed(2)} ₪</Text></View>
+              <View style={styles.wizardContent}>
+                {checkoutStep === 1 && (
+                  <View>
+                    <OrderTypeSelector 
+                      orderType={orderType} 
+                      onTypeChange={handleOrderTypeChange} 
+                    />
+                    <TouchableOpacity
+                      style={[styles.wizardButton, !orderType && styles.disabledButton]}
+                      disabled={!orderType}
+                      onPress={() => setCheckoutStep(2)}
+                    >
+                      <Text style={styles.checkoutButtonText}>التالي</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    style={[styles.wizardButton, isPlacingOrder && styles.disabledButton]}
-                    disabled={isPlacingOrder}
-                    onPress={handleCheckout}
-                  >
-                    {isPlacingOrder ? <ActivityIndicator color="#fff" /> : <Text style={styles.checkoutButtonText}>تأكيد الطلب الآن</Text>}
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+                )}
+
+                {checkoutStep === 2 && (
+                  <View>
+                    {orderType === 'delivery' ? (
+                      <AddressSection
+                        orderType={orderType}
+                        loadingAddresses={loadingAddresses}
+                        availableAddresses={availableAddresses}
+                        selectedAddress={selectedAddress}
+                        onSelectAddress={handleSelectAddress}
+                        onAddAddress={handleAddAddress}
+                      />
+                    ) : (
+                      <BranchSection
+                        orderType={orderType}
+                        loadingBranches={loadingBranches}
+                        availableBranches={availableBranches}
+                        selectedBranch={selectedBranch}
+                        onSelectBranch={handleSelectBranch}
+                      />
+                    )}
+                    <TouchableOpacity
+                      style={[
+                        styles.wizardButton,
+                        (orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch) && styles.disabledButton
+                      ]}
+                      disabled={orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch}
+                      onPress={() => setCheckoutStep(3)}
+                    >
+                      <Text style={styles.checkoutButtonText}>التالي</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {checkoutStep === 3 && (
+                  <View>
+                    <View style={styles.priceSummary}>
+                      <View style={styles.priceRow}>
+                        <Text style={styles.priceLabel}>المجموع الفرعي</Text>
+                        <Text style={styles.priceValue}>{subtotal.toFixed(2)} ₪</Text>
+                      </View>
+                      {orderType === 'delivery' && (
+                        <View style={styles.priceRow}>
+                          <Text style={styles.priceLabel}>سعر التوصيل</Text>
+                          <Text style={styles.priceValue}>{deliveryPrice.toFixed(2)} ₪</Text>
+                        </View>
+                      )}
+                      <View style={[styles.priceRow, styles.totalRow]}>
+                        <Text style={styles.totalLabel}>المجموع الكلي</Text>
+                        <Text style={styles.totalPrice}>{totalPrice.toFixed(2)} ₪</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.wizardButton, isPlacingOrder && styles.disabledButton]}
+                      disabled={isPlacingOrder}
+                      onPress={handleCheckout}
+                    >
+                      {isPlacingOrder ? <ActivityIndicator color="#fff" /> : <Text style={styles.checkoutButtonText}>تأكيد الطلب الآن</Text>}
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      )}
 
       <FlatList
         data={items}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={7}
+        windowSize={5}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 180 }}
-        ListHeaderComponent={
-          <>
-            <Text style={styles.headerTitle}>سلتي</Text>
-            {items.length > 0 && <Text style={styles.sectionTitle}>المنتجات</Text>}
-          </>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}><Ionicons name="cart-outline" size={80} color="#ccc" /><Text style={styles.emptyText}>سلّتك فارغة بعد!</Text><TouchableOpacity style={styles.browseButton} onPress={() => router.push('/')}><Text style={styles.browseButtonText}>تصفح القائمة</Text></TouchableOpacity></View>
-        }
+        ListHeaderComponent={listHeaderComponent}
+        ListEmptyComponent={listEmptyComponent}
       />
+      
       {items.length > 0 && (
         <View style={styles.footer}>
           <View style={styles.priceSummary}>
@@ -414,7 +634,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
   },
-  // ✅ تنسيقات جديدة مضافة
   locationOption: {
     flexDirection: 'row',
     alignItems: 'center',
