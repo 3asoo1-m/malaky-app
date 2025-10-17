@@ -3,12 +3,17 @@
 import React, { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '@/lib/useAuth';
-import { ActivityIndicator, View, I18nManager } from 'react-native';
+import { ActivityIndicator, View, I18nManager, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { FavoritesProvider } from '@/lib/useFavorites';
 import { CartProvider } from '@/lib/useCart';
 
-// ✅✅✅ 1. استيراد الدوال الجديدة والمهمة ✅✅✅
+// ✅ استيراد نظام الصيانة والتحديثات
+import { useAppConfig } from '@/hooks/useAppConfig';
+import { MaintenanceScreen } from '@/components/MaintenanceScreen';
+import { ForceUpdateScreen } from '@/components/ForceUpdateScreen';
+
+// ✅ استيراد نظام الإشعارات
 import { 
   registerForPushNotificationsAsync, 
   setupNotificationHandlers,
@@ -29,8 +34,22 @@ const AuthGuard = () => {
   const segments = useSegments();
   const router = useRouter();
 
+  // ✅ استخدام نظام الصيانة والتحديثات داخل AuthGuard
+  const { 
+    loading: configLoading, 
+    showMaintenance, 
+    showForceUpdate, 
+    appConfig, 
+    handleUpdate 
+  } = useAppConfig();
+
   useEffect(() => {
-    if (initialLoading) return;
+    if (initialLoading || configLoading) return;
+
+    // ✅ إذا كان التطبيق تحت الصيانة أو يحتاج تحديث إجباري، لا نتحقق من المصادقة
+    if (showMaintenance || showForceUpdate) {
+      return;
+    }
 
     const inAuthGroup = segments[0] === '(auth)';
 
@@ -39,8 +58,7 @@ const AuthGuard = () => {
       if (inAuthGroup) {
         router.replace('/');
       }
-      // ✅✅✅ 2. تسجيل التوكن عند تسجيل الدخول ✅✅✅
-      // لا حاجة لـ useRef، هذا سيتم استدعاؤه مرة واحدة عند تغير user من null إلى قيمة
+      // ✅ تسجيل التوكن عند تسجيل الدخول
       console.log("User authenticated. Registering for push notifications...");
       registerForPushNotificationsAsync();
 
@@ -50,13 +68,32 @@ const AuthGuard = () => {
         router.replace('/(auth)/login'); 
       }
     }
-  }, [user, initialLoading]); // ✅ الاعتماد على user و initialLoading فقط
+  }, [user, initialLoading, configLoading, showMaintenance, showForceUpdate]);
 
-  if (initialLoading) {
+  // ✅ عرض شاشات الصيانة والتحديث إذا لزم الأمر
+  if (configLoading || initialLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <ActivityIndicator size="large" color="#1D3557" />
+        <Text style={{ marginTop: 10, fontSize: 16, fontFamily: 'Cairo-Regular', color: '#1D3557' }}>
+          {configLoading ? 'جاري التحقق من التحديثات...' : 'جاري التحميل...'}
+        </Text>
       </View>
+    );
+  }
+
+  // ✅ عرض شاشة الصيانة
+  if (showMaintenance) {
+    return <MaintenanceScreen message={appConfig.maintenance_message} />;
+  }
+
+  // ✅ عرض شاشة التحديث الإجباري
+  if (showForceUpdate) {
+    return (
+      <ForceUpdateScreen 
+        message={appConfig.force_update_message || 'يوجد تحديث جديد مطلوب'}
+        onUpdate={handleUpdate}
+      />
     );
   }
 
@@ -65,29 +102,28 @@ const AuthGuard = () => {
 
 export default function RootLayout() {
   
-  // ✅✅✅ 3. إعداد معالجات الإشعارات والتطبيق ✅✅✅
+  // ✅ إعداد معالجات الإشعارات والتطبيق
   useEffect(() => {
-    // --- إعداد معالجات النقر على الإشعارات ---
+    // إعداد معالجات النقر على الإشعارات
     const { removeReceivedListener, removeResponseListener } = setupNotificationHandlers();
 
-    // --- التعامل مع حالة التطبيق (عندما يعود المستخدم للتطبيق) ---
+    // التعامل مع حالة التطبيق (عندما يعود المستخدم للتطبيق)
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       // إذا عاد المستخدم إلى التطبيق وهو في المقدمة
       if (nextAppState === 'active') {
         console.log('App has come to the foreground, clearing badge count.');
-        // قم بمسح عداد الإشعارات على أيقونة التطبيق
+        // مسح عداد الإشعارات على أيقونة التطبيق
         clearBadgeCount();
       }
     });
 
-    // --- دالة التنظيف (Cleanup function) ---
-    // يتم استدعاؤها عند إغلاق المكون لتجنب تسرب الذاكرة
+    // دالة التنظيف (Cleanup function)
     return () => {
       removeReceivedListener();
       removeResponseListener();
       subscription.remove();
     };
-  }, []); // ✅ مصفوفة فارغة تعني أن هذا الـ effect يعمل مرة واحدة فقط عند تحميل التطبيق
+  }, []);
 
   return (
     <SafeAreaProvider>
