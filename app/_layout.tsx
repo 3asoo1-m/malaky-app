@@ -21,6 +21,9 @@ import {
 } from '@/lib/notifications';
 import { AppState } from 'react-native';
 
+// ✅ استيراد نظام OTA للتحديثات التلقائية
+import * as Updates from 'expo-updates';
+
 // --- كود RTL يبقى كما هو ---
 try {
   I18nManager.forceRTL(true);
@@ -42,6 +45,35 @@ const AuthGuard = () => {
     appConfig, 
     handleUpdate 
   } = useAppConfig();
+
+  // ✅ كود التحديث التلقائي OTA
+  useEffect(() => {
+    const checkForOTAUpdates = async () => {
+      if (__DEV__) {
+        console.log('OTA disabled in development');
+        return;
+      }
+      
+      try {
+        console.log('🔍 جاري التحقق من تحديثات OTA...');
+        const update = await Updates.checkForUpdateAsync();
+        
+        if (update.isAvailable) {
+          console.log('📦 يوجد تحديث OTA جديد، جاري التحميل...');
+          await Updates.fetchUpdateAsync();
+          console.log('✅ تم تحميل التحديث، جاري إعادة التشغيل...');
+          await Updates.reloadAsync();
+        } else {
+          console.log('✅ التطبيق محدث بالفعل - لا يوجد تحديثات OTA جديدة');
+        }
+      } catch (error) {
+        console.log('❌ فشل التحقق من تحديثات OTA:', error);
+      }
+    };
+
+    // تحقق من التحديثات عند فتح التطبيق
+    checkForOTAUpdates();
+  }, []);
 
   useEffect(() => {
     if (initialLoading || configLoading) return;
