@@ -245,7 +245,7 @@ export default function MenuItemDetailsScreen() {
               );
             })}
 
-            <Text style={styles.sectionTitle}>ملاحظات خاصة</Text>
+            <Text style={styles.sectionTitle}>ملاحظات</Text>
             <TextInput
               value={notes}
               onChangeText={setNotes}
