@@ -11,8 +11,9 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
     shouldSetBadge: true,
-    shouldShowBanner: true, // خاص بـ Android، يظهر الإشعار كـ "بانر" في الأعلى
-    shouldShowList: true,   // خاص بـ Android، يضيف الإشعار إلى قائمة الإشعارات
+    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true, 
   }),
 });
 
