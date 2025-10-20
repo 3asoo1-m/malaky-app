@@ -7,43 +7,14 @@ import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
 Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    const { data } = notification.request.content;
-
-    if (data && typeof data === 'object' && 'title' in data && 'body' in data) {
-      console.log('Received a data-only notification in foreground. Scheduling a local notification to display it.');
-      
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: data.title as string,
-          body: data.body as string,
-          data: data,
-          sound: true,
-        },
-        trigger: null,
-      });
-
-      // ✅ أخبر النظام بتجاهل الإشعار الأصلي بالكامل
-      return {
-        shouldShowAlert: false,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-        // ✅✅ إضافة الخصائص المفقودة
-        shouldShowBanner: false, 
-        shouldShowList: false,
-      };
-    }
-
-    // ✅ السلوك الافتراضي للإشعارات الأخرى (يجب أن يحتوي أيضًا على كل الخصائص)
-    return {
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      // ✅✅ إضافة الخصائص المفقودة
-      shouldShowBanner: true, 
-      shouldShowList: true,
-    };
-  },
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    // ✅✅ إضافة الخصائص المفقودة لـ Android
+    shouldShowBanner: true, 
+    shouldShowList: true,
+  }),
 });
 
 /**
