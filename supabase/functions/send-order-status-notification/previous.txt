@@ -18,9 +18,9 @@ interface OrderRecord {
 function getNotificationMessage(status: string): { title: string; body: string } | null {
   switch (status) {
     case 'new': return {
-      title: 'تم إستلام طلبك بنجاح',
-      body: 'يمكنك تتبع عملية طلبك في التطبيق.',
-    };
+        title: 'تم إستلام طلبك بنجاح',
+        body: 'يمكنك تتبع عملية طلبك في التطبيق.',
+      };
     case 'processing':
       return {
         title: 'طلبك قيد التحضير! 👨‍🍳',
@@ -31,7 +31,7 @@ function getNotificationMessage(status: string): { title: string; body: string }
         title: 'طلبك في الطريق إليك! 🛵',
         body: 'سائق التوصيل في طريقه إليك الآن. استعد لاستلام وجبتك الشهية!',
       };
-    case 'ready':
+      case 'ready':
       return {
         title: 'طلب جاهز',
         body: 'طلبك الان جاهز, يمكنك استلام طلبك من الفرع.',
@@ -99,31 +99,20 @@ serve(async (req: Request) => {
     // 6. إرسال الإشعار باستخدام Expo
     console.log(`Found ${tokenData.length} tokens. Preparing to send notifications.`);
     const expo = new Expo();
-
-    // ✅✅✅ هذا هو التعديل الكامل والمطلوب ✅✅✅
-    const messagesToSend = tokenData.map((t) => ({
-      to: t.token,
-      // 🚫 لا نرسل title أو body في المستوى الأعلى
-
-      // ✅ نرسل كل شيء داخل حقل 'data'
-      data: {
-        orderId: updatedOrder.id,
-        title: message.title, // العنوان أصبح هنا
-        body: message.body,   // والنص أصبح هنا
-      },
-
-      // ✅✅ الأهم: تحديد الأولوية والقناة لـ Android ✅✅
-      priority: 'high', // يخبر Android أن هذا الإشعار مهم
-      channelId: 'default', // استخدم نفس اسم القناة التي أنشأتها في التطبيق
-      sound: 'default', // يمكنك إبقاء الصوت هنا أو نقله للـ data
-    }));
-
-    const chunks = expo.chunkPushNotifications(messagesToSend);
-    // ✅✅✅ نهاية التعديل ✅✅✅
+    const chunks = expo.chunkPushNotifications(
+      tokenData.map((t: { token: string }) => ({
+        to: t.token,
+        sound: 'default',
+        title: message.title,
+        body: message.body,
+        data: { orderId: updatedOrder.id },
+      }))
+    );
 
     for (const chunk of chunks) {
       await expo.sendPushNotificationsAsync(chunk);
     }
+
     console.log('Successfully sent notifications.');
     // 7. إرجاع رسالة نجاح
     return new Response(JSON.stringify({ message: 'Notification sent!' }), {
