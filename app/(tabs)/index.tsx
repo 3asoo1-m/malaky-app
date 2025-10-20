@@ -184,31 +184,22 @@ const SectionComponent = React.memo(({ section, router }: SectionComponentProps)
     <MenuItemCard
       item={item}
       onPress={() => {
-        // ✅ تتبع النقر على المنتج
-        trackEvent(AnalyticsEvents.ITEM_VIEWED, {
-          item_id: item.id,
-          item_name: item.name,
-          item_price: item.price,
-          category_id: section.id,
-          category_name: section.name
-        });
+        // ✅ نقل التتبع خارج التصيير الرئيسي
+        setTimeout(() => {
+          trackEvent(AnalyticsEvents.ITEM_VIEWED, {
+            item_id: item.id,
+            item_name: item.name,
+            category_id: section.id,
+          });
+        }, 0);
+
         router.push(`/item/${item.id}`);
       }}
     />
-  ), [router, section]);
+  ), [router, section.id, section.name]);
 
-  const keyExtractor = useCallback((menuItem: MenuItem) => menuItem.id.toString(), []);
-
-  // ✅ تتبع عرض القسم
-  useEffect(() => {
-    if (section.menu_items && section.menu_items.length > 0) {
-      trackEvent(AnalyticsEvents.SECTION_VIEWED, {
-        section_id: section.id,
-        section_name: section.name,
-        items_count: section.menu_items.length
-      });
-    }
-  }, [section]);
+  const keyExtractor = useCallback((menuItem: MenuItem) =>
+    `menu_item_${menuItem.id}`, []);
 
   return (
     <View style={styles.section}>
@@ -220,11 +211,12 @@ const SectionComponent = React.memo(({ section, router }: SectionComponentProps)
           showsHorizontalScrollIndicator={false}
           keyExtractor={keyExtractor}
           renderItem={renderMenuItem}
-          contentContainerStyle={{ paddingHorizontal: 10, overflow: 'visible', paddingVertical: 10 }}
+          contentContainerStyle={{ paddingHorizontal: 10, paddingVertical: 10 }}
           removeClippedSubviews={true}
-          maxToRenderPerBatch={3}
-          windowSize={3}
-          initialNumToRender={3}
+          maxToRenderPerBatch={5}
+          updateCellsBatchingPeriod={100}
+          windowSize={7}
+          initialNumToRender={5}
         />
       ) : (
         <Text style={styles.noItemsText}>لا توجد وجبات في هذا القسم حالياً.</Text>
@@ -255,6 +247,9 @@ export default function HomeScreen() {
   const [isDataCached, setDataCached] = useState({ menu: false, promotions: false, categories: false });
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
+  // ✅ استخدام useRef للـ timeout - الإصدار المصحح
+  const searchTimeoutRef = useRef<number | null>(null);
+
   // ✅ useCallback للدوال
   const handleCategorySelect = useCallback((categoryId: ActiveCategory) => {
     setSearchQuery('');
@@ -268,13 +263,29 @@ export default function HomeScreen() {
     });
   }, [activeCategory]);
 
+  // ✅ تحسين البحث مع useRef - الإصدار المصحح
   const handleSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
 
-    // ✅ تتبع البحث مع حل أكثر كفاءة
+    // ✅ تنظيف الـ timeout السابق
+    if (searchTimeoutRef.current !== null) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+
+    // ✅ معالجة مسح البحث مباشرة
+    if (text.length === 0) {
+      if (searchQuery.length > 0) {
+        trackEvent(AnalyticsEvents.SEARCH_CLEARED, {
+          previous_query_length: searchQuery.length
+        });
+      }
+      return;
+    }
+
+    // ✅ بحث بعد توقف الكتابة
     if (text.length > 2) {
-      // ✅ استخدام setTimeout لتأجيل التتبع حتى يتم تحديث الحالة
-      setTimeout(() => {
+      searchTimeoutRef.current = setTimeout(() => {
         const searchTerm = text.toLowerCase().trim();
         const hasResults = sections.some(section =>
           section.menu_items?.some(item =>
@@ -287,13 +298,13 @@ export default function HomeScreen() {
           query: text,
           query_length: text.length,
           has_results: hasResults,
-          // ✅ إضافة معلومات إضافية مفيدة
-          sections_count: sections.length,
-          timestamp: new Date().toISOString()
+          search_term: searchTerm
         });
-      }, 50); // ✅ تأخير بسيط 50ms يكفي
+
+        searchTimeoutRef.current = null;
+      }, 500);
     }
-  }, [sections]); // ✅ استخدام sections فقط - أكثر استقراراً // ✅ إصلاح: استخدام filteredSections.length بدلاً من filteredSections
+  }, [sections, searchQuery]);
 
   const handleClearSearch = useCallback(() => {
     if (searchQuery.length > 0) {
@@ -510,11 +521,14 @@ export default function HomeScreen() {
 
     loadData();
 
-    // ✅ إضافة cleanup function
+    // ✅ تنظيف الـ timeout عند unmount - الإصدار المصحح
     return () => {
-      // تنظيف إذا لزم الأمر
+      if (searchTimeoutRef.current !== null) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
     };
-  }, []); // ✅ إصلاح: إزالة loadData من dependencies لتجنب loop
+  }, []);
 
   // ✅ مزامنة تلقائية دورية
   useEffect(() => {

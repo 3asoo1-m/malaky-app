@@ -79,19 +79,16 @@ const CategoryChip = memo(({
 CategoryChip.displayName = 'CategoryChip';
 
 function CategoryChips({ categories, activeCategory, onCategorySelect, loading = false }: Props) {
-  // ✅ ترتيب ثابت - "الكل" أولاً ثم باقي الفئات كما تأتي من السيرفر
+  // ✅ ترتيب ثابت
   const allCategories = useMemo(() => 
     [{ id: 'all' as const, name: 'الكل' }, ...categories],
     [categories]
   );
 
-  // ✅ اختيار الفئة مع التتبع فقط
+  // ✅ اختيار الفئة
   const handleCategorySelect = useCallback((id: ActiveCategory) => {
     console.log(`🎯 Category selected: ${id}`);
-    
-    // ✅ تأثير حركي ناعم
     LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
-    
     onCategorySelect(id);
   }, [onCategorySelect]);
 
@@ -106,37 +103,8 @@ function CategoryChips({ categories, activeCategory, onCategorySelect, loading =
   const keyExtractor = useCallback((item: { id: ActiveCategory; name: string }) => 
     `category_${item.id}`, []);
 
-  // ✅ التمرير التلقائي للفئة النشطة
-  const flatListRef = React.useRef<FlatList>(null);
-
-  React.useEffect(() => {
-    if (activeCategory && flatListRef.current) {
-      const activeIndex = allCategories.findIndex(cat => cat.id === activeCategory);
-      if (activeIndex !== -1) {
-        setTimeout(() => {
-          flatListRef.current?.scrollToIndex({
-            index: activeIndex,
-            animated: true,
-            viewPosition: 0.5
-          });
-        }, 100);
-      }
-    }
-  }, [activeCategory, allCategories]);
-
-  // ✅ معالج للأخطاء في التمرير
-  const handleScrollToIndexFailed = useCallback((info: {
-    index: number;
-    highestMeasuredFrameIndex: number;
-    averageItemLength: number;
-  }) => {
-    setTimeout(() => {
-      flatListRef.current?.scrollToIndex({
-        index: Math.min(info.index, allCategories.length - 1),
-        animated: true,
-      });
-    }, 50);
-  }, [allCategories.length]);
+  // ✅ إزالة معالج الأخطاء أيضاً (لأنه مرتبط بالتمرير التلقائي)
+  // const handleScrollToIndexFailed = useCallback(...)
 
   if (loading) {
     return (
@@ -151,7 +119,7 @@ function CategoryChips({ categories, activeCategory, onCategorySelect, loading =
   return (
     <View style={styles.container}>
       <FlatList
-        ref={flatListRef}
+        // ✅ إزالة الـ ref
         data={allCategories}
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -162,17 +130,9 @@ function CategoryChips({ categories, activeCategory, onCategorySelect, loading =
         maxToRenderPerBatch={15}
         windowSize={10}
         removeClippedSubviews={false}
-        getItemLayout={(data, index) => ({
-          length: 100,
-          offset: 100 * index,
-          index,
-        })}
         decelerationRate="fast"
         snapToAlignment="center"
-        onScrollToIndexFailed={handleScrollToIndexFailed}
-        updateCellsBatchingPeriod={100}
-        disableVirtualization={false}
-        initialScrollIndex={0}
+        // ✅ إزالة onScrollToIndexFailed
       />
     </View>
   );
