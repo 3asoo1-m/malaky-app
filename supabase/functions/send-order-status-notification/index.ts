@@ -1,11 +1,8 @@
 // مسار الملف: supabase/functions/send-order-status-notification/index.ts
 
-// =================== التصحيح النهائي هنا ===================
-// استخدام الأسماء المختصرة المعرفة في deno.json
 import { serve } from "std/http";
 import { createClient } from "@supabase/supabase-js";
 import { Expo } from "expo-server-sdk";
-// ================= نهاية التصحيح ==================
 
 // تعريف أنواع البيانات التي نتوقعها من الـ Webhook
 interface OrderRecord {
@@ -14,7 +11,7 @@ interface OrderRecord {
   user_id: string;
 }
 
-// دالة لترجمة الحالة إلى رسالة باللغة العربية (مع الحالات الجديدة )
+// دالة لترجمة الحالة إلى رسالة باللغة العربية
 function getNotificationMessage(status: string): { title: string; body: string } | null {
   switch (status) {
     case 'new': return {
@@ -41,7 +38,6 @@ function getNotificationMessage(status: string): { title: string; body: string }
         title: 'بالهناء والشفاء! ✅',
         body: 'تم توصيل طلبك بنجاح. نأمل أن تستمتع بوجبتك!',
       };
-    // لا نرسل إشعاراً عند الإلغاء أو للحالات الأخرى
     case 'canceled':
     default:
       return null;
@@ -100,31 +96,35 @@ serve(async (req: Request) => {
     console.log(`Found ${tokenData.length} tokens. Preparing to send notifications.`);
     const expo = new Expo();
 
-    // ✅✅✅ هذا هو التعديل الكامل والمطلوب ✅✅✅
+    // ✅✅✅ التصحيح النهائي ✅✅✅
     const messagesToSend = tokenData.map((t) => ({
       to: t.token,
-      // 🚫 لا نرسل title أو body في المستوى الأعلى
-
-      // ✅ نرسل كل شيء داخل حقل 'data'
+      
+      // ✅ الحقول الأساسية للإشعار (تعمل مع iOS والتطبيقات في الخلفية)
+      title: message.title,
+      body: message.body,
+      sound: 'default',
+      
+      // ✅ إعدادات Android المهمة
+      priority: 'high',
+      channelId: 'default',
+      
+      // ✅ البيانات الإضافية (تعمل مع التطبيقات في المقدمة)
       data: {
         orderId: updatedOrder.id,
-        title: message.title, // العنوان أصبح هنا
-        body: message.body,   // والنص أصبح هنا
+        title: message.title,    // نسخ احتياطي
+        body: message.body,      // نسخ احتياطي
+        _displayInForeground: 'true' // ✅ إضافة هذه الخاصية المهمة
       },
-
-      // ✅✅ الأهم: تحديد الأولوية والقناة لـ Android ✅✅
-      priority: 'high', // يخبر Android أن هذا الإشعار مهم
-      channelId: 'default', // استخدم نفس اسم القناة التي أنشأتها في التطبيق
-      sound: 'default', // يمكنك إبقاء الصوت هنا أو نقله للـ data
     }));
 
     const chunks = expo.chunkPushNotifications(messagesToSend);
-    // ✅✅✅ نهاية التعديل ✅✅✅
 
     for (const chunk of chunks) {
       await expo.sendPushNotificationsAsync(chunk);
     }
     console.log('Successfully sent notifications.');
+    
     // 7. إرجاع رسالة نجاح
     return new Response(JSON.stringify({ message: 'Notification sent!' }), {
       headers: { 'Content-Type': 'application/json' },
