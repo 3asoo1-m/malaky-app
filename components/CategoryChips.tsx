@@ -1,6 +1,6 @@
 // مسار الملف: components/CategoryChips.tsx
 
-import React, { memo, useCallback, useMemo, useEffect, useState } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { 
   FlatList, 
   StyleSheet, 
@@ -13,7 +13,6 @@ import {
   Platform
 } from 'react-native';
 import { Category, ActiveCategory } from '@/lib/types';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { trackEvent, AnalyticsEvents } from '@/lib/analytics';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -23,12 +22,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// ✅ مفاتيح التخزين المؤقت
-const CACHE_KEYS = {
-  CATEGORIES_ORDER: 'categories_order_cache',
-  LAST_ACTIVE_CATEGORY: 'last_active_category'
-};
-
 type Props = {
   categories: Category[];
   activeCategory: ActiveCategory;
@@ -36,20 +29,16 @@ type Props = {
   loading?: boolean;
 };
 
-// ✅ 1. مكون Chip منفصل مع memo وتحليلات
+// ✅ مكون Chip منفصل مع memo
 const CategoryChip = memo(({ 
   item, 
   isActive, 
-  onPress,
-  isFirstRender 
+  onPress 
 }: { 
   item: { id: ActiveCategory; name: string };
   isActive: boolean;
   onPress: (id: ActiveCategory) => void;
-  isFirstRender: boolean;
 }) => {
-  const [isPressed, setIsPressed] = useState(false);
-
   const handlePress = useCallback(() => {
     // ✅ تأثير ناعم عند الضغط
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -64,36 +53,17 @@ const CategoryChip = memo(({
     onPress(item.id);
   }, [item.id, item.name, onPress]);
 
-  const handlePressIn = useCallback(() => {
-    setIsPressed(true);
-  }, []);
-
-  const handlePressOut = useCallback(() => {
-    setIsPressed(false);
-  }, []);
-
   return (
     <TouchableOpacity
-      style={[
-        styles.chip, 
-        isActive && styles.activeChip,
-        isPressed && styles.pressedChip,
-        isFirstRender && styles.initialRender
-      ]}
+      style={[styles.chip, isActive && styles.activeChip]}
       onPress={handlePress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       activeOpacity={0.8}
       delayPressIn={0}
       hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
       disabled={isActive}
     >
       <Text 
-        style={[
-          styles.text, 
-          isActive && styles.activeText,
-          isPressed && styles.pressedText
-        ]}
+        style={[styles.text, isActive && styles.activeText]}
         numberOfLines={1}
         ellipsizeMode="tail"
         adjustsFontSizeToFit
@@ -109,122 +79,38 @@ const CategoryChip = memo(({
 CategoryChip.displayName = 'CategoryChip';
 
 function CategoryChips({ categories, activeCategory, onCategorySelect, loading = false }: Props) {
-  const [isFirstRender, setIsFirstRender] = useState(true);
-  const [cachedOrder, setCachedOrder] = useState<string[]>([]);
+  // ✅ ترتيب ثابت - "الكل" أولاً ثم باقي الفئات كما تأتي من السيرفر
+  const allCategories = useMemo(() => 
+    [{ id: 'all' as const, name: 'الكل' }, ...categories],
+    [categories]
+  );
 
-  // ✅ 2. جلب الترتيب المخزن للمستخدم
-  useEffect(() => {
-    loadCachedOrder();
-  }, []);
-
-  const loadCachedOrder = async () => {
-    try {
-      const cached = await AsyncStorage.getItem(CACHE_KEYS.CATEGORIES_ORDER);
-      if (cached) {
-        setCachedOrder(JSON.parse(cached));
-        console.log('✅ Loaded cached categories order:', JSON.parse(cached));
-      }
-    } catch (error) {
-      console.log('❌ Error loading categories order cache:', error);
-    }
-  };
-
-  // ✅ 3. تخزين الترتيب بناءً على استخدام المستخدم
-  const saveCategoryOrder = async (selectedId: string) => {
-    try {
-      const newOrder = [selectedId, ...cachedOrder.filter(id => id !== selectedId)];
-      const limitedOrder = newOrder.slice(0, 10);
-      setCachedOrder(limitedOrder);
-      await AsyncStorage.setItem(CACHE_KEYS.CATEGORIES_ORDER, JSON.stringify(limitedOrder));
-      console.log('💾 Saved category order:', limitedOrder);
-    } catch (error) {
-      console.log('❌ Error saving categories order:', error);
-    }
-  };
-
-  // ✅ 4. ترتيب الفئات بناءً على الاستخدام + caching
-  const allCategories = useMemo(() => {
-    const baseCategories = [{ id: 'all' as const, name: 'الكل' }, ...categories];
-    
-    if (cachedOrder.length === 0 || loading) return baseCategories;
-
-    // ✅ تطبيق الترتيب الذكي
-    const orderedCategories = baseCategories.sort((a, b) => {
-      const aIndex = cachedOrder.indexOf(a.id.toString());
-      const bIndex = cachedOrder.indexOf(b.id.toString());
-      
-      if (aIndex === -1 && bIndex === -1) return 0;
-      if (aIndex === -1) return 1;
-      if (bIndex === -1) return -1;
-      
-      return aIndex - bIndex;
-    });
-
-    console.log('🔄 Applied smart ordering to categories');
-    return orderedCategories;
-  }, [categories, cachedOrder, loading]);
-
-  // ✅ 5. تحسين اختيار الفئة مع التخزين المؤقت والتحليلات
+  // ✅ اختيار الفئة مع التتبع فقط
   const handleCategorySelect = useCallback((id: ActiveCategory) => {
     console.log(`🎯 Category selected: ${id}`);
     
     // ✅ تأثير حركي ناعم
     LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
     
-    // ✅ تخزين آخر فئة نشطة
-    AsyncStorage.setItem(CACHE_KEYS.LAST_ACTIVE_CATEGORY, id.toString());
-    
-    // ✅ تحديث ترتيب الفئات المستخدمة
-    if (id !== 'all') {
-      saveCategoryOrder(id.toString());
-    }
-    
     onCategorySelect(id);
-  }, [onCategorySelect, cachedOrder]);
+  }, [onCategorySelect]);
 
-  // ✅ 6. استعادة آخر فئة نشطة من cache
-  useEffect(() => {
-    const restoreLastActiveCategory = async () => {
-      try {
-        const lastActive = await AsyncStorage.getItem(CACHE_KEYS.LAST_ACTIVE_CATEGORY);
-        if (lastActive && lastActive !== 'all') {
-          console.log('🔄 Restored last active category:', lastActive);
-        }
-      } catch (error) {
-        console.log('❌ Error restoring last active category:', error);
-      }
-    };
-    
-    restoreLastActiveCategory();
-  }, []);
-
-  // ✅ 7. إلغاء تأثير first render بعد التحميل
-  useEffect(() => {
-    if (!loading && isFirstRender) {
-      setTimeout(() => {
-        setIsFirstRender(false);
-        console.log('🎉 Category chips fully rendered');
-      }, 300);
-    }
-  }, [loading, isFirstRender]);
-
-  const renderItem = useCallback(({ item, index }: { item: { id: ActiveCategory; name: string }; index: number }) => (
+  const renderItem = useCallback(({ item }: { item: { id: ActiveCategory; name: string } }) => (
     <CategoryChip
       item={item}
       isActive={activeCategory === item.id}
       onPress={handleCategorySelect}
-      isFirstRender={isFirstRender && index > 5}
     />
-  ), [activeCategory, handleCategorySelect, isFirstRender]);
+  ), [activeCategory, handleCategorySelect]);
 
   const keyExtractor = useCallback((item: { id: ActiveCategory; name: string }) => 
     `category_${item.id}`, []);
 
-  // ✅ 8. التمرير التلقائي للفئة النشطة مع cache للposition
+  // ✅ التمرير التلقائي للفئة النشطة
   const flatListRef = React.useRef<FlatList>(null);
 
-  useEffect(() => {
-    if (!isFirstRender && activeCategory && flatListRef.current) {
+  React.useEffect(() => {
+    if (activeCategory && flatListRef.current) {
       const activeIndex = allCategories.findIndex(cat => cat.id === activeCategory);
       if (activeIndex !== -1) {
         setTimeout(() => {
@@ -236,9 +122,9 @@ function CategoryChips({ categories, activeCategory, onCategorySelect, loading =
         }, 100);
       }
     }
-  }, [activeCategory, isFirstRender, allCategories]);
+  }, [activeCategory, allCategories]);
 
-  // ✅ 9. معالج للأخطاء في التمرير
+  // ✅ معالج للأخطاء في التمرير
   const handleScrollToIndexFailed = useCallback((info: {
     index: number;
     highestMeasuredFrameIndex: number;
@@ -252,27 +138,15 @@ function CategoryChips({ categories, activeCategory, onCategorySelect, loading =
     }, 50);
   }, [allCategories.length]);
 
-  // ✅ 10. حالة التحميل مع skeleton
   if (loading) {
     return (
       <View style={styles.container}>
         <View style={styles.skeletonChip} />
         <View style={styles.skeletonChip} />
         <View style={styles.skeletonChip} />
-        <View style={styles.skeletonChip} />
       </View>
     );
   }
-
-  // ✅ 11. تتبع عرض الفئات
-  useEffect(() => {
-    if (!loading && allCategories.length > 0) {
-      trackEvent(AnalyticsEvents.CATEGORY_VIEWED, {
-        categories_count: allCategories.length,
-        has_cached_order: cachedOrder.length > 0
-      });
-    }
-  }, [loading, allCategories.length, cachedOrder.length]);
 
   return (
     <View style={styles.container}>
@@ -299,10 +173,6 @@ function CategoryChips({ categories, activeCategory, onCategorySelect, loading =
         updateCellsBatchingPeriod={100}
         disableVirtualization={false}
         initialScrollIndex={0}
-        // ✅ تحسينات أداء إضافية
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-        }}
       />
     </View>
   );
@@ -338,7 +208,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    transform: [{ scale: 1 }],
   },
   activeChip: {
     backgroundColor: '#D32128',
@@ -348,15 +217,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    transform: [{ scale: 1.02 }],
-  },
-  pressedChip: {
-    transform: [{ scale: 0.96 }],
-    opacity: 0.9,
-  },
-  initialRender: {
-    opacity: 0,
-    transform: [{ translateY: 10 }],
   },
   text: {
     fontSize: 14,
@@ -367,9 +227,6 @@ const styles = StyleSheet.create({
   activeText: {
     color: '#fff',
     fontWeight: '800',
-  },
-  pressedText: {
-    opacity: 0.8,
   },
   activeIndicator: {
     position: 'absolute',
