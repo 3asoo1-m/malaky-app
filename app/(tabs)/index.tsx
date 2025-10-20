@@ -16,15 +16,18 @@ import CategoryChips from '@/components/CategoryChips';
 import CustomBottomNav from '@/components/CustomBottomNav';
 
 // ✅✅✅ استيراد كل الأنواع من مصدر الحقيقة الواحد ✅✅✅
-import { 
-  Category, 
-  CategoryWithItems, 
-  ActiveCategory, 
-  Promotion, 
+import {
+  Category,
+  CategoryWithItems,
+  ActiveCategory,
+  Promotion,
   MenuItem,
   PromotionsCarouselProps,
   SectionComponentProps
 } from '@/lib/types';
+
+// ✅ استيراد نظام التحليلات
+import { trackEvent, AnalyticsEvents, flushBackupEvents, cleanupOldBackupEvents } from '@/lib/analytics';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -35,14 +38,20 @@ const CACHE_KEYS = {
   MENU_DATA: 'menu_data',
   PROMOTIONS: 'promotions_data',
   CATEGORIES: 'categories_data',
-  SEARCH_CACHE: 'search_cache'
+  SEARCH_CACHE: 'search_cache',
+  LAST_SYNC_TIMESTAMP: 'last_sync_timestamp'
 };
 
 const CACHE_DURATION = 1000 * 60 * 10; // 10 دقائق
+const SYNC_INTERVAL = 1000 * 60 * 5; // 5 دقائق
 
 const cacheData = async (key: string, data: any) => {
   try {
-    const cacheItem = { data, timestamp: Date.now() };
+    const cacheItem = {
+      data,
+      timestamp: Date.now(),
+      version: '1.0'
+    };
     await AsyncStorage.setItem(key, JSON.stringify(cacheItem));
     console.log(`✅ Data cached for key: ${key}`);
   } catch (error) {
@@ -58,12 +67,15 @@ const getCachedData = async (key: string) => {
       return null;
     }
     const cacheItem = JSON.parse(cached);
+
+    // ✅ التحقق من الصلاحية والنسخة
     const isExpired = Date.now() - cacheItem.timestamp > CACHE_DURATION;
     if (isExpired) {
       console.log(`🕐 Cache expired for key: ${key}`);
       await AsyncStorage.removeItem(key);
       return null;
     }
+
     console.log(`✅ Using cached data for key: ${key}`);
     return cacheItem.data;
   } catch (error) {
@@ -93,6 +105,13 @@ const PromotionsCarousel = React.memo(({ promotions }: PromotionsCarouselProps) 
   const router = useRouter();
 
   const handlePress = useCallback((promotion: Promotion) => {
+    // ✅ تتبع النقر على الإعلان
+    trackEvent(AnalyticsEvents.PROMOTION_TAPPED, {
+      promotion_id: promotion.id,
+      promotion_title: promotion.title,
+      action_type: promotion.action_type
+    });
+
     if (!promotion.action_type || !promotion.action_value) return;
     switch (promotion.action_type) {
       case 'navigate_to_item':
@@ -127,6 +146,16 @@ const PromotionsCarousel = React.memo(({ promotions }: PromotionsCarouselProps) 
 
   const keyExtractor = useCallback((item: Promotion) => item.id.toString(), []);
 
+  // ✅ تتبع عرض الإعلانات
+  useEffect(() => {
+    if (promotions.length > 0) {
+      trackEvent(AnalyticsEvents.PROMOTIONS_VIEWED, {
+        promotions_count: promotions.length,
+        promotion_ids: promotions.map(p => p.id)
+      });
+    }
+  }, [promotions.length]);
+
   if (!promotions || promotions.length === 0) return null;
 
   return (
@@ -152,10 +181,34 @@ const PromotionsCarousel = React.memo(({ promotions }: PromotionsCarouselProps) 
 
 const SectionComponent = React.memo(({ section, router }: SectionComponentProps) => {
   const renderMenuItem = useCallback(({ item }: { item: MenuItem }) => (
-    <MenuItemCard item={item} onPress={() => router.push(`/item/${item.id}`)} />
-  ), [router]);
+    <MenuItemCard
+      item={item}
+      onPress={() => {
+        // ✅ تتبع النقر على المنتج
+        trackEvent(AnalyticsEvents.ITEM_VIEWED, {
+          item_id: item.id,
+          item_name: item.name,
+          item_price: item.price,
+          category_id: section.id,
+          category_name: section.name
+        });
+        router.push(`/item/${item.id}`);
+      }}
+    />
+  ), [router, section]);
 
   const keyExtractor = useCallback((menuItem: MenuItem) => menuItem.id.toString(), []);
+
+  // ✅ تتبع عرض القسم
+  useEffect(() => {
+    if (section.menu_items && section.menu_items.length > 0) {
+      trackEvent(AnalyticsEvents.SECTION_VIEWED, {
+        section_id: section.id,
+        section_name: section.name,
+        items_count: section.menu_items.length
+      });
+    }
+  }, [section]);
 
   return (
     <View style={styles.section}>
@@ -198,33 +251,83 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<FlatList>(null);
   const [hasUnread, setHasUnread] = useState(false);
-  const [searchCache, setSearchCache] = useState<{[query: string]: CategoryWithItems[]}>({});
+  const [searchCache, setSearchCache] = useState<{ [query: string]: CategoryWithItems[] }>({});
   const [isDataCached, setDataCached] = useState({ menu: false, promotions: false, categories: false });
+  const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
   // ✅ useCallback للدوال
   const handleCategorySelect = useCallback((categoryId: ActiveCategory) => {
     setSearchQuery('');
     setActiveCategory(categoryId);
-  }, []);
+
+    // ✅ تتبع تغيير الفئة
+    trackEvent(AnalyticsEvents.CATEGORY_CHANGED, {
+      new_category: categoryId,
+      previous_category: activeCategory,
+      source: 'chips'
+    });
+  }, [activeCategory]);
 
   const handleSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
-  }, []);
+
+    // ✅ تتبع البحث مع حل أكثر كفاءة
+    if (text.length > 2) {
+      // ✅ استخدام setTimeout لتأجيل التتبع حتى يتم تحديث الحالة
+      setTimeout(() => {
+        const searchTerm = text.toLowerCase().trim();
+        const hasResults = sections.some(section =>
+          section.menu_items?.some(item =>
+            item.name.toLowerCase().includes(searchTerm) ||
+            (item.description && item.description.toLowerCase().includes(searchTerm))
+          )
+        );
+
+        trackEvent(AnalyticsEvents.SEARCH_PERFORMED, {
+          query: text,
+          query_length: text.length,
+          has_results: hasResults,
+          // ✅ إضافة معلومات إضافية مفيدة
+          sections_count: sections.length,
+          timestamp: new Date().toISOString()
+        });
+      }, 50); // ✅ تأخير بسيط 50ms يكفي
+    }
+  }, [sections]); // ✅ استخدام sections فقط - أكثر استقراراً // ✅ إصلاح: استخدام filteredSections.length بدلاً من filteredSections
 
   const handleClearSearch = useCallback(() => {
+    if (searchQuery.length > 0) {
+      // ✅ تتبع مسح البحث
+      trackEvent(AnalyticsEvents.SEARCH_CLEARED, {
+        previous_query: searchQuery,
+        query_length: searchQuery.length
+      });
+    }
     setSearchQuery('');
-  }, []);
+  }, [searchQuery]);
 
   const handleScroll = useCallback((event: any) => {
     const scrollY = event.nativeEvent.contentOffset.y;
     const PROMO_HEIGHT = promotions.length > 0 ? 240 : 0;
     const HEADER_HEIGHT = (Platform.OS === 'ios' ? 260 : 280) + PROMO_HEIGHT;
     setIsChipsSticky(scrollY > HEADER_HEIGHT);
+
+    // ✅ تتبع التمرير
+    if (scrollY > 500) {
+      trackEvent(AnalyticsEvents.SCROLL_DEPTH, {
+        scroll_depth: 'deep',
+        scroll_position: scrollY
+      });
+    }
   }, [promotions.length]);
 
   const handleNotificationPress = useCallback(() => {
+    // ✅ تتبع النقر على الإشعارات
+    trackEvent(AnalyticsEvents.NOTIFICATIONS_ACCESSED, {
+      has_unread: hasUnread
+    });
     router.push('/notifications');
-  }, [router]);
+  }, [router, hasUnread]);
 
   // ✅ دوال مساعدة محسنة
   const fetchFreshData = useCallback(async () => {
@@ -236,7 +339,7 @@ export default function HomeScreen() {
     if (menuResponse.error) throw menuResponse.error;
     const fetchedSections: CategoryWithItems[] = menuResponse.data || [];
     const fetchedCategories: Category[] = fetchedSections.map(s => ({ id: s.id, name: s.name }));
-    
+
     setSections(fetchedSections);
     setCategories(fetchedCategories);
     await cacheData(CACHE_KEYS.MENU_DATA, fetchedSections);
@@ -246,6 +349,18 @@ export default function HomeScreen() {
     const fetchedPromotions = promotionsResponse.data || [];
     setPromotions(fetchedPromotions);
     await cacheData(CACHE_KEYS.PROMOTIONS, fetchedPromotions);
+
+    // ✅ تحديث وقت المزامنة
+    const syncTime = Date.now();
+    setLastSyncTime(syncTime);
+    await AsyncStorage.setItem(CACHE_KEYS.LAST_SYNC_TIMESTAMP, syncTime.toString());
+
+    // ✅ تتبع نجاح جلب البيانات
+    trackEvent(AnalyticsEvents.DATA_FETCH_SUCCESS, {
+      sections_count: fetchedSections.length,
+      promotions_count: fetchedPromotions.length,
+      categories_count: fetchedCategories.length
+    });
 
     return { fetchedSections, fetchedCategories, fetchedPromotions };
   }, []);
@@ -278,34 +393,47 @@ export default function HomeScreen() {
       setCategories(cachedCategories);
       setPromotions(cachedPromotions);
       setDataCached({ menu: true, promotions: true, categories: true });
+
+      // ✅ تتبع استخدام البيانات المخزنة
+      trackEvent(AnalyticsEvents.CACHE_USED, {
+        cache_type: 'full_fallback',
+        sections_count: cachedMenu.length,
+        promotions_count: cachedPromotions.length
+      });
     }
   }, []);
 
-  // ✅ تحسين الـ loadData مع Error Handling
+  // ✅ تحسين الـ loadData مع Error Handling والتحليلات
   const loadData = useCallback(async (isRefreshing = false) => {
     setError(null);
-    
+
     if (isRefreshing) {
       setRefreshing(true);
     } else {
       setLoading(true);
     }
-    
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not found");
 
+      // ✅ تتبع بدء جلب البيانات
+      trackEvent(AnalyticsEvents.DATA_FETCH_STARTED, {
+        is_refreshing: isRefreshing,
+        user_id: user.id
+      });
+
       // ✅ تحسين جلب البيانات المخزنة
-      const cachePromises = isRefreshing 
-        ? [null, null, null] 
+      const cachePromises = isRefreshing
+        ? [null, null, null]
         : [
-            getCachedData(CACHE_KEYS.MENU_DATA),
-            getCachedData(CACHE_KEYS.PROMOTIONS),
-            getCachedData(CACHE_KEYS.CATEGORIES)
-          ];
+          getCachedData(CACHE_KEYS.MENU_DATA),
+          getCachedData(CACHE_KEYS.PROMOTIONS),
+          getCachedData(CACHE_KEYS.CATEGORIES)
+        ];
 
       const [cachedMenu, cachedPromotions, cachedCategories] = await Promise.all(cachePromises);
-      
+
       let shouldFetchFromServer = true;
 
       // ✅ استخدام البيانات المخزنة إذا كانت متاحة
@@ -316,6 +444,14 @@ export default function HomeScreen() {
         setPromotions(cachedPromotions);
         setDataCached({ menu: true, promotions: true, categories: true });
         shouldFetchFromServer = false;
+
+        // ✅ تتبع استخدام الكاش
+        const lastSync = await AsyncStorage.getItem(CACHE_KEYS.LAST_SYNC_TIMESTAMP);
+        const dataAge = Date.now() - (lastSync ? parseInt(lastSync) : Date.now());
+        trackEvent(AnalyticsEvents.CACHE_USED, {
+          cache_type: 'initial_load',
+          data_age: dataAge
+        });
       } else {
         console.log('🌐 Fetching fresh data from server');
       }
@@ -333,7 +469,13 @@ export default function HomeScreen() {
       const errorMessage = "فشل في تحميل البيانات. تأكد من اتصال الإنترنت.";
       setError(errorMessage);
       console.error("Error loading data:", err);
-      
+
+      // ✅ تتبع الأخطاء
+      trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
+        error_type: 'data_fetch_failed',
+        error_message: err instanceof Error ? err.message : 'Unknown error'
+      });
+
       // ✅ استخدام البيانات المخزنة كـ fallback
       await handleCacheFallback();
     } finally {
@@ -344,56 +486,112 @@ export default function HomeScreen() {
 
   const handleRefreshData = useCallback(async () => {
     console.log('🔄 Manually refreshing data...');
-    await loadData(true);
-  }, [loadData]);
 
+    // ✅ تتبع التحديث اليدوي
+    trackEvent(AnalyticsEvents.MANUAL_REFRESH, {
+      current_data_age: Date.now() - lastSyncTime
+    });
+
+    await loadData(true);
+  }, [loadData, lastSyncTime]);
+
+  // ✅ تأثير التحميل الأولي والمزامنة
   useEffect(() => {
+    // ✅ تتبع فتح التطبيق
+    trackEvent(AnalyticsEvents.APP_OPENED, {
+      source: 'cold_start',
+      platform: Platform.OS,
+      timestamp: new Date().toISOString()
+    });
+
+    // ✅ محاولة إرسال الأحداث المحفوظة
+    flushBackupEvents();
+    cleanupOldBackupEvents();
+
     loadData();
-  }, [loadData]);
+
+    // ✅ إضافة cleanup function
+    return () => {
+      // تنظيف إذا لزم الأمر
+    };
+  }, []); // ✅ إصلاح: إزالة loadData من dependencies لتجنب loop
+
+  // ✅ مزامنة تلقائية دورية
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!loading && Date.now() - lastSyncTime > SYNC_INTERVAL) {
+        console.log('🔄 Auto-syncing data...');
+        loadData(true);
+      }
+    }, SYNC_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [loading, lastSyncTime]);
 
   // ✅ تحسين scroll to category
   useEffect(() => {
     if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
-    
+
     const promoSectionExists = promotions.length > 0;
     const categoriesIndex = 1 + (promoSectionExists ? 1 : 0);
     const sectionIndex = sections.findIndex(section => section.id === activeCategory);
-    
+
     if (sectionIndex !== -1) {
       const targetIndex = categoriesIndex + sectionIndex + 1;
       setTimeout(() => {
-        listRef.current?.scrollToIndex({ 
-          animated: true, 
-          index: targetIndex, 
-          viewOffset: chipsHeight 
+        listRef.current?.scrollToIndex({
+          animated: true,
+          index: targetIndex,
+          viewOffset: chipsHeight
         });
       }, 50);
     }
   }, [activeCategory, chipsHeight, sections, promotions]);
 
-  // ✅ تحسين البحث مع caching
+  // ✅ تحسين البحث مع caching والتحليلات
   const filteredSections = useMemo(() => {
     if (searchQuery.trim() === '') return sections;
-    
+
     const cacheKey = searchQuery.toLowerCase().trim();
-    
+
     // ✅ تحقق من الـ cache أولاً
     if (searchCache[cacheKey]) {
       console.log(`✅ Using cached search results for: "${searchQuery}"`);
+
+      // ✅ تتبع استخدام كاش البحث
+      const resultsCount = searchCache[cacheKey].reduce((total, section) =>
+        total + (section.menu_items?.length || 0), 0
+      );
+      trackEvent(AnalyticsEvents.SEARCH_CACHE_HIT, {
+        query: searchQuery,
+        results_count: resultsCount
+      });
+
       return searchCache[cacheKey];
     }
 
     console.log(`🔍 Performing new search for: "${searchQuery}"`);
-    
+
     // ✅ تحسين خوارزمية البحث
     const result = sections
       .map(section => ({
         ...section,
-        menu_items: section.menu_items?.filter(item => 
-          item.name.toLowerCase().includes(cacheKey)
+        menu_items: section.menu_items?.filter(item =>
+          item.name.toLowerCase().includes(cacheKey) ||
+          (item.description && item.description.toLowerCase().includes(cacheKey))
         ) || []
       }))
       .filter(section => section.menu_items.length > 0);
+
+    // ✅ تتبع نتائج البحث
+    const resultsCount = result.reduce((total, section) =>
+      total + (section.menu_items?.length || 0), 0
+    );
+    trackEvent(AnalyticsEvents.SEARCH_RESULTS, {
+      query: searchQuery,
+      results_count: resultsCount,
+      sections_with_results: result.length
+    });
 
     // ✅ خزن النتائج فقط إذا كانت هناك نتائج
     if (result.length > 0) {
@@ -411,7 +609,7 @@ export default function HomeScreen() {
     { type: 'header' as const, id: 'main-header' },
     ...(promotions.length > 0 ? [{ type: 'promotions' as const, id: 'promo-carousel' }] : []),
     { type: 'categories' as const, id: 'cat-chips' },
-    ...filteredSections,
+    ...filteredSections.map(section => ({ ...section, type: 'section' as const })),
   ], [filteredSections, promotions]);
 
   // ✅ useCallback لـ renderItem
@@ -429,10 +627,10 @@ export default function HomeScreen() {
                 <Ionicons name="refresh" size={24} color="#D32F2F" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.notificationButton} onPress={handleNotificationPress}>
-                <Ionicons 
-                  name={hasUnread ? "notifications" : "notifications-outline"} 
-                  size={28} 
-                  color={hasUnread ? "#D32F2F" : "#000"} 
+                <Ionicons
+                  name={hasUnread ? "notifications" : "notifications-outline"}
+                  size={28}
+                  color={hasUnread ? "#D32F2F" : "#000"}
                 />
                 {hasUnread && <View style={styles.notificationDot} />}
               </TouchableOpacity>
@@ -459,8 +657,8 @@ export default function HomeScreen() {
               )}
             </View>
             <TouchableOpacity style={styles.searchButton} onPress={handleClearSearch}>
-              {searchQuery.length > 0 ? 
-                <Ionicons name="close" size={24} color="#fff" /> : 
+              {searchQuery.length > 0 ?
+                <Ionicons name="close" size={24} color="#fff" /> :
                 <Feather name="arrow-left" size={24} color="#fff" />
               }
             </TouchableOpacity>
@@ -482,25 +680,31 @@ export default function HomeScreen() {
           }}
           style={[styles.categoryChipsContainer, isChipsSticky && styles.stickyCategoryChipsContainer]}
         >
-          <CategoryChips 
-            categories={categories} 
-            activeCategory={activeCategory} 
-            onCategorySelect={handleCategorySelect} 
+          <CategoryChips
+            categories={categories}
+            activeCategory={activeCategory}
+            onCategorySelect={handleCategorySelect}
+            loading={loading}
           />
         </View>
       );
     }
 
-    return <SectionComponent section={item as CategoryWithItems} router={router} />;
+    if (item.type === 'section') {
+      return <SectionComponent section={item as CategoryWithItems} router={router} />;
+    }
+
+    return null;
   }, [
-    searchQuery, hasUnread, promotions, categories, activeCategory, isChipsSticky, 
-    chipsHeight, filteredSections, handleCategorySelect, handleSearchChange, 
-    handleClearSearch, handleNotificationPress, handleRefreshData, router
+    searchQuery, hasUnread, promotions, categories, activeCategory, isChipsSticky,
+    chipsHeight, filteredSections, handleCategorySelect, handleSearchChange,
+    handleClearSearch, handleNotificationPress, handleRefreshData, router, loading
   ]);
 
   const keyExtractor = useCallback((item: any) => {
-    if (item.type) return item.id;
-    return (item as CategoryWithItems).id.toString();
+    if (item.type && item.id) return item.id;
+    if (item.id) return item.id.toString();
+    return Math.random().toString();
   }, []);
 
   if (loading && !refreshing) {
@@ -524,7 +728,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         )}
-        
+
         <FlatList
           ref={listRef}
           data={listData}
@@ -540,7 +744,11 @@ export default function HomeScreen() {
           initialNumToRender={5}
           renderItem={renderListItem}
           refreshing={refreshing}
-          onRefresh={() => loadData(true)}
+          onRefresh={() => {
+            // ✅ تتبع السحب للتحديث
+            trackEvent(AnalyticsEvents.PULL_TO_REFRESH);
+            loadData(true);
+          }}
           ListEmptyComponent={
             <View style={styles.centered}>
               <Text style={styles.emptyText}>
@@ -558,18 +766,18 @@ export default function HomeScreen() {
 
 // ✅✅✅ التنسيقات المحدثة مع تحسينات إضافية ✅✅✅
 const styles = StyleSheet.create({
-  fullScreen: { 
-    flex: 1, 
-    backgroundColor: '#F5F5F5' 
+  fullScreen: {
+    flex: 1,
+    backgroundColor: '#F5F5F5'
   },
-  container: { 
-    flex: 1 
+  container: {
+    flex: 1
   },
-  loader: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    backgroundColor: '#F5F5F5' 
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5'
   },
   loadingText: {
     marginTop: 10,
@@ -611,12 +819,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-  topBar: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingHorizontal: 20, 
-    paddingTop: 10 
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 10
   },
   headerActions: {
     flexDirection: 'row',
@@ -626,67 +834,67 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 10,
   },
-  logoContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center' 
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center'
   },
-  logoImage: { 
-    width: 80, 
-    height: 80, 
-    resizeMode: 'contain' 
+  logoImage: {
+    width: 80,
+    height: 80,
+    resizeMode: 'contain'
   },
-  logoText: { 
-    fontFamily: 'Cairo-Bold', 
-    fontSize: 18, 
-    marginHorizontal: 8, 
-    marginTop: 4 
+  logoText: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 18,
+    marginHorizontal: 8,
+    marginTop: 4
   },
-  notificationButton: { 
-    position: 'relative' 
+  notificationButton: {
+    position: 'relative'
   },
-  notificationDot: { 
-    position: 'absolute', 
-    top: 2, 
-    end: 2, 
-    width: 10, 
-    height: 10, 
-    borderRadius: 5, 
-    backgroundColor: '#D32F2F', 
-    borderWidth: 1.5, 
-    borderColor: '#fff' 
+  notificationDot: {
+    position: 'absolute',
+    top: 2,
+    end: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#D32F2F',
+    borderWidth: 1.5,
+    borderColor: '#fff'
   },
-  header: { 
-    paddingHorizontal: 20, 
-    marginTop: 20, 
+  header: {
+    paddingHorizontal: 20,
+    marginTop: 20,
     alignItems: 'flex-start'
   },
-  headerText: { 
-    fontSize: 28, 
-    fontWeight: 'bold', 
-    color: '#333', 
-    textAlign: 'right' 
+  headerText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'right'
   },
-  searchSection: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingHorizontal: 20, 
-    marginTop: 20 
+  searchSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 20
   },
-  searchBar: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#fff', 
-    borderRadius: 25, 
-    paddingHorizontal: 15, 
-    height: 50, 
-    elevation: 5 
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    height: 50,
+    elevation: 5
   },
-  searchInput: { 
-    flex: 1, 
-    fontSize: 16, 
-    marginHorizontal: 5, 
-    textAlign: 'right' 
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    marginHorizontal: 5,
+    textAlign: 'right'
   },
   searchResultsText: {
     fontSize: 12,
@@ -694,16 +902,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 5,
   },
-  searchButton: { 
-    width: 50, 
-    height: 50, 
-    borderRadius: 25, 
-    backgroundColor: '#D32F2F', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginStart: 10 
+  searchButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#D32F2F',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginStart: 10
   },
-  
+
   // --- تنسيقات الإعلانات المحسنة ---
   promoContainer: {
     marginTop: 25,
@@ -749,39 +957,39 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  categoryChipsContainer: { 
-    backgroundColor: '#F5F5F5', 
-    paddingVertical: 10 
+  categoryChipsContainer: {
+    backgroundColor: '#F5F5F5',
+    paddingVertical: 10
   },
-  stickyCategoryChipsContainer: { 
-    elevation: 4, 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.1, 
-    shadowRadius: 3 
+  stickyCategoryChipsContainer: {
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3
   },
-  section: { 
-    marginTop: 25, 
-    backgroundColor: '#F5F5F5', 
+  section: {
+    marginTop: 25,
+    backgroundColor: '#F5F5F5',
     overflow: 'visible'
   },
-  sectionTitle: { 
-    fontSize: 18, 
-    fontWeight: 'bold', 
-    color: '#333', 
-    marginBottom: 15, 
-    paddingHorizontal: 20, 
-    textAlign: 'left' 
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+    paddingHorizontal: 20,
+    textAlign: 'left'
   },
-  noItemsText: { 
-    paddingHorizontal: 20, 
-    color: '#888', 
-    textAlign: 'left' 
+  noItemsText: {
+    paddingHorizontal: 20,
+    color: '#888',
+    textAlign: 'left'
   },
-  centered: { 
-    padding: 20, 
-    alignItems: 'center', 
-    marginTop: 50 
+  centered: {
+    padding: 20,
+    alignItems: 'center',
+    marginTop: 50
   },
   emptyText: {
     fontSize: 16,
