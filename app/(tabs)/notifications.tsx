@@ -82,11 +82,17 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasFetchedRef = useRef(false); // ✅ منع إعادة التحميل المتكرر
 
   // ✅ useCallback لـ fetchNotifications بدون caching
   const fetchNotifications = useCallback(async (isRefreshing = false, isAutoRefresh = false) => {
     if (!user) {
       setLoading(false);
+      return;
+    }
+
+    // ✅ منع إعادة التحميل إذا كانت البيانات موجودة مسبقاً
+    if (!isRefreshing && !isAutoRefresh && hasFetchedRef.current) {
       return;
     }
 
@@ -113,6 +119,7 @@ export default function NotificationsScreen() {
       
       const notificationsData = data || [];
       setNotifications(notificationsData);
+      hasFetchedRef.current = true; // ✅ وضع علامة أن البيانات تم جلبها
 
       // ✅ تتبع نجاح جلب الإشعارات
       if (!isAutoRefresh) {
@@ -142,7 +149,28 @@ export default function NotificationsScreen() {
     }
   }, [user]);
 
-  // ✅ useFocusEffect لتحميل البيانات عند التركيز
+  // ✅ useEffect للتحديث التلقائي - منفصل عن useFocusEffect
+  useEffect(() => {
+    // ✅ بدء التحديث التلقائي كل 30 ثانية فقط إذا كان هناك إشعارات غير مقروءة
+    const hasUnreadNotifications = notifications.some(n => !n.is_read);
+    
+    if (hasUnreadNotifications) {
+      refreshIntervalRef.current = setInterval(() => {
+        console.log('🔄 Auto-refreshing notifications...');
+        fetchNotifications(false, true);
+      }, 30000); // 30 ثانية
+    }
+
+    return () => {
+      // ✅ تنظيف الـ interval عند تغيير notifications
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    };
+  }, [notifications, fetchNotifications]); // ✅ يعتمد على notifications الحالية
+
+  // ✅ useFocusEffect مبسط - للتحميل الأولي فقط
   useFocusEffect(
     useCallback(() => {
       // ✅ تتبع فتح شاشة الإشعارات
@@ -151,23 +179,13 @@ export default function NotificationsScreen() {
         has_unread_notifications: notifications.some(n => !n.is_read)
       });
 
-      fetchNotifications();
-
-      // ✅ بدء التحديث التلقائي كل 20 ثانية
-      refreshIntervalRef.current = setInterval(() => {
-        const hasUnreadNotifications = notifications.some(n => !n.is_read);
-        if (hasUnreadNotifications) {
-          console.log('🔄 Auto-refreshing notifications...');
-          fetchNotifications(false, true);
-        }
-      }, 20000); // 20 ثانية
+      // ✅ جلب البيانات فقط إذا لم تكن محملة مسبقاً
+      if (!hasFetchedRef.current) {
+        fetchNotifications();
+      }
 
       return () => {
-        // ✅ تنظيف الـ interval عند مغادرة الشاشة
-        if (refreshIntervalRef.current) {
-          clearInterval(refreshIntervalRef.current);
-          refreshIntervalRef.current = null;
-        }
+        // ✅ لا تقم بتنظيف الـ interval هنا لأنه في useEffect منفصل
       };
     }, [fetchNotifications, user, notifications])
   );
@@ -217,16 +235,15 @@ export default function NotificationsScreen() {
     }
 
     // ✅ توجيه المستخدم إلى الشاشة المناسبة
-    // ✅ توجيه المستخدم إلى الشاشة المناسبة
-if (notification.data?.orderId) {
-  router.push({
-    pathname: '/order/[orderId]',
-    params: { orderId: notification.data.orderId.toString() }
-  });
-} else if (notification.data?.promotionId || notification.data?.type === 'promotion') {
-  // ✅ توجيه كل ما يتعلق بالعروض إلى الصفحة الرئيسية
-  router.push('/');
-}
+    if (notification.data?.orderId) {
+      router.push({
+        pathname: '/order/[orderId]',
+        params: { orderId: notification.data.orderId.toString() }
+      });
+    } else if (notification.data?.promotionId || notification.data?.type === 'promotion') {
+      // ✅ توجيه كل ما يتعلق بالعروض إلى الصفحة الرئيسية
+      router.push('/');
+    }
   }, [router]);
 
   // ✅ useCallback لـ renderItem و keyExtractor
