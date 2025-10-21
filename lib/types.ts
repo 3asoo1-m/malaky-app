@@ -25,6 +25,7 @@ export interface MenuItemImage {
 }
 
 export interface MenuItem {
+  category_id: any;
   id: number;
   name: string;
   description: string | null;
@@ -182,4 +183,13 @@ export interface PromotionsCarouselProps {
 export interface SectionComponentProps {
   section: CategoryWithItems;
   router: any; // يمكنك تحسين هذا النوع لاحقًا إذا أردت
+}
+
+
+export interface CategoryChipsProps {
+  categories: Category[];
+  activeCategory: ActiveCategory;
+  onCategorySelect: (categoryId: ActiveCategory) => void;
+  loading: boolean;
+  sectionsWithItems?: number[]; // ✅ خاصية اختيارية للتعامل مع الأقسام الفارغة
 }

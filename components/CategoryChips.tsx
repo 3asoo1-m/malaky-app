@@ -12,7 +12,7 @@ import {
   UIManager,
   Platform
 } from 'react-native';
-import { Category, ActiveCategory } from '@/lib/types';
+import { Category, ActiveCategory, CategoryChipsProps } from '@/lib/types';
 import { trackEvent, AnalyticsEvents } from '@/lib/analytics';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -22,24 +22,25 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-type Props = {
-  categories: Category[];
-  activeCategory: ActiveCategory;
-  onCategorySelect: (id: ActiveCategory) => void;
-  loading?: boolean;
-};
-
 // ✅ مكون Chip منفصل مع memo
 const CategoryChip = memo(({ 
   item, 
   isActive, 
-  onPress 
+  onPress,
+  hasItems = true // ✅ خاصية جديدة للتحقق من وجود العناصر
 }: { 
   item: { id: ActiveCategory; name: string };
   isActive: boolean;
   onPress: (id: ActiveCategory) => void;
+  hasItems?: boolean; // ✅ خاصية جديدة
 }) => {
   const handlePress = useCallback(() => {
+    // ✅ إذا لم يكن هناك عناصر، لا تفعل شيئاً
+    if (!hasItems && item.id !== 'all') {
+      console.log(`⚠️ القسم ${item.name} فارغ - لا يمكن اختياره`);
+      return;
+    }
+
     // ✅ تأثير ناعم عند الضغط
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     
@@ -47,29 +48,42 @@ const CategoryChip = memo(({
     trackEvent(AnalyticsEvents.CATEGORY_SELECTED, {
       category_id: item.id,
       category_name: item.name,
+      has_items: hasItems,
       interaction_type: 'tap'
     });
     
     onPress(item.id);
-  }, [item.id, item.name, onPress]);
+  }, [item.id, item.name, onPress, hasItems]);
+
+  // ✅ تحديد إذا كان الزر معطلاً
+  const isDisabled = !hasItems && item.id !== 'all';
 
   return (
     <TouchableOpacity
-      style={[styles.chip, isActive && styles.activeChip]}
+      style={[
+        styles.chip, 
+        isActive && styles.activeChip,
+        isDisabled && styles.disabledChip // ✅ نمط للفئات الفارغة
+      ]}
       onPress={handlePress}
-      activeOpacity={0.8}
+      activeOpacity={isDisabled ? 1 : 0.8} // ✅ إزالة التأثير إذا كان معطلاً
       delayPressIn={0}
       hitSlop={{ top: 15, bottom: 15, left: 10, right: 10 }}
-      disabled={isActive}
+      disabled={isActive || isDisabled} // ✅ تعطيل إذا كان نشطاً أو فارغاً
     >
       <Text 
-        style={[styles.text, isActive && styles.activeText]}
+        style={[
+          styles.text, 
+          isActive && styles.activeText,
+          isDisabled && styles.disabledText // ✅ نص للفئات الفارغة
+        ]}
         numberOfLines={1}
         ellipsizeMode="tail"
         adjustsFontSizeToFit
         minimumFontScale={0.8}
       >
         {item.name}
+        {isDisabled && ' (فارغ)'} {/* ✅ إشارة إلى أن القسم فارغ */}
       </Text>
       {isActive && <View style={styles.activeIndicator} />}
     </TouchableOpacity>
@@ -78,33 +92,62 @@ const CategoryChip = memo(({
 
 CategoryChip.displayName = 'CategoryChip';
 
-function CategoryChips({ categories, activeCategory, onCategorySelect, loading = false }: Props) {
-  // ✅ ترتيب ثابت
-  const allCategories = useMemo(() => 
-    [{ id: 'all' as const, name: 'الكل' }, ...categories],
-    [categories]
-  );
+function CategoryChips({ 
+  categories, 
+  activeCategory, 
+  onCategorySelect, 
+  loading = false,
+  sectionsWithItems = [] // ✅ الخاصية الجديدة
+}: CategoryChipsProps) { // ✅ استخدام النوع الجديد
+  // ✅ ترتيب ثابت مع فلترة الفئات الفارغة
+  const allCategories = useMemo(() => {
+    const baseCategories = [{ id: 'all' as const, name: 'الكل' }, ...categories];
+    
+    // ✅ إذا تم توفير sectionsWithItems، قم بفلترة الفئات الفارغة
+    if (sectionsWithItems.length > 0) {
+      return baseCategories.filter(cat => 
+        cat.id === 'all' || sectionsWithItems.includes(cat.id)
+      );
+    }
+    
+    return baseCategories;
+  }, [categories, sectionsWithItems]);
+
+  // ✅ دالة مساعدة للتحقق من وجود عناصر في الفئة
+  const categoryHasItems = useCallback((categoryId: ActiveCategory): boolean => {
+    if (categoryId === 'all') return true;
+    return sectionsWithItems.length === 0 || sectionsWithItems.includes(categoryId);
+  }, [sectionsWithItems]);
 
   // ✅ اختيار الفئة
   const handleCategorySelect = useCallback((id: ActiveCategory) => {
     console.log(`🎯 Category selected: ${id}`);
+    
+    // ✅ التحقق من وجود عناصر قبل الاختيار
+    if (!categoryHasItems(id) && id !== 'all') {
+      console.log(`❌ لا يمكن اختيار القسم ${id} لأنه فارغ`);
+      trackEvent('empty_category_selection_blocked', {
+        category_id: id,
+        reason: 'no_items_available'
+      });
+      return;
+    }
+    
     LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
     onCategorySelect(id);
-  }, [onCategorySelect]);
+  }, [onCategorySelect, categoryHasItems]);
 
   const renderItem = useCallback(({ item }: { item: { id: ActiveCategory; name: string } }) => (
     <CategoryChip
       item={item}
       isActive={activeCategory === item.id}
       onPress={handleCategorySelect}
+      hasItems={categoryHasItems(item.id)} // ✅ تمرير معلومات وجود العناصر
     />
-  ), [activeCategory, handleCategorySelect]);
+  ), [activeCategory, handleCategorySelect, categoryHasItems]);
 
   const keyExtractor = useCallback((item: { id: ActiveCategory; name: string }) => 
     `category_${item.id}`, []);
-
-  // ✅ إزالة معالج الأخطاء أيضاً (لأنه مرتبط بالتمرير التلقائي)
-  // const handleScrollToIndexFailed = useCallback(...)
 
   if (loading) {
     return (
@@ -116,10 +159,18 @@ function CategoryChips({ categories, activeCategory, onCategorySelect, loading =
     );
   }
 
+  // ✅ إذا لم يكن هناك فئات لعرضها
+  if (allCategories.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.noCategoriesText}>لا توجد فئات متاحة</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
-        // ✅ إزالة الـ ref
         data={allCategories}
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -132,7 +183,6 @@ function CategoryChips({ categories, activeCategory, onCategorySelect, loading =
         removeClippedSubviews={false}
         decelerationRate="fast"
         snapToAlignment="center"
-        // ✅ إزالة onScrollToIndexFailed
       />
     </View>
   );
@@ -178,6 +228,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
+  disabledChip: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#CCCCCC',
+    opacity: 0.6,
+    elevation: 0,
+    shadowOpacity: 0,
+  },
   text: {
     fontSize: 14,
     fontWeight: '700',
@@ -187,6 +244,11 @@ const styles = StyleSheet.create({
   activeText: {
     color: '#fff',
     fontWeight: '800',
+  },
+  disabledText: {
+    color: '#888888',
+    fontStyle: 'italic',
+    fontWeight: '500',
   },
   activeIndicator: {
     position: 'absolute',
@@ -202,5 +264,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E0E0',
     borderRadius: 25,
     marginHorizontal: 6,
+  },
+  noCategoriesText: {
+    textAlign: 'center',
+    color: '#888',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 });

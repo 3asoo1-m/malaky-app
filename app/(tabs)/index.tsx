@@ -222,7 +222,10 @@ const SectionComponent = React.memo(({ section, router }: SectionComponentProps)
           initialNumToRender={3}
         />
       ) : (
-        <Text style={styles.noItemsText}>لا توجد وجبات في هذا القسم حالياً.</Text>
+        <View style={styles.emptySectionContainer}>
+          <Text style={styles.noItemsText}>لا توجد وجبات في هذا القسم حالياً.</Text>
+          <Text style={styles.emptySectionHint}>جرب اختيار قسم آخر</Text>
+        </View>
       )}
     </View>
   );
@@ -251,18 +254,115 @@ export default function HomeScreen() {
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
   // ✅ استخدام useRef للـ timeout
-const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // ✅ useCallback للدوال المحسنة
-  const handleCategorySelect = useCallback((categoryId: ActiveCategory) => {
-    setSearchQuery('');
-    setActiveCategory(categoryId);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    trackEvent(AnalyticsEvents.CATEGORY_CHANGED, {
-      new_category: categoryId,
-      previous_category: activeCategory,
-      source: 'chips'
-    });
-  }, [activeCategory]);
+  // ✅ دالة مساعدة محسنة للعثور على أقرب قسم غير فارغ
+  const findNearestNonEmptySectionId = useCallback((currentCategoryId: ActiveCategory): ActiveCategory | null => {
+    if (currentCategoryId === 'all') return null;
+
+    // ✅ فلترة الأقسام التي تحتوي على عناصر
+    const nonEmptySections = sections.filter(section => 
+      section && section.menu_items && section.menu_items.length > 0
+    );
+
+    if (nonEmptySections.length === 0) return null;
+
+    const currentIndex = nonEmptySections.findIndex(section => section.id === currentCategoryId);
+    
+    // ✅ إذا كان القسم الحالي غير فارغ، استخدمه
+    if (currentIndex !== -1) {
+      console.log(`✅ القسم الحالي غير فارغ: ${nonEmptySections[currentIndex].name}`);
+      return nonEmptySections[currentIndex].id;
+    }
+
+    // ✅ البحث عن أقرب قسم غير فارغ
+    const allSectionIds = sections.map(s => s.id);
+    const currentIndexInAll = allSectionIds.indexOf(currentCategoryId);
+    
+    if (currentIndexInAll === -1) return nonEmptySections[0].id;
+
+    // ✅ البحث للأمام
+    for (let i = currentIndexInAll + 1; i < sections.length; i++) {
+      const section = sections[i];
+      if (section && section.menu_items && section.menu_items.length > 0) {
+        console.log(`✅ وجد قسم غير فارغ للأمام: ${section.name}`);
+        return section.id;
+      }
+    }
+    
+    // ✅ البحث للخلف
+    for (let i = currentIndexInAll - 1; i >= 0; i--) {
+      const section = sections[i];
+      if (section && section.menu_items && section.menu_items.length > 0) {
+        console.log(`✅ وجد قسم غير فارغ للخلف: ${section.name}`);
+        return section.id;
+      }
+    }
+
+    console.log('⚠️ لم يتم العثور على أي قسم غير فارغ');
+    return null;
+  }, [sections]);
+
+  // ✅ دالة محسنة لاختيار الفئة مع معالجة الأقسام الفارغة
+  const handleCategorySelect = useCallback((categoryId: ActiveCategory) => {
+    console.log(`🎯 محاولة اختيار الفئة: ${categoryId}`);
+    
+    if (categoryId === 'all') {
+      setSearchQuery('');
+      setActiveCategory('all');
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      trackEvent(AnalyticsEvents.CATEGORY_CHANGED, { new_category: 'all', source: 'chips' });
+      return;
+    }
+
+    const selectedSection = sections.find(section => section.id === categoryId);
+    const isEmptySection = !selectedSection?.menu_items || selectedSection.menu_items.length === 0;
+
+    let targetCategoryId: ActiveCategory | null = categoryId;
+
+    // ✅ إذا كان القسم المختار فارغاً
+    if (isEmptySection) {
+      console.log(`⚠️ القسم '${selectedSection?.name}' فارغ. البحث عن بديل...`);
+      
+      // تتبع محاولة اختيار قسم فارغ
+      trackEvent('empty_category_selected', {
+        category_id: categoryId,
+        category_name: selectedSection?.name
+      });
+
+      // ابحث عن أقرب قسم غير فارغ
+      targetCategoryId = findNearestNonEmptySectionId(categoryId);
+      
+      // ✅ إذا لم يتم العثور على بديل، استخدم "الكل"
+      if (!targetCategoryId) {
+        console.log("❌ لم يتم العثور على قسم بديل، العودة إلى 'الكل'");
+        setActiveCategory('all');
+        trackEvent(AnalyticsEvents.CATEGORY_CHANGED, {
+          original_selection: categoryId,
+          final_category: 'all',
+          was_redirected: true,
+          reason: 'no_non_empty_sections_found'
+        });
+        return;
+      }
+    }
+
+    // ✅ إذا وجدنا قسماً (سواء الأصلي أو البديل)
+    if (targetCategoryId) {
+      setSearchQuery('');
+      setActiveCategory(targetCategoryId);
+
+      // تتبع تغيير الفئة
+      if (targetCategoryId !== activeCategory) {
+        trackEvent(AnalyticsEvents.CATEGORY_CHANGED, {
+          original_selection: categoryId,
+          final_category: targetCategoryId,
+          was_redirected: categoryId !== targetCategoryId,
+          source: 'chips'
+        });
+      }
+    }
+  }, [activeCategory, sections, findNearestNonEmptySectionId]);
 
   // ✅ تحسين البحث مع تقليل التتبع
   const handleSearchChange = useCallback((text: string) => {
@@ -298,7 +398,6 @@ const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
         trackEvent(AnalyticsEvents.SEARCH_PERFORMED, {
           query_length: text.length,
           has_results: hasResults,
-          // ❌ إزالة query نفسه لتقليل حجم البيانات
         });
 
       }, 600); // ✅ زيادة وقت الانتظار
@@ -490,59 +589,6 @@ const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     await loadData(true);
   }, [loadData, lastSyncTime]);
 
-  // ✅ تأثير التحميل الأولي والمزامنة المحسن
-  useEffect(() => {
-    // ✅ تهيئة التحليلات أولاً
-    initializeAnalytics();
-
-    // ✅ تتبع فتح التطبيق
-    trackEvent(AnalyticsEvents.APP_OPENED, {
-      source: 'cold_start',
-      platform: Platform.OS,
-    });
-
-    loadData();
-
-    // ✅ تنظيف الموارد
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-      cleanupAnalytics();
-    };
-  }, []);
-
-  // ✅ مزامنة تلقائية مخففة
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!loading && Date.now() - lastSyncTime > SYNC_INTERVAL) {
-        loadData(true);
-      }
-    }, SYNC_INTERVAL);
-
-    return () => clearInterval(interval);
-  }, [loading, lastSyncTime]);
-
-  // ✅ تحسين scroll to category
-  useEffect(() => {
-    if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
-
-    const promoSectionExists = promotions.length > 0;
-    const categoriesIndex = 1 + (promoSectionExists ? 1 : 0);
-    const sectionIndex = sections.findIndex(section => section.id === activeCategory);
-
-    if (sectionIndex !== -1) {
-      const targetIndex = categoriesIndex + sectionIndex + 1;
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToIndex({
-          animated: true,
-          index: targetIndex,
-          viewOffset: chipsHeight
-        });
-      });
-    }
-  }, [activeCategory, chipsHeight, sections, promotions]);
-
   // ✅ تحسين البحث مع caching
   const filteredSections = useMemo(() => {
     if (searchQuery.trim() === '') return sections;
@@ -585,12 +631,131 @@ const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     return result;
   }, [sections, searchQuery, searchCache]);
 
+  // ✅ العودة للفكرة الأصلية: عرض جميع الأقسام دائماً
+  const displaySections = useMemo(() => {
+    if (searchQuery.trim() !== '') {
+      return filteredSections;
+    }
+    
+    // ✅ دائماً نعرض جميع الأقسام، بغض النظر عن الفئة النشطة
+    return sections;
+  }, [sections, filteredSections, searchQuery]);
+
   const listData = useMemo(() => [
     { type: 'header' as const, id: 'main-header' },
     ...(promotions.length > 0 ? [{ type: 'promotions' as const, id: 'promo-carousel' }] : []),
     { type: 'categories' as const, id: 'cat-chips' },
-    ...filteredSections.map(section => ({ ...section, type: 'section' as const })),
-  ], [filteredSections, promotions]);
+    ...displaySections.map(section => ({ ...section, type: 'section' as const })),
+  ], [displaySections, promotions]);
+
+  // ✅ معالج محسن لفشل التمرير
+  const handleScrollToIndexFailed = useCallback((info: any) => {
+    console.warn('❌ فشل في التمرير للعنصر:', info);
+    
+    trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
+      error_type: 'scroll_to_index_failed',
+      index: info.index,
+      highestMeasuredFrameIndex: info.highestMeasuredFrameIndex,
+      averageItemLength: info.averageItemLength
+    });
+
+    // ✅ محاولة بديلة: استخدام scrollToOffset للتمرير التقريبي
+    const approximateOffset = info.averageItemLength * Math.max(0, info.index - 1);
+    
+    setTimeout(() => {
+      listRef.current?.scrollToOffset({
+        animated: true,
+        offset: approximateOffset,
+      });
+    }, 100);
+  }, []);
+
+  // ✅ تحسين scroll to category - العودة للفكرة الأصلية
+  useEffect(() => {
+    if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
+
+    const promoSectionExists = promotions.length > 0;
+    const categoriesIndex = 1 + (promoSectionExists ? 1 : 0);
+    
+    // ✅ البحث في sections الأصلية (جميع الأقسام)
+    const sectionIndex = sections.findIndex(section => section.id === activeCategory);
+
+    console.log(`🎯 محاولة التمرير إلى القسم: ${activeCategory}, موجود في الفهرس: ${sectionIndex}, إجمالي الأقسام: ${sections.length}`);
+
+    if (sectionIndex !== -1) {
+      const targetSection = sections[sectionIndex];
+      
+      // ✅ التحقق إذا كان القسم فارغاً
+      const isEmptySection = !targetSection.menu_items || targetSection.menu_items.length === 0;
+      
+      if (isEmptySection) {
+        console.log(`⚠️ القسم ${targetSection.name} فارغ - إلغاء التمرير`);
+        trackEvent('scroll_to_empty_section_attempt', {
+          category_id: activeCategory,
+          category_name: targetSection.name
+        });
+        return;
+      }
+
+      const targetIndex = categoriesIndex + sectionIndex + 1;
+      
+      console.log(`🎯 الفهرس المستهدف: ${targetIndex}, عدد العناصر في القائمة: ${listData.length}`);
+      
+      // ✅ التحقق من صحة الفهرس قبل التمرير
+      if (targetIndex >= 0 && targetIndex < listData.length) {
+        requestAnimationFrame(() => {
+          listRef.current?.scrollToIndex({
+            animated: true,
+            index: targetIndex,
+            viewOffset: chipsHeight
+          });
+        });
+      } else {
+        console.warn(`❌ الفهرس ${targetIndex} خارج النطاق (0-${listData.length - 1})`);
+        trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
+          error_type: 'invalid_scroll_index',
+          target_index: targetIndex,
+          list_length: listData.length,
+          category_id: activeCategory
+        });
+      }
+    } else {
+      console.warn(`❌ القسم ${activeCategory} غير موجود في الأقسام`);
+    }
+  }, [activeCategory, chipsHeight, sections, promotions, listData.length]);
+
+  // ✅ تأثير التحميل الأولي والمزامنة المحسن
+  useEffect(() => {
+    // ✅ تهيئة التحليلات أولاً
+    initializeAnalytics();
+
+    // ✅ تتبع فتح التطبيق
+    trackEvent(AnalyticsEvents.APP_OPENED, {
+      source: 'cold_start',
+      platform: Platform.OS,
+    });
+
+    loadData();
+
+    // ✅ تنظيف الموارد
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      cleanupAnalytics();
+    };
+  }, []);
+
+  // ✅ مزامنة تلقائية مخففة
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!loading && Date.now() - lastSyncTime > SYNC_INTERVAL) {
+        loadData(true);
+      }
+    }, SYNC_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [loading, lastSyncTime]);
 
   // ✅ useCallback لـ renderItem محسن
   const renderListItem = useCallback(({ item }: { item: any }) => {
@@ -664,6 +829,8 @@ const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
               activeCategory={activeCategory}
               onCategorySelect={handleCategorySelect}
               loading={loading}
+              // ✅ إضافة خاصية جديدة للتعامل مع الأقسام الفارغة
+              sectionsWithItems={sections.filter(s => s.menu_items && s.menu_items.length > 0).map(s => s.id)}
             />
           </View>
         );
@@ -676,8 +843,9 @@ const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     }
   }, [
     searchQuery, hasUnread, promotions, categories, activeCategory, isChipsSticky,
-    chipsHeight, filteredSections, handleCategorySelect, handleSearchChange,
-    handleClearSearch, handleNotificationPress, handleRefreshData, router, loading
+    chipsHeight, displaySections, filteredSections,
+    handleCategorySelect, handleSearchChange, handleClearSearch, 
+    handleNotificationPress, handleRefreshData, router, loading
   ]);
 
   const keyExtractor = useCallback((item: any) => {
@@ -721,6 +889,7 @@ const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
           updateCellsBatchingPeriod={100}
           windowSize={5}
           initialNumToRender={3}
+          onScrollToIndexFailed={handleScrollToIndexFailed} // ✅ إضافة معالج الأخطاء المحسن
           renderItem={renderListItem}
           refreshing={refreshing}
           onRefresh={() => {
@@ -956,10 +1125,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     textAlign: 'left'
   },
-  noItemsText: {
+  emptySectionContainer: {
     paddingHorizontal: 20,
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  noItemsText: {
     color: '#888',
-    textAlign: 'left'
+    textAlign: 'left',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  emptySectionHint: {
+    color: '#D32F2F',
+    textAlign: 'left',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
   centered: {
     padding: 20,
