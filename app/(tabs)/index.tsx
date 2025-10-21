@@ -26,13 +26,21 @@ import {
   SectionComponentProps
 } from '@/lib/types';
 
-// ✅ استيراد نظام التحليلات
-import { trackEvent, AnalyticsEvents, flushBackupEvents, cleanupOldBackupEvents } from '@/lib/analytics';
+// ✅ استيراد نظام التحليلات المحسن
+import { 
+  trackEvent, 
+  AnalyticsEvents, 
+  flushBackupEvents, 
+  cleanupOldBackupEvents,
+  initializeAnalytics,
+  cleanupAnalytics,
+  forceFlush
+} from '@/lib/analytics';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 // =================================================================
-// دوال الـ Caching المحسنة
+// إعدادات الكاش المحسنة
 // =================================================================
 const CACHE_KEYS = {
   MENU_DATA: 'menu_data',
@@ -42,18 +50,18 @@ const CACHE_KEYS = {
   LAST_SYNC_TIMESTAMP: 'last_sync_timestamp'
 };
 
-const CACHE_DURATION = 1000 * 60 * 10; // 10 دقائق
-const SYNC_INTERVAL = 1000 * 60 * 5; // 5 دقائق
+const CACHE_DURATION = 1000 * 60 * 15; // زيادة إلى 15 دقيقة
+const SYNC_INTERVAL = 1000 * 60 * 10; // زيادة إلى 10 دقائق
 
+// ✅ دوال الكاش المحسنة
 const cacheData = async (key: string, data: any) => {
   try {
     const cacheItem = {
       data,
       timestamp: Date.now(),
-      version: '1.0'
+      version: '1.1' // تحديث النسخة
     };
     await AsyncStorage.setItem(key, JSON.stringify(cacheItem));
-    console.log(`✅ Data cached for key: ${key}`);
   } catch (error) {
     console.error('❌ Error caching data:', error);
   }
@@ -62,38 +70,20 @@ const cacheData = async (key: string, data: any) => {
 const getCachedData = async (key: string) => {
   try {
     const cached = await AsyncStorage.getItem(key);
-    if (!cached) {
-      console.log(`📭 No cache found for key: ${key}`);
-      return null;
-    }
+    if (!cached) return null;
+    
     const cacheItem = JSON.parse(cached);
-
-    // ✅ التحقق من الصلاحية والنسخة
     const isExpired = Date.now() - cacheItem.timestamp > CACHE_DURATION;
+    
     if (isExpired) {
-      console.log(`🕐 Cache expired for key: ${key}`);
       await AsyncStorage.removeItem(key);
       return null;
     }
 
-    console.log(`✅ Using cached data for key: ${key}`);
     return cacheItem.data;
   } catch (error) {
     console.error('❌ Error getting cached data:', error);
     return null;
-  }
-};
-
-const clearCache = async (key?: string) => {
-  try {
-    if (key) {
-      await AsyncStorage.removeItem(key);
-    } else {
-      await AsyncStorage.multiRemove(Object.values(CACHE_KEYS));
-    }
-    console.log(`🗑️ Cache cleared for key: ${key || 'all'}`);
-  } catch (error) {
-    console.error('❌ Error clearing cache:', error);
   }
 };
 
@@ -105,7 +95,6 @@ const PromotionsCarousel = React.memo(({ promotions }: PromotionsCarouselProps) 
   const router = useRouter();
 
   const handlePress = useCallback((promotion: Promotion) => {
-    // ✅ تتبع النقر على الإعلان
     trackEvent(AnalyticsEvents.PROMOTION_TAPPED, {
       promotion_id: promotion.id,
       promotion_title: promotion.title,
@@ -113,12 +102,15 @@ const PromotionsCarousel = React.memo(({ promotions }: PromotionsCarouselProps) 
     });
 
     if (!promotion.action_type || !promotion.action_value) return;
+    
     switch (promotion.action_type) {
       case 'navigate_to_item':
         router.push(`/item/${promotion.action_value}`);
         break;
       case 'open_url':
-        Linking.openURL(promotion.action_value).catch(err => console.error("Couldn't load page", err));
+        Linking.openURL(promotion.action_value).catch(err => 
+          console.error("Couldn't load page", err)
+        );
         break;
       default:
         break;
@@ -135,18 +127,26 @@ const PromotionsCarousel = React.memo(({ promotions }: PromotionsCarouselProps) 
       activeOpacity={0.9}
     >
       <View style={styles.promoImageContainer}>
-        <Image source={{ uri: item.image_url }} style={styles.promoImage} resizeMode="cover" />
+        <Image 
+          source={{ uri: item.image_url }} 
+          style={styles.promoImage} 
+          resizeMode="cover"
+          defaultSource={require('@/assets/images/placeholder.png')} // ✅ إضافة صورة افتراضية
+        />
       </View>
       <View style={styles.promoTextContainer}>
         <Text style={styles.promoTitle} numberOfLines={1}>{item.title}</Text>
-        {item.description && <Text style={styles.promoDescription} numberOfLines={1}>{item.description}</Text>}
+        {item.description && (
+          <Text style={styles.promoDescription} numberOfLines={1}>
+            {item.description}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   ), [CARD_WIDTH, handlePress]);
 
   const keyExtractor = useCallback((item: Promotion) => item.id.toString(), []);
 
-  // ✅ تتبع عرض الإعلانات
   useEffect(() => {
     if (promotions.length > 0) {
       trackEvent(AnalyticsEvents.PROMOTIONS_VIEWED, {
@@ -165,14 +165,17 @@ const PromotionsCarousel = React.memo(({ promotions }: PromotionsCarouselProps) 
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={keyExtractor}
-        contentContainerStyle={{ paddingStart: CARD_MARGIN - 10, paddingEnd: CARD_MARGIN }}
+        contentContainerStyle={{ 
+          paddingStart: CARD_MARGIN - 10, 
+          paddingEnd: CARD_MARGIN 
+        }}
         snapToInterval={CARD_WIDTH + 10}
         decelerationRate="fast"
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={3}
-        updateCellsBatchingPeriod={50}
-        windowSize={5}
-        initialNumToRender={3}
+        removeClippedSubviews={Platform.OS === 'android'} // ✅ تحسين للأندرويد فقط
+        maxToRenderPerBatch={2} // ✅ تقليل العدد
+        updateCellsBatchingPeriod={100}
+        windowSize={3} // ✅ تقليل حجم النافذة
+        initialNumToRender={2}
         renderItem={renderPromoItem}
       />
     </View>
@@ -184,19 +187,19 @@ const SectionComponent = React.memo(({ section, router }: SectionComponentProps)
     <MenuItemCard
       item={item}
       onPress={() => {
-        // ✅ نقل التتبع خارج التصيير الرئيسي
-        setTimeout(() => {
+        // ✅ استخدام requestAnimationFrame بدلاً من setTimeout
+        requestAnimationFrame(() => {
           trackEvent(AnalyticsEvents.ITEM_VIEWED, {
             item_id: item.id,
             item_name: item.name,
             category_id: section.id,
           });
-        }, 0);
+        });
 
         router.push(`/item/${item.id}`);
       }}
     />
-  ), [router, section.id, section.name]);
+  ), [router, section.id]);
 
   const keyExtractor = useCallback((menuItem: MenuItem) =>
     `menu_item_${menuItem.id}`, []);
@@ -212,11 +215,11 @@ const SectionComponent = React.memo(({ section, router }: SectionComponentProps)
           keyExtractor={keyExtractor}
           renderItem={renderMenuItem}
           contentContainerStyle={{ paddingHorizontal: 10, paddingVertical: 10 }}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={5}
-          updateCellsBatchingPeriod={100}
-          windowSize={7}
-          initialNumToRender={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          maxToRenderPerBatch={3} // ✅ تقليل العدد
+          updateCellsBatchingPeriod={150}
+          windowSize={5}
+          initialNumToRender={3}
         />
       ) : (
         <Text style={styles.noItemsText}>لا توجد وجبات في هذا القسم حالياً.</Text>
@@ -247,15 +250,13 @@ export default function HomeScreen() {
   const [isDataCached, setDataCached] = useState({ menu: false, promotions: false, categories: false });
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
-  // ✅ استخدام useRef للـ timeout - الإصدار المصحح
-  const searchTimeoutRef = useRef<number | null>(null);
-
-  // ✅ useCallback للدوال
+  // ✅ استخدام useRef للـ timeout
+const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ✅ useCallback للدوال المحسنة
   const handleCategorySelect = useCallback((categoryId: ActiveCategory) => {
     setSearchQuery('');
     setActiveCategory(categoryId);
 
-    // ✅ تتبع تغيير الفئة
     trackEvent(AnalyticsEvents.CATEGORY_CHANGED, {
       new_category: categoryId,
       previous_category: activeCategory,
@@ -263,17 +264,15 @@ export default function HomeScreen() {
     });
   }, [activeCategory]);
 
-  // ✅ تحسين البحث مع useRef - الإصدار المصحح
+  // ✅ تحسين البحث مع تقليل التتبع
   const handleSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
 
-    // ✅ تنظيف الـ timeout السابق
-    if (searchTimeoutRef.current !== null) {
+    // تنظيف الـ timeout السابق
+    if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
-      searchTimeoutRef.current = null;
     }
 
-    // ✅ معالجة مسح البحث مباشرة
     if (text.length === 0) {
       if (searchQuery.length > 0) {
         trackEvent(AnalyticsEvents.SEARCH_CLEARED, {
@@ -283,10 +282,12 @@ export default function HomeScreen() {
       return;
     }
 
-    // ✅ بحث بعد توقف الكتابة
+    // ✅ بحث بعد توقف الكتابة مع تقليل الأحداث
     if (text.length > 2) {
       searchTimeoutRef.current = setTimeout(() => {
         const searchTerm = text.toLowerCase().trim();
+        
+        // ✅ تتبع فقط إذا كانت النتائج مختلفة
         const hasResults = sections.some(section =>
           section.menu_items?.some(item =>
             item.name.toLowerCase().includes(searchTerm) ||
@@ -295,23 +296,19 @@ export default function HomeScreen() {
         );
 
         trackEvent(AnalyticsEvents.SEARCH_PERFORMED, {
-          query: text,
           query_length: text.length,
           has_results: hasResults,
-          search_term: searchTerm
+          // ❌ إزالة query نفسه لتقليل حجم البيانات
         });
 
-        searchTimeoutRef.current = null;
-      }, 500);
+      }, 600); // ✅ زيادة وقت الانتظار
     }
   }, [sections, searchQuery]);
 
   const handleClearSearch = useCallback(() => {
     if (searchQuery.length > 0) {
-      // ✅ تتبع مسح البحث
       trackEvent(AnalyticsEvents.SEARCH_CLEARED, {
-        previous_query: searchQuery,
-        query_length: searchQuery.length
+        previous_query_length: searchQuery.length
       });
     }
     setSearchQuery('');
@@ -323,17 +320,15 @@ export default function HomeScreen() {
     const HEADER_HEIGHT = (Platform.OS === 'ios' ? 260 : 280) + PROMO_HEIGHT;
     setIsChipsSticky(scrollY > HEADER_HEIGHT);
 
-    // ✅ تتبع التمرير
-    if (scrollY > 500) {
+    // ✅ تتبع التمرير فقط مرة واحدة عند الوصول للعمق
+    if (scrollY > 500 && scrollY < 600) {
       trackEvent(AnalyticsEvents.SCROLL_DEPTH, {
-        scroll_depth: 'deep',
-        scroll_position: scrollY
+        scroll_depth: 'deep'
       });
     }
   }, [promotions.length]);
 
   const handleNotificationPress = useCallback(() => {
-    // ✅ تتبع النقر على الإشعارات
     trackEvent(AnalyticsEvents.NOTIFICATIONS_ACCESSED, {
       has_unread: hasUnread
     });
@@ -342,56 +337,62 @@ export default function HomeScreen() {
 
   // ✅ دوال مساعدة محسنة
   const fetchFreshData = useCallback(async () => {
-    const [menuResponse, promotionsResponse] = await Promise.all([
-      supabase.rpc('get_menu'),
-      supabase.from('promotions').select('*').eq('is_active', true).order('display_order'),
-    ]);
+    try {
+      const [menuResponse, promotionsResponse] = await Promise.all([
+        supabase.rpc('get_menu'),
+        supabase.from('promotions').select('*').eq('is_active', true).order('display_order'),
+      ]);
 
-    if (menuResponse.error) throw menuResponse.error;
-    const fetchedSections: CategoryWithItems[] = menuResponse.data || [];
-    const fetchedCategories: Category[] = fetchedSections.map(s => ({ id: s.id, name: s.name }));
+      if (menuResponse.error) throw menuResponse.error;
+      const fetchedSections: CategoryWithItems[] = menuResponse.data || [];
+      const fetchedCategories: Category[] = fetchedSections.map(s => ({ id: s.id, name: s.name }));
 
-    setSections(fetchedSections);
-    setCategories(fetchedCategories);
-    await cacheData(CACHE_KEYS.MENU_DATA, fetchedSections);
-    await cacheData(CACHE_KEYS.CATEGORIES, fetchedCategories);
+      setSections(fetchedSections);
+      setCategories(fetchedCategories);
+      
+      // ✅ التخزين بشكل متوازي
+      await Promise.all([
+        cacheData(CACHE_KEYS.MENU_DATA, fetchedSections),
+        cacheData(CACHE_KEYS.CATEGORIES, fetchedCategories)
+      ]);
 
-    if (promotionsResponse.error) throw promotionsResponse.error;
-    const fetchedPromotions = promotionsResponse.data || [];
-    setPromotions(fetchedPromotions);
-    await cacheData(CACHE_KEYS.PROMOTIONS, fetchedPromotions);
+      if (promotionsResponse.error) throw promotionsResponse.error;
+      const fetchedPromotions = promotionsResponse.data || [];
+      setPromotions(fetchedPromotions);
+      await cacheData(CACHE_KEYS.PROMOTIONS, fetchedPromotions);
 
-    // ✅ تحديث وقت المزامنة
-    const syncTime = Date.now();
-    setLastSyncTime(syncTime);
-    await AsyncStorage.setItem(CACHE_KEYS.LAST_SYNC_TIMESTAMP, syncTime.toString());
+      // ✅ تحديث وقت المزامنة
+      const syncTime = Date.now();
+      setLastSyncTime(syncTime);
+      await AsyncStorage.setItem(CACHE_KEYS.LAST_SYNC_TIMESTAMP, syncTime.toString());
 
-    // ✅ تتبع نجاح جلب البيانات
-    trackEvent(AnalyticsEvents.DATA_FETCH_SUCCESS, {
-      sections_count: fetchedSections.length,
-      promotions_count: fetchedPromotions.length,
-      categories_count: fetchedCategories.length
-    });
+      trackEvent(AnalyticsEvents.DATA_FETCH_SUCCESS, {
+        sections_count: fetchedSections.length,
+        promotions_count: fetchedPromotions.length,
+      });
 
-    return { fetchedSections, fetchedCategories, fetchedPromotions };
+    } catch (error) {
+      throw error;
+    }
   }, []);
 
   const checkNotifications = useCallback(async (userId: string) => {
-    const { count: unreadCount, error: notificationError } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('is_read', false);
+    try {
+      const { count: unreadCount, error: notificationError } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
 
-    if (notificationError) {
-      console.error("Error fetching notification status:", notificationError);
-    } else {
-      setHasUnread((unreadCount ?? 0) > 0);
+      if (!notificationError) {
+        setHasUnread((unreadCount ?? 0) > 0);
+      }
+    } catch (error) {
+      console.error("Error checking notifications:", error);
     }
   }, []);
 
   const handleCacheFallback = useCallback(async () => {
-    // ✅ fallback إلى البيانات المخزنة إذا كانت موجودة
     const [cachedMenu, cachedPromotions, cachedCategories] = await Promise.all([
       getCachedData(CACHE_KEYS.MENU_DATA),
       getCachedData(CACHE_KEYS.PROMOTIONS),
@@ -399,22 +400,19 @@ export default function HomeScreen() {
     ]);
 
     if (cachedMenu && cachedPromotions && cachedCategories) {
-      console.log('🔄 Using cached data as fallback');
       setSections(cachedMenu);
       setCategories(cachedCategories);
       setPromotions(cachedPromotions);
       setDataCached({ menu: true, promotions: true, categories: true });
 
-      // ✅ تتبع استخدام البيانات المخزنة
       trackEvent(AnalyticsEvents.CACHE_USED, {
         cache_type: 'full_fallback',
         sections_count: cachedMenu.length,
-        promotions_count: cachedPromotions.length
       });
     }
   }, []);
 
-  // ✅ تحسين الـ loadData مع Error Handling والتحليلات
+  // ✅ تحسين الـ loadData مع تقليل الحمل
   const loadData = useCallback(async (isRefreshing = false) => {
     setError(null);
 
@@ -428,43 +426,35 @@ export default function HomeScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not found");
 
-      // ✅ تتبع بدء جلب البيانات
       trackEvent(AnalyticsEvents.DATA_FETCH_STARTED, {
         is_refreshing: isRefreshing,
-        user_id: user.id
       });
 
-      // ✅ تحسين جلب البيانات المخزنة
-      const cachePromises = isRefreshing
-        ? [null, null, null]
-        : [
+      // ✅ جلب البيانات المخزنة فقط للتحميل الأولي
+      let shouldFetchFromServer = true;
+      
+      if (!isRefreshing) {
+        const [cachedMenu, cachedPromotions, cachedCategories] = await Promise.all([
           getCachedData(CACHE_KEYS.MENU_DATA),
           getCachedData(CACHE_KEYS.PROMOTIONS),
           getCachedData(CACHE_KEYS.CATEGORIES)
-        ];
+        ]);
 
-      const [cachedMenu, cachedPromotions, cachedCategories] = await Promise.all(cachePromises);
+        if (cachedMenu && cachedPromotions && cachedCategories) {
+          setSections(cachedMenu);
+          setCategories(cachedCategories);
+          setPromotions(cachedPromotions);
+          setDataCached({ menu: true, promotions: true, categories: true });
+          shouldFetchFromServer = false;
 
-      let shouldFetchFromServer = true;
-
-      // ✅ استخدام البيانات المخزنة إذا كانت متاحة
-      if (cachedMenu && cachedPromotions && cachedCategories && !isRefreshing) {
-        console.log('✅ Using cached data for initial render');
-        setSections(cachedMenu);
-        setCategories(cachedCategories);
-        setPromotions(cachedPromotions);
-        setDataCached({ menu: true, promotions: true, categories: true });
-        shouldFetchFromServer = false;
-
-        // ✅ تتبع استخدام الكاش
-        const lastSync = await AsyncStorage.getItem(CACHE_KEYS.LAST_SYNC_TIMESTAMP);
-        const dataAge = Date.now() - (lastSync ? parseInt(lastSync) : Date.now());
-        trackEvent(AnalyticsEvents.CACHE_USED, {
-          cache_type: 'initial_load',
-          data_age: dataAge
-        });
-      } else {
-        console.log('🌐 Fetching fresh data from server');
+          const lastSync = await AsyncStorage.getItem(CACHE_KEYS.LAST_SYNC_TIMESTAMP);
+          const dataAge = Date.now() - (lastSync ? parseInt(lastSync) : Date.now());
+          
+          trackEvent(AnalyticsEvents.CACHE_USED, {
+            cache_type: 'initial_load',
+            data_age: dataAge
+          });
+        }
       }
 
       // ✅ جلب البيانات الجديدة إذا لزم الأمر
@@ -479,15 +469,12 @@ export default function HomeScreen() {
     } catch (err) {
       const errorMessage = "فشل في تحميل البيانات. تأكد من اتصال الإنترنت.";
       setError(errorMessage);
-      console.error("Error loading data:", err);
-
-      // ✅ تتبع الأخطاء
+      
       trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
         error_type: 'data_fetch_failed',
         error_message: err instanceof Error ? err.message : 'Unknown error'
       });
 
-      // ✅ استخدام البيانات المخزنة كـ fallback
       await handleCacheFallback();
     } finally {
       setLoading(false);
@@ -496,9 +483,6 @@ export default function HomeScreen() {
   }, [fetchFreshData, checkNotifications, handleCacheFallback]);
 
   const handleRefreshData = useCallback(async () => {
-    console.log('🔄 Manually refreshing data...');
-
-    // ✅ تتبع التحديث اليدوي
     trackEvent(AnalyticsEvents.MANUAL_REFRESH, {
       current_data_age: Date.now() - lastSyncTime
     });
@@ -506,35 +490,32 @@ export default function HomeScreen() {
     await loadData(true);
   }, [loadData, lastSyncTime]);
 
-  // ✅ تأثير التحميل الأولي والمزامنة
+  // ✅ تأثير التحميل الأولي والمزامنة المحسن
   useEffect(() => {
+    // ✅ تهيئة التحليلات أولاً
+    initializeAnalytics();
+
     // ✅ تتبع فتح التطبيق
     trackEvent(AnalyticsEvents.APP_OPENED, {
       source: 'cold_start',
       platform: Platform.OS,
-      timestamp: new Date().toISOString()
     });
-
-    // ✅ محاولة إرسال الأحداث المحفوظة
-    flushBackupEvents();
-    cleanupOldBackupEvents();
 
     loadData();
 
-    // ✅ تنظيف الـ timeout عند unmount - الإصدار المصحح
+    // ✅ تنظيف الموارد
     return () => {
-      if (searchTimeoutRef.current !== null) {
+      if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
-        searchTimeoutRef.current = null;
       }
+      cleanupAnalytics();
     };
   }, []);
 
-  // ✅ مزامنة تلقائية دورية
+  // ✅ مزامنة تلقائية مخففة
   useEffect(() => {
     const interval = setInterval(() => {
       if (!loading && Date.now() - lastSyncTime > SYNC_INTERVAL) {
-        console.log('🔄 Auto-syncing data...');
         loadData(true);
       }
     }, SYNC_INTERVAL);
@@ -552,41 +533,29 @@ export default function HomeScreen() {
 
     if (sectionIndex !== -1) {
       const targetIndex = categoriesIndex + sectionIndex + 1;
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         listRef.current?.scrollToIndex({
           animated: true,
           index: targetIndex,
           viewOffset: chipsHeight
         });
-      }, 50);
+      });
     }
   }, [activeCategory, chipsHeight, sections, promotions]);
 
-  // ✅ تحسين البحث مع caching والتحليلات
+  // ✅ تحسين البحث مع caching
   const filteredSections = useMemo(() => {
     if (searchQuery.trim() === '') return sections;
 
     const cacheKey = searchQuery.toLowerCase().trim();
 
-    // ✅ تحقق من الـ cache أولاً
     if (searchCache[cacheKey]) {
-      console.log(`✅ Using cached search results for: "${searchQuery}"`);
-
-      // ✅ تتبع استخدام كاش البحث
-      const resultsCount = searchCache[cacheKey].reduce((total, section) =>
-        total + (section.menu_items?.length || 0), 0
-      );
       trackEvent(AnalyticsEvents.SEARCH_CACHE_HIT, {
-        query: searchQuery,
-        results_count: resultsCount
+        query_length: searchQuery.length
       });
-
       return searchCache[cacheKey];
     }
 
-    console.log(`🔍 Performing new search for: "${searchQuery}"`);
-
-    // ✅ تحسين خوارزمية البحث
     const result = sections
       .map(section => ({
         ...section,
@@ -597,23 +566,20 @@ export default function HomeScreen() {
       }))
       .filter(section => section.menu_items.length > 0);
 
-    // ✅ تتبع نتائج البحث
     const resultsCount = result.reduce((total, section) =>
       total + (section.menu_items?.length || 0), 0
     );
+    
     trackEvent(AnalyticsEvents.SEARCH_RESULTS, {
-      query: searchQuery,
       results_count: resultsCount,
       sections_with_results: result.length
     });
 
-    // ✅ خزن النتائج فقط إذا كانت هناك نتائج
     if (result.length > 0) {
       setSearchCache(prev => ({
         ...prev,
         [cacheKey]: result
       }));
-      console.log(`💾 Cached search results for: "${searchQuery}"`);
     }
 
     return result;
@@ -626,89 +592,88 @@ export default function HomeScreen() {
     ...filteredSections.map(section => ({ ...section, type: 'section' as const })),
   ], [filteredSections, promotions]);
 
-  // ✅ useCallback لـ renderItem
+  // ✅ useCallback لـ renderItem محسن
   const renderListItem = useCallback(({ item }: { item: any }) => {
-    if (item.type === 'header') {
-      return (
-        <View>
-          <View style={styles.topBar}>
-            <View style={styles.logoContainer}>
-              <Image source={require('@/assets/images/malakylogo.png')} style={styles.logoImage} />
-              <Text style={styles.logoText}>الدجاج الملكي بروست</Text>
+    switch (item.type) {
+      case 'header':
+        return (
+          <View>
+            <View style={styles.topBar}>
+              <View style={styles.logoContainer}>
+                <Image source={require('@/assets/images/malakylogo.png')} style={styles.logoImage} />
+                <Text style={styles.logoText}>الدجاج الملكي بروست</Text>
+              </View>
+              <View style={styles.headerActions}>
+                <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshData}>
+                  <Ionicons name="refresh" size={24} color="#D32F2F" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.notificationButton} onPress={handleNotificationPress}>
+                  <Ionicons
+                    name={hasUnread ? "notifications" : "notifications-outline"}
+                    size={28}
+                    color={hasUnread ? "#D32F2F" : "#000"}
+                  />
+                  {hasUnread && <View style={styles.notificationDot} />}
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshData}>
-                <Ionicons name="refresh" size={24} color="#D32F2F" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.notificationButton} onPress={handleNotificationPress}>
-                <Ionicons
-                  name={hasUnread ? "notifications" : "notifications-outline"}
-                  size={28}
-                  color={hasUnread ? "#D32F2F" : "#000"}
+            <View style={styles.header}>
+              <Text style={styles.headerText}>اختر</Text>
+              <Text style={styles.headerText}>طعامك <Text style={{ color: '#c02626ff' }}>المفضل</Text></Text>
+            </View>
+            <View style={styles.searchSection}>
+              <View style={styles.searchBar}>
+                <Feather name="search" size={22} color="#888" />
+                <TextInput
+                  placeholder="ابحث..."
+                  style={styles.searchInput}
+                  placeholderTextColor="#888"
+                  value={searchQuery}
+                  onChangeText={handleSearchChange}
                 />
-                {hasUnread && <View style={styles.notificationDot} />}
+                {searchQuery.length > 0 && (
+                  <Text style={styles.searchResultsText}>
+                    {filteredSections.reduce((total, section) => total + (section.menu_items?.length || 0), 0)} نتيجة
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity style={styles.searchButton} onPress={handleClearSearch}>
+                {searchQuery.length > 0 ?
+                  <Ionicons name="close" size={24} color="#fff" /> :
+                  <Feather name="arrow-left" size={24} color="#fff" />
+                }
               </TouchableOpacity>
             </View>
           </View>
-          <View style={styles.header}>
-            <Text style={styles.headerText}>اختر</Text>
-            <Text style={styles.headerText}>طعامك <Text style={{ color: '#c02626ff' }}>المفضل</Text></Text>
+        );
+      
+      case 'promotions':
+        return <PromotionsCarousel promotions={promotions} />;
+      
+      case 'categories':
+        return (
+          <View
+            onLayout={(event) => {
+              const { height } = event.nativeEvent.layout;
+              if (height > 0 && chipsHeight === 0) setChipsHeight(height);
+            }}
+            style={[styles.categoryChipsContainer, isChipsSticky && styles.stickyCategoryChipsContainer]}
+          >
+            <CategoryChips
+              categories={categories}
+              activeCategory={activeCategory}
+              onCategorySelect={handleCategorySelect}
+              loading={loading}
+            />
           </View>
-          <View style={styles.searchSection}>
-            <View style={styles.searchBar}>
-              <Feather name="search" size={22} color="#888" />
-              <TextInput
-                placeholder="ابحث..."
-                style={styles.searchInput}
-                placeholderTextColor="#888"
-                value={searchQuery}
-                onChangeText={handleSearchChange}
-              />
-              {searchQuery.length > 0 && (
-                <Text style={styles.searchResultsText}>
-                  {filteredSections.reduce((total, section) => total + (section.menu_items?.length || 0), 0)} نتيجة
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity style={styles.searchButton} onPress={handleClearSearch}>
-              {searchQuery.length > 0 ?
-                <Ionicons name="close" size={24} color="#fff" /> :
-                <Feather name="arrow-left" size={24} color="#fff" />
-              }
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
+        );
+      
+      case 'section':
+        return <SectionComponent section={item as CategoryWithItems} router={router} />;
+      
+      default:
+        return null;
     }
-
-    if (item.type === 'promotions') {
-      return <PromotionsCarousel promotions={promotions} />;
-    }
-
-    if (item.type === 'categories') {
-      return (
-        <View
-          onLayout={(event) => {
-            const { height } = event.nativeEvent.layout;
-            if (height > 0 && chipsHeight === 0) setChipsHeight(height);
-          }}
-          style={[styles.categoryChipsContainer, isChipsSticky && styles.stickyCategoryChipsContainer]}
-        >
-          <CategoryChips
-            categories={categories}
-            activeCategory={activeCategory}
-            onCategorySelect={handleCategorySelect}
-            loading={loading}
-          />
-        </View>
-      );
-    }
-
-    if (item.type === 'section') {
-      return <SectionComponent section={item as CategoryWithItems} router={router} />;
-    }
-
-    return null;
   }, [
     searchQuery, hasUnread, promotions, categories, activeCategory, isChipsSticky,
     chipsHeight, filteredSections, handleCategorySelect, handleSearchChange,
@@ -749,17 +714,16 @@ export default function HomeScreen() {
           keyExtractor={keyExtractor}
           stickyHeaderIndices={promotions.length > 0 ? [2] : [1]}
           onScroll={handleScroll}
-          scrollEventThrottle={16}
+          scrollEventThrottle={32} // ✅ تقليل التكرار
           keyboardDismissMode="on-drag"
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={5}
-          updateCellsBatchingPeriod={50}
-          windowSize={7}
-          initialNumToRender={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          maxToRenderPerBatch={3} // ✅ تقليل العدد
+          updateCellsBatchingPeriod={100}
+          windowSize={5}
+          initialNumToRender={3}
           renderItem={renderListItem}
           refreshing={refreshing}
           onRefresh={() => {
-            // ✅ تتبع السحب للتحديث
             trackEvent(AnalyticsEvents.PULL_TO_REFRESH);
             loadData(true);
           }}
@@ -925,8 +889,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginStart: 10
   },
-
-  // --- تنسيقات الإعلانات المحسنة ---
   promoContainer: {
     marginTop: 25,
     marginBottom: -5,
@@ -970,7 +932,6 @@ const styles = StyleSheet.create({
     color: '#777',
     marginTop: 2,
   },
-
   categoryChipsContainer: {
     backgroundColor: '#F5F5F5',
     paddingVertical: 10
