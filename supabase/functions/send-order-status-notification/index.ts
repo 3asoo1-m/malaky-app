@@ -30,8 +30,8 @@ function getNotificationMessage(status: string): { title: string; body: string }
       };
     case 'ready':
       return {
-        title: 'طلب جاهز',
-        body: 'طلبك الان جاهز, يمكنك استلام طلبك من الفرع.',
+        title: 'طلبك جاهز',
+        body: 'طلبك الان جاهز, يمكنك الان التوجه الى الفرع و  استلام طلبك.',
       };
     case 'delivered':
       return {
@@ -39,6 +39,10 @@ function getNotificationMessage(status: string): { title: string; body: string }
         body: 'تم توصيل طلبك بنجاح. نأمل أن تستمتع بوجبتك!',
       };
     case 'canceled':
+      return {
+        title: 'تم الغاء الطلب',
+        body: 'اذا كنت تعتقد ان مشكلة ما قد حدثت يرجى التواصل مع فريق الملكي.',
+      };
     default:
       return null;
   }
