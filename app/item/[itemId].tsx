@@ -597,6 +597,34 @@ export default function MenuItemDetailsScreen() {
           <View style={styles.detailsContainer}>
             <Text style={styles.title}>{item.name}</Text>
 
+            {/* --- باقي المحتوى --- */}
+            {Array.isArray(item.options) && item.options.length > 0 && item.options.map(group => {
+              if (!group || !Array.isArray(group.values)) return null;
+              return (
+                <View key={group.id} style={styles.optionsSection}>
+                  <Text style={styles.sectionTitle}>{group.label}</Text>
+                  <View style={styles.optionsContainer}>
+                    {group.values.map(option => {
+                      const isSelected = selectedOptions[group.id] === option.value;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          style={[styles.optionButton, isSelected && styles.optionSelected]}
+                          onPress={() => handleOptionSelect(group.id, option.value)}
+                        >
+                          <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                            {option.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <View style={styles.separator} />
+                </View>
+              );
+            })}
+
+
             {/* ✅ قسم إضافة القطع الخارجية */}
             <View style={styles.piecesSection}>
               <Text style={styles.sectionTitle}>إضافة قطع خارجية</Text>
@@ -631,32 +659,10 @@ export default function MenuItemDetailsScreen() {
               <View style={styles.separator} />
             </View>
 
-            {/* --- باقي المحتوى --- */}
-            {Array.isArray(item.options) && item.options.length > 0 && item.options.map(group => {
-              if (!group || !Array.isArray(group.values)) return null;
-              return (
-                <View key={group.id} style={styles.optionsSection}>
-                  <Text style={styles.sectionTitle}>{group.label}</Text>
-                  <View style={styles.optionsContainer}>
-                    {group.values.map(option => {
-                      const isSelected = selectedOptions[group.id] === option.value;
-                      return (
-                        <TouchableOpacity
-                          key={option.value}
-                          style={[styles.optionButton, isSelected && styles.optionSelected]}
-                          onPress={() => handleOptionSelect(group.id, option.value)}
-                        >
-                          <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
-                            {option.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                  <View style={styles.separator} />
-                </View>
-              );
-            })}
+
+
+
+
 
             <Text style={styles.sectionTitle}>ملاحظات</Text>
             <TextInput
