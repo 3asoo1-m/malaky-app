@@ -111,6 +111,14 @@ export default function ProfileScreen() {
           />
         </View>
 
+        
+        <TouchableOpacity 
+        style={{ padding: 20, backgroundColor: 'lightblue', margin: 20 }}
+        onPress={() => router.push('/menu/5')} // استخدم أي ID للاختبار
+      >
+        <Text>اختبار شاشة الفئة</Text>
+      </TouchableOpacity>
+
         {/* --- تسجيل الخروج --- */}
         <View style={styles.logoutSection}>
           <ProfileListItem
