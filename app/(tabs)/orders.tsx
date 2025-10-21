@@ -1,54 +1,15 @@
 // مسار الملف: app/(tabs)/orders.tsx
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Animated } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// =================================================================
-// ✅ دوال الـ Caching للطلبات
-// =================================================================
-const CACHE_KEYS = {
-  ORDERS_DATA: 'orders_data'
-};
-
-const CACHE_DURATION = 1000 * 60 * 5; // 5 دقائق للطلبات
-
-const cacheOrdersData = async (userId: string, data: any) => {
-  try {
-    const cacheItem = { data, timestamp: Date.now() };
-    await AsyncStorage.setItem(`${CACHE_KEYS.ORDERS_DATA}_${userId}`, JSON.stringify(cacheItem));
-    console.log(`✅ Orders cached for user: ${userId}`);
-  } catch (error) {
-    console.error('❌ Error caching orders:', error);
-  }
-};
-
-const getCachedOrdersData = async (userId: string) => {
-  try {
-    const cached = await AsyncStorage.getItem(`${CACHE_KEYS.ORDERS_DATA}_${userId}`);
-    if (!cached) {
-      console.log(`📭 No cache found for user orders: ${userId}`);
-      return null;
-    }
-    const cacheItem = JSON.parse(cached);
-    const isExpired = Date.now() - cacheItem.timestamp > CACHE_DURATION;
-    if (isExpired) {
-      console.log(`🕐 Cache expired for user orders: ${userId}`);
-      await AsyncStorage.removeItem(`${CACHE_KEYS.ORDERS_DATA}_${userId}`);
-      return null;
-    }
-    console.log(`✅ Using cached orders for user: ${userId}`);
-    return cacheItem.data;
-  } catch (error) {
-    console.error('❌ Error getting cached orders:', error);
-    return null;
-  }
-};
+// ✅ استيراد نظام التحليلات
+import { trackEvent, AnalyticsEvents } from '@/lib/analytics';
 
 // =================================================================
 // ✅ واجهة الطلب والمكونات الفرعية
@@ -58,6 +19,7 @@ interface Order {
   created_at: string;
   total_price: number;
   status: string;
+  items_count?: number;
 }
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -68,22 +30,20 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
-  useFocusEffect(
-    useCallback(() => {
-      Animated.timing(fadeAnim, { 
-        toValue: 1, 
-        duration: 500, 
-        delay: index * 100, 
-        useNativeDriver: true 
-      }).start();
-      Animated.timing(slideAnim, { 
-        toValue: 0, 
-        duration: 500, 
-        delay: index * 100, 
-        useNativeDriver: true 
-      }).start();
-    }, [fadeAnim, slideAnim, index])
-  );
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, { 
+      toValue: 1, 
+      duration: 500, 
+      delay: index * 100, 
+      useNativeDriver: true 
+    }).start();
+    Animated.timing(slideAnim, { 
+      toValue: 0, 
+      duration: 500, 
+      delay: index * 100, 
+      useNativeDriver: true 
+    }).start();
+  }, [fadeAnim, slideAnim, index]);
 
   // ✅ useMemo للترجمة والأساليب
   const translateStatus = useCallback((status: string): string => {
@@ -92,7 +52,9 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
       'processing': 'قيد التحضير',
       'delivered': 'تم التوصيل',
       'ready': 'جاهز',
-      'cancelled': 'ملغي'
+      'cancelled': 'ملغي',
+      'preparing': 'جاري التحضير',
+      'on_the_way': 'في الطريق'
     };
     return translations[status.toLowerCase()] || status;
   }, []);
@@ -105,11 +67,14 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
   } => {
     switch (status.toLowerCase()) {
       case 'processing':
+      case 'preparing':
         return { icon: 'hourglass-outline', color: '#D97706', backgroundColor: '#FEF3C7', borderColor: '#FBBF24' };
       case 'delivered':
-        return { icon: 'bicycle-outline', color: '#2563EB', backgroundColor: '#DBEAFE', borderColor: '#93C5FD' };
+        return { icon: 'checkmark-done-circle-outline', color: '#16A34A', backgroundColor: '#DCFCE7', borderColor: '#86EFAC' };
       case 'ready':
-        return { icon: 'checkmark-circle-outline', color: '#16A34A', backgroundColor: '#DCFCE7', borderColor: '#86EFAC' };
+        return { icon: 'checkmark-circle-outline', color: '#2563EB', backgroundColor: '#DBEAFE', borderColor: '#93C5FD' };
+      case 'on_the_way':
+        return { icon: 'bicycle-outline', color: '#7C3AED', backgroundColor: '#F3E8FF', borderColor: '#C4B5FD' };
       case 'cancelled':
         return { icon: 'close-circle-outline', color: '#DC2626', backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' };
       case 'new':
@@ -122,8 +87,15 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
   const translatedStatus = useMemo(() => translateStatus(item.status), [item.status, translateStatus]);
 
   const handlePress = useCallback(() => {
+    // ✅ تتبع النقر على الطلب
+    trackEvent('order_details_viewed', {
+      order_id: item.id,
+      order_status: item.status,
+      order_total: item.total_price
+    });
+    
     router.push({ pathname: '/order/[orderId]', params: { orderId: item.id.toString() } });
-  }, [router, item.id]);
+  }, [router, item.id, item.status, item.total_price]);
 
   const formattedDate = useMemo(() => {
     return new Date(item.created_at).toLocaleDateString('ar-EG', { 
@@ -146,6 +118,9 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
           <View style={styles.orderInfo}>
             <Text style={styles.orderId}>طلب #{item.id}</Text>
             <Text style={styles.orderDate}>{formattedDate}</Text>
+            {item.items_count && (
+              <Text style={styles.itemsCount}>{item.items_count} عنصر</Text>
+            )}
           </View>
           <View style={[
             styles.statusContainer, 
@@ -184,81 +159,158 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ✅ useCallback لـ fetchOrders
-  const fetchOrders = useCallback(async (isRefreshing = false) => {
+  // ✅ useCallback لـ fetchOrders بدون caching
+  const fetchOrders = useCallback(async (isRefreshing = false, isAutoRefresh = false) => {
     if (!user) {
       setLoading(false);
       return;
     }
 
-    setError(null);
-    if (isRefreshing) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
+    // لا تعرض loading في التحديث التلقائي
+    if (!isAutoRefresh) {
+      setError(null);
+      if (isRefreshing) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
     }
 
     try {
-      // ✅ تحقق من الـ cache أولاً
-      const cachedOrders = isRefreshing ? null : await getCachedOrdersData(user.id);
+      console.log('🌐 Fetching fresh orders data from server');
       
-      if (cachedOrders && !isRefreshing) {
-        console.log('✅ Using cached orders data');
-        setOrders(cachedOrders);
-      } else {
-        console.log('🌐 Fetching fresh orders data');
-        const { data, error } = await supabase
-          .from('orders')
-          .select('id, created_at, total_price, status')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+      // ✅ جلب البيانات مع معلومات إضافية
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id, 
+          created_at, 
+          total_price, 
+          status,
+          order_items(count)
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-        if (error) {
-          throw new Error(error.message);
-        }
-        
-        setOrders(data || []);
-        
-        // ✅ خزن البيانات في الـ cache
-        if (data && data.length > 0) {
-          await cacheOrdersData(user.id, data);
-        }
+      if (error) {
+        throw new Error(error.message);
       }
+      
+      // ✅ معالجة البيانات لإضافة items_count
+      const processedOrders: Order[] = (data || []).map(order => ({
+        id: order.id,
+        created_at: order.created_at,
+        total_price: order.total_price,
+        status: order.status,
+        items_count: order.order_items?.[0]?.count || 0
+      }));
+      
+      setOrders(processedOrders);
+
+      // ✅ تتبع نجاح جلب الطلبات
+      if (!isAutoRefresh) {
+        trackEvent(AnalyticsEvents.DATA_FETCH_SUCCESS, {
+          screen: 'orders',
+          orders_count: processedOrders.length,
+          is_refreshing: isRefreshing
+        });
+      }
+
     } catch (err: any) {
       const errorMessage = "فشل في تحميل الطلبات. تأكد من اتصال الإنترنت.";
       setError(errorMessage);
       console.error('Error fetching orders:', err.message);
       
-      // ✅ fallback إلى البيانات المخزنة
-      const cachedOrders = await getCachedOrdersData(user.id);
-      if (cachedOrders) {
-        setOrders(cachedOrders);
-      }
+      // ✅ تتبع الأخطاء
+      trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
+        screen: 'orders',
+        error_type: 'fetch_orders_failed',
+        error_message: err.message
+      });
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!isAutoRefresh) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [user]);
 
   // ✅ useFocusEffect محسن
   useFocusEffect(
     useCallback(() => {
+      // ✅ تتبع فتح شاشة الطلبات
+      trackEvent('orders_screen_viewed', {
+        user_id: user?.id,
+        has_previous_orders: orders.length > 0
+      });
+
       fetchOrders();
-    }, [fetchOrders])
+
+      // ✅ بدء التحديث التلقائي كل 30 ثانية للطلبات النشطة
+      refreshIntervalRef.current = setInterval(() => {
+        const hasActiveOrders = orders.some(order => 
+          ['new', 'processing', 'preparing', 'on_the_way'].includes(order.status.toLowerCase())
+        );
+        
+        if (hasActiveOrders) {
+          console.log('🔄 Auto-refreshing active orders...');
+          fetchOrders(false, true);
+        }
+      }, 30000); // 30 ثانية
+
+      return () => {
+        // ✅ تنظيف الـ interval عند مغادرة الشاشة
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+          refreshIntervalRef.current = null;
+        }
+      };
+    }, [fetchOrders, user, orders.length])
   );
+
+  // ✅ تأثير إضافي للتحديث عند تغيير حالة الطلبات
+  useEffect(() => {
+    // ✅ تتبع تغيير حالة الطلبات
+    const orderStatuses = orders.map(order => order.status);
+    console.log('📊 Current orders statuses:', orderStatuses);
+    
+    // يمكن إضافة تحليلات إضافية هنا
+  }, [orders]);
 
   const handleBack = useCallback(() => {
     router.back();
   }, [router]);
 
   const handleRefresh = useCallback(() => {
+    // ✅ تتبع السحب للتحديث
+    trackEvent(AnalyticsEvents.PULL_TO_REFRESH, {
+      screen: 'orders',
+      current_orders_count: orders.length
+    });
+    
     fetchOrders(true);
-  }, [fetchOrders]);
+  }, [fetchOrders, orders.length]);
 
   const handleRetry = useCallback(() => {
+    // ✅ تتبع إعادة المحاولة
+    trackEvent('orders_retry_attempt', {
+      previous_error: error
+    });
+    
     fetchOrders();
-  }, [fetchOrders]);
+  }, [fetchOrders, error]);
+
+  const handleBrowseMenu = useCallback(() => {
+    // ✅ تتبع الانتقال للقائمة
+    trackEvent('browse_menu_from_orders', {
+      source: 'empty_orders',
+      user_id: user?.id
+    });
+    
+    router.push('/');
+  }, [router, user]);
 
   // ✅ useCallback لـ renderItem و keyExtractor
   const renderOrderItem = useCallback(({ item, index }: { item: Order; index: number }) => (
@@ -269,6 +321,13 @@ export default function OrdersScreen() {
 
   // ✅ useMemo للبيانات المشتقة
   const hasOrders = useMemo(() => orders.length > 0, [orders.length]);
+  
+  const activeOrdersCount = useMemo(() => 
+    orders.filter(order => 
+      ['new', 'processing', 'preparing', 'on_the_way'].includes(order.status.toLowerCase())
+    ).length, 
+    [orders]
+  );
 
   return (
     <View style={styles.container}>
@@ -277,17 +336,43 @@ export default function OrdersScreen() {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>طلباتي</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>طلباتي</Text>
+          {activeOrdersCount > 0 && (
+            <View style={styles.activeOrdersBadge}>
+              <Text style={styles.activeOrdersText}>{activeOrdersCount} نشط</Text>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity 
+          onPress={handleRefresh} 
+          style={styles.refreshButton}
+          disabled={refreshing}
+        >
+          <Ionicons 
+            name="refresh" 
+            size={22} 
+            color={refreshing ? "#999" : "#C62828"} 
+          />
+        </TouchableOpacity>
       </View>
 
       {/* ✅ عرض الخطأ إذا وجد */}
       {error && (
         <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={20} color="#D32F2F" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
             <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* ✅ مؤشر التحديث التلقائي */}
+      {refreshing && (
+        <View style={styles.autoRefreshIndicator}>
+          <ActivityIndicator size="small" color="#C62828" />
+          <Text style={styles.autoRefreshText}>جاري تحديث الطلبات...</Text>
         </View>
       )}
 
@@ -309,20 +394,21 @@ export default function OrdersScreen() {
           onRefresh={handleRefresh}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
-          windowSize={11}
-          initialNumToRender={10}
+          maxToRenderPerBatch={8}
+          updateCellsBatchingPeriod={100}
+          windowSize={7}
+          initialNumToRender={6}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="receipt-outline" size={80} color="#ccc" />
+              <Ionicons name="receipt-outline" size={80} color="#E5E7EB" />
               <Text style={styles.emptyText}>لا توجد طلبات سابقة</Text>
               <Text style={styles.emptySubText}>ابدأ أول طلب لك من قائمة الطعام!</Text>
               <TouchableOpacity 
                 style={styles.browseButton}
-                onPress={() => router.push('/')}
+                onPress={handleBrowseMenu}
               >
                 <Text style={styles.browseButtonText}>تصفح القائمة</Text>
+                <Ionicons name="fast-food-outline" size={18} color="#fff" style={styles.browseIcon} />
               </TouchableOpacity>
             </View>
           }
@@ -359,10 +445,31 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 22,
     fontFamily: 'Cairo-Bold',
     color: '#1A1A1A',
+    marginRight: 8,
+  },
+  activeOrdersBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FBBF24',
+  },
+  activeOrdersText: {
+    fontSize: 12,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#D97706',
+  },
+  refreshButton: {
+    padding: 8,
   },
   errorContainer: {
     backgroundColor: '#FFEBEE',
@@ -372,7 +479,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#D32F2F',
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
   errorText: {
@@ -381,19 +487,32 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
     fontFamily: 'Cairo-Regular',
+    marginRight: 8,
   },
   retryButton: {
     backgroundColor: '#D32F2F',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    marginRight: 10,
   },
   retryButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
     fontFamily: 'Cairo-SemiBold',
+  },
+  autoRefreshIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 8,
+  },
+  autoRefreshText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Cairo-Regular',
+    marginLeft: 8,
   },
   loaderContainer: {
     flex: 1,
@@ -429,7 +548,7 @@ const styles = StyleSheet.create({
   cardTopSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: 16,
   },
   orderInfo: {
@@ -446,6 +565,12 @@ const styles = StyleSheet.create({
     color: '#888',
     fontFamily: 'Cairo-Regular',
     marginTop: 4,
+  },
+  itemsCount: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Cairo-Regular',
+    marginTop: 2,
   },
   statusContainer: {
     flexDirection: 'row',
@@ -513,11 +638,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   browseButtonText: {
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Cairo-Bold',
+  },
+  browseIcon: {
+    marginRight: 8,
   },
   listFooter: {
     height: 20,

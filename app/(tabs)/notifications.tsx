@@ -1,6 +1,6 @@
 // مسار الملف: app/notifications.tsx
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -9,48 +9,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useRouter, useFocusEffect } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// =================================================================
-// ✅ دوال الـ Caching للإشعارات
-// =================================================================
-const CACHE_KEYS = {
-  NOTIFICATIONS_DATA: 'notifications_data'
-};
-
-const CACHE_DURATION = 1000 * 60 * 2; // 2 دقائق للإشعارات
-
-const cacheNotificationsData = async (userId: string, data: any) => {
-  try {
-    const cacheItem = { data, timestamp: Date.now() };
-    await AsyncStorage.setItem(`${CACHE_KEYS.NOTIFICATIONS_DATA}_${userId}`, JSON.stringify(cacheItem));
-    console.log(`✅ Notifications cached for user: ${userId}`);
-  } catch (error) {
-    console.error('❌ Error caching notifications:', error);
-  }
-};
-
-const getCachedNotificationsData = async (userId: string) => {
-  try {
-    const cached = await AsyncStorage.getItem(`${CACHE_KEYS.NOTIFICATIONS_DATA}_${userId}`);
-    if (!cached) {
-      console.log(`📭 No cache found for user notifications: ${userId}`);
-      return null;
-    }
-    const cacheItem = JSON.parse(cached);
-    const isExpired = Date.now() - cacheItem.timestamp > CACHE_DURATION;
-    if (isExpired) {
-      console.log(`🕐 Cache expired for user notifications: ${userId}`);
-      await AsyncStorage.removeItem(`${CACHE_KEYS.NOTIFICATIONS_DATA}_${userId}`);
-      return null;
-    }
-    console.log(`✅ Using cached notifications for user: ${userId}`);
-    return cacheItem.data;
-  } catch (error) {
-    console.error('❌ Error getting cached notifications:', error);
-    return null;
-  }
-};
+// ✅ استيراد نظام التحليلات
+import { trackEvent, AnalyticsEvents } from '@/lib/analytics';
 
 // =================================================================
 // ✅ تعريف نوع بيانات الإشعار
@@ -64,13 +25,14 @@ type Notification = {
   data: {
     orderId?: number;
     type?: string;
+    promotionId?: number;
   } | null;
 };
 
 // =================================================================
 // ✅ مكون NotificationItem مع React.memo
 // =================================================================
-const NotificationItem = React.memo(({ item }: { item: Notification }) => {
+const NotificationItem = React.memo(({ item, onPress }: { item: Notification; onPress: (notification: Notification) => void }) => {
   const formattedDate = useMemo(() => {
     return formatDistanceToNow(new Date(item.created_at), { 
       addSuffix: true, 
@@ -83,8 +45,16 @@ const NotificationItem = React.memo(({ item }: { item: Notification }) => {
     [item.is_read]
   );
 
+  const handlePress = useCallback(() => {
+    onPress(item);
+  }, [onPress, item]);
+
   return (
-    <View style={[styles.notificationItem, !item.is_read && styles.unreadItem]}>
+    <TouchableOpacity 
+      activeOpacity={0.7} 
+      onPress={handlePress}
+      style={[styles.notificationItem, !item.is_read && styles.unreadItem]}
+    >
       <View style={styles.iconContainer}>
         <Ionicons name={iconName} size={24} color="#c02626ff" />
         {!item.is_read && <View style={styles.unreadDot} />}
@@ -94,10 +64,10 @@ const NotificationItem = React.memo(({ item }: { item: Notification }) => {
         <Text style={styles.notificationBody}>{item.body}</Text>
         <Text style={styles.notificationDate}>{formattedDate}</Text>
       </View>
-      {item.data?.orderId && (
+      {(item.data?.orderId || item.data?.promotionId) && (
         <Ionicons name="chevron-forward" size={16} color="#999" style={styles.chevron} />
       )}
-    </View>
+    </TouchableOpacity>
   );
 });
 
@@ -111,71 +81,107 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ✅ useCallback لـ fetchNotifications
-  const fetchNotifications = useCallback(async (isRefreshing = false) => {
+  // ✅ useCallback لـ fetchNotifications بدون caching
+  const fetchNotifications = useCallback(async (isRefreshing = false, isAutoRefresh = false) => {
     if (!user) {
       setLoading(false);
       return;
     }
 
-    setError(null);
-    if (isRefreshing) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
+    // لا تعرض loading في التحديث التلقائي
+    if (!isAutoRefresh) {
+      setError(null);
+      if (isRefreshing) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
     }
 
     try {
-      // ✅ تحقق من الـ cache أولاً
-      const cachedNotifications = isRefreshing ? null : await getCachedNotificationsData(user.id);
+      console.log('🌐 Fetching fresh notifications data from server');
       
-      if (cachedNotifications && !isRefreshing) {
-        console.log('✅ Using cached notifications data');
-        setNotifications(cachedNotifications);
-      } else {
-        console.log('🌐 Fetching fresh notifications data');
-        const { data, error } = await supabase
-          .from('notifications')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        
-        const notificationsData = data || [];
-        setNotifications(notificationsData);
-        
-        // ✅ خزن البيانات في الـ cache
-        if (notificationsData.length > 0) {
-          await cacheNotificationsData(user.id, notificationsData);
-        }
+      if (error) throw error;
+      
+      const notificationsData = data || [];
+      setNotifications(notificationsData);
+
+      // ✅ تتبع نجاح جلب الإشعارات
+      if (!isAutoRefresh) {
+        trackEvent('notifications_fetched', {
+          notifications_count: notificationsData.length,
+          unread_count: notificationsData.filter(n => !n.is_read).length,
+          is_refreshing: isRefreshing
+        });
       }
+
     } catch (err: any) {
       const errorMessage = "فشل في تحميل الإشعارات. تأكد من اتصال الإنترنت.";
       setError(errorMessage);
       console.error("Error fetching notifications:", err);
       
-      // ✅ fallback إلى البيانات المخزنة
-      const cachedNotifications = await getCachedNotificationsData(user.id);
-      if (cachedNotifications) {
-        setNotifications(cachedNotifications);
-      }
+      // ✅ تتبع الأخطاء
+      trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
+        screen: 'notifications',
+        error_type: 'fetch_notifications_failed',
+        error_message: err.message
+      });
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!isAutoRefresh) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [user]);
 
   // ✅ useFocusEffect لتحميل البيانات عند التركيز
   useFocusEffect(
     useCallback(() => {
+      // ✅ تتبع فتح شاشة الإشعارات
+      trackEvent('notifications_screen_viewed', {
+        user_id: user?.id,
+        has_unread_notifications: notifications.some(n => !n.is_read)
+      });
+
       fetchNotifications();
-    }, [fetchNotifications])
+
+      // ✅ بدء التحديث التلقائي كل 20 ثانية
+      refreshIntervalRef.current = setInterval(() => {
+        const hasUnreadNotifications = notifications.some(n => !n.is_read);
+        if (hasUnreadNotifications) {
+          console.log('🔄 Auto-refreshing notifications...');
+          fetchNotifications(false, true);
+        }
+      }, 20000); // 20 ثانية
+
+      return () => {
+        // ✅ تنظيف الـ interval عند مغادرة الشاشة
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+          refreshIntervalRef.current = null;
+        }
+      };
+    }, [fetchNotifications, user, notifications])
   );
 
   // ✅ useCallback لـ handleNotificationPress
   const handleNotificationPress = useCallback(async (notification: Notification) => {
+    // ✅ تتبع النقر على الإشعار
+    trackEvent('notification_tapped', {
+      notification_id: notification.id,
+      notification_title: notification.title,
+      is_read: notification.is_read,
+      has_action: !!(notification.data?.orderId || notification.data?.promotionId)
+    });
+
     // ✅ تحديث حالة القراءة محلياً للاستجابة الفورية
     if (!notification.is_read) {
       setNotifications(currentNotifications =>
@@ -194,6 +200,11 @@ export default function NotificationsScreen() {
         if (error) throw error;
         
         console.log(`✅ Notification ${notification.id} marked as read`);
+        
+        // ✅ تتبع تحديث حالة القراءة
+        trackEvent('notification_marked_read', {
+          notification_id: notification.id
+        });
       } catch (err) {
         console.error("Failed to mark notification as read:", err);
         // ✅ استعادة الحالة في حالة الفشل
@@ -206,37 +217,92 @@ export default function NotificationsScreen() {
     }
 
     // ✅ توجيه المستخدم إلى الشاشة المناسبة
-    if (notification.data?.orderId) {
-      router.push(`/order/${notification.data.orderId}`);
-    } else if (notification.data?.type === 'promotion') {
-      router.push('/');
-    }
+    // ✅ توجيه المستخدم إلى الشاشة المناسبة
+if (notification.data?.orderId) {
+  router.push({
+    pathname: '/order/[orderId]',
+    params: { orderId: notification.data.orderId.toString() }
+  });
+} else if (notification.data?.promotionId || notification.data?.type === 'promotion') {
+  // ✅ توجيه كل ما يتعلق بالعروض إلى الصفحة الرئيسية
+  router.push('/');
+}
   }, [router]);
 
   // ✅ useCallback لـ renderItem و keyExtractor
   const renderNotificationItem = useCallback(({ item }: { item: Notification }) => (
-    <TouchableOpacity 
-      activeOpacity={0.7} 
-      onPress={() => handleNotificationPress(item)}
-      style={styles.notificationTouchable}
-    >
-      <NotificationItem item={item} />
-    </TouchableOpacity>
+    <NotificationItem item={item} onPress={handleNotificationPress} />
   ), [handleNotificationPress]);
 
   const keyExtractor = useCallback((item: Notification) => item.id.toString(), []);
 
   const handleRefresh = useCallback(() => {
+    // ✅ تتبع السحب للتحديث
+    trackEvent(AnalyticsEvents.PULL_TO_REFRESH, {
+      screen: 'notifications',
+      current_notifications_count: notifications.length
+    });
+    
     fetchNotifications(true);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, notifications.length]);
 
   const handleRetry = useCallback(() => {
+    // ✅ تتبع إعادة المحاولة
+    trackEvent('notifications_retry_attempt', {
+      previous_error: error
+    });
+    
     fetchNotifications();
-  }, [fetchNotifications]);
+  }, [fetchNotifications, error]);
 
   const handleBack = useCallback(() => {
     router.back();
   }, [router]);
+
+  const handleMarkAllAsRead = useCallback(async () => {
+    // ✅ تتبع محاولة تعيين الكل كمقروء
+    trackEvent('mark_all_notifications_read', {
+      total_notifications: notifications.length,
+      unread_count: unreadCount
+    });
+
+    try {
+      const unreadNotifications = notifications.filter(n => !n.is_read);
+      
+      if (unreadNotifications.length === 0) return;
+
+      // ✅ تحديث محلي فوري
+      setNotifications(currentNotifications =>
+        currentNotifications.map(n => ({ ...n, is_read: true }))
+      );
+
+      // ✅ تحديث قاعدة البيانات
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', user?.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      console.log(`✅ Marked ${unreadNotifications.length} notifications as read`);
+      
+      // ✅ تتبع النجاح
+      trackEvent('all_notifications_marked_read', {
+        marked_count: unreadNotifications.length
+      });
+
+    } catch (err) {
+      console.error("Failed to mark all notifications as read:", err);
+      // ✅ استعادة الحالة في حالة الفشل
+      setNotifications(currentNotifications =>
+        currentNotifications.map(n => {
+          const original = notifications.find(original => original.id === n.id);
+          return original ? { ...n, is_read: original.is_read } : n;
+        })
+      );
+    }
+  }, [notifications, user]);
 
   // ✅ useMemo للبيانات المشتقة
   const unreadCount = useMemo(() => 
@@ -270,16 +336,42 @@ export default function NotificationsScreen() {
             </View>
           )}
         </View>
-        <View style={{ width: 40 }} />
+        <View style={styles.headerActions}>
+          {unreadCount > 0 && (
+            <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
+              <Text style={styles.markAllText}>تعيين الكل كمقروء</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity 
+            onPress={handleRefresh} 
+            style={styles.refreshButton}
+            disabled={refreshing}
+          >
+            <Ionicons 
+              name="refresh" 
+              size={20} 
+              color={refreshing ? "#999" : "#c02626ff"} 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ✅ عرض الخطأ إذا وجد */}
       {error && (
         <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={20} color="#c02626ff" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
             <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* ✅ مؤشر التحديث التلقائي */}
+      {refreshing && (
+        <View style={styles.autoRefreshIndicator}>
+          <ActivityIndicator size="small" color="#c02626ff" />
+          <Text style={styles.autoRefreshText}>جاري تحديث الإشعارات...</Text>
         </View>
       )}
 
@@ -301,13 +393,13 @@ export default function NotificationsScreen() {
         }
         showsVerticalScrollIndicator={false}
         removeClippedSubviews={true}
-        maxToRenderPerBatch={15}
-        updateCellsBatchingPeriod={50}
-        windowSize={11}
-        initialNumToRender={10}
+        maxToRenderPerBatch={12}
+        updateCellsBatchingPeriod={100}
+        windowSize={9}
+        initialNumToRender={8}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="notifications-off-outline" size={80} color="#ccc" />
+            <Ionicons name="notifications-off-outline" size={80} color="#E5E7EB" />
             <Text style={styles.emptyText}>لا توجد إشعارات لعرضها</Text>
             <Text style={styles.emptySubText}>سيظهر هنا أي إشعارات جديدة تتلقاها</Text>
           </View>
@@ -368,6 +460,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Cairo-Bold',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  markAllButton: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  markAllText: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontFamily: 'Cairo-SemiBold',
+  },
+  refreshButton: {
+    padding: 6,
+  },
   errorContainer: {
     backgroundColor: '#FFEBEE',
     padding: 16,
@@ -376,7 +487,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#c02626ff',
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
   errorText: {
@@ -385,19 +495,32 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
     fontFamily: 'Cairo-Regular',
+    marginRight: 8,
   },
   retryButton: {
     backgroundColor: '#c02626ff',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    marginRight: 10,
   },
   retryButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
     fontFamily: 'Cairo-SemiBold',
+  },
+  autoRefreshIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 8,
+  },
+  autoRefreshText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Cairo-Regular',
+    marginLeft: 8,
   },
   centered: { 
     flex: 1, 
@@ -419,9 +542,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  notificationTouchable: {
-    marginBottom: 10,
-  },
   notificationItem: { 
     flexDirection: 'row', 
     backgroundColor: '#fff', 
@@ -433,6 +553,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     alignItems: 'center',
+    marginBottom: 10,
   },
   unreadItem: { 
     backgroundColor: '#fff8f8', 
@@ -486,7 +607,7 @@ const styles = StyleSheet.create({
   emptyText: { 
     marginTop: 16, 
     fontSize: 18, 
-    color: '#666',
+    color: '#555',
     fontFamily: 'Cairo-Bold',
     textAlign: 'center',
   },
