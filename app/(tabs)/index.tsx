@@ -131,7 +131,7 @@ const PromotionsCarousel = React.memo(({ promotions }: PromotionsCarouselProps) 
           source={{ uri: item.image_url }} 
           style={styles.promoImage} 
           resizeMode="cover"
-          defaultSource={require('@/assets/images/placeholder.png')} // ✅ إضافة صورة افتراضية
+          defaultSource={require('@/assets/images/icon.png')} // ✅ إضافة صورة افتراضية
         />
       </View>
       <View style={styles.promoTextContainer}>
