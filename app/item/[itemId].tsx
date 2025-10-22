@@ -1,4 +1,4 @@
-// مسار الملف: app/item/[itemId].tsx
+// مسار   الملف: app/item/[itemId].tsx
 
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
