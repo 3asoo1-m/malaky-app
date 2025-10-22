@@ -24,6 +24,18 @@ import { useCart } from '@/lib/useCart';
 
 const { width: screenWidth } = Dimensions.get('window');
 
+// ✅ أنواع القطع الإضافية
+interface AdditionalPieceType {
+  id: string;
+  name_ar: string;
+  price: number;
+}
+
+interface AddedPiece {
+  type: string;
+  quantity: number;
+}
+
 // ✅ مكون Pagination المتحسن
 const Pagination = ({ data, scrollX, itemWidth }: { data: any[]; scrollX: Animated.Value; itemWidth: number }) => {
   return (
@@ -77,7 +89,7 @@ export default function MenuItemDetailsScreen() {
   const [selectedOptions, setSelectedOptions] = useState<Record<string, any>>({});
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
-  const [additionalPieces, setAdditionalPieces] = useState<Array<{type: string, quantity: number}>>([]);
+  const [addedPieces, setAddedPieces] = useState<AddedPiece[]>([]);
   const [showAddPieceForm, setShowAddPieceForm] = useState(false);
   const [newPieceType, setNewPieceType] = useState('');
   const [newPieceQuantity, setNewPieceQuantity] = useState(1);
@@ -85,16 +97,48 @@ export default function MenuItemDetailsScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // أنواع القطع المتاحة (يمكن جلبها من قاعدة البيانات)
-  const availablePieceTypes = [
-    { id: 'thigh', label: 'أفخاذ', price: 5 },
-    { id: 'wing', label: 'أجنحة', price: 3 },
-    { id: 'breast', label: 'صدور', price: 7 },
-    { id: 'leg', label: 'أرجل', price: 4 },
-  ];
+  // ✅ تحديث: سحب أنواع القطع من قاعدة البيانات
+  const [availablePieceTypes, setAvailablePieceTypes] = useState<AdditionalPieceType[]>([]);
+  const [loadingPieces, setLoadingPieces] = useState(false);
+
+  // ✅ جلب أنواع القطع الإضافية من قاعدة البيانات
+  useEffect(() => {
+    const fetchAdditionalPieces = async () => {
+      setLoadingPieces(true);
+      try {
+        const { data, error } = await supabase
+          .from('additional_piece_types')
+          .select('*')
+          .eq('is_active', true)
+          .order('display_order');
+        
+        if (error) {
+          console.error('Error fetching additional pieces:', error);
+          // استخدام بيانات افتراضية في حالة الخطأ
+          setAvailablePieceTypes([
+            { id: 'thigh', name_ar: 'فخذه', price: 9.00,},
+            { id: 'thigh2', name_ar: 'ورك', price: 9.00,},
+            { id: 'wings', name_ar: 'جناح بروست', price: 9.00,},
+            { id: 'breast', name_ar: 'سفينة', price: 12.00,},
+            { id: 'crispy', name_ar: 'كرسبي', price: 5.00,},
+            { id: 'crunchy', name_ar: 'كرنشي', price: 5.00,},
+          ]);
+        } else {
+          setAvailablePieceTypes(data || []);
+        }
+      } catch (e) {
+        console.error('Error in fetch additional pieces:', e);
+      } finally {
+        setLoadingPieces(false);
+      }
+    };
+
+    fetchAdditionalPieces();
+  }, []);
 
   useEffect(() => {
     if (!itemId) return;
+    
     const fetchItemDetails = async () => {
       setLoading(true);
       try {
@@ -105,13 +149,14 @@ export default function MenuItemDetailsScreen() {
           .single<MenuItem>();
 
         if (error) {
-          console.error(error);
+          console.error('Error fetching item:', error);
           router.back();
         } else {
           if (data?.images) {
             data.images.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
           }
           setItem(data);
+          
           if (data?.options) {
             const defaultOptions: Record<string, string> = {};
             data.options.forEach(group => {
@@ -121,14 +166,16 @@ export default function MenuItemDetailsScreen() {
             });
             setSelectedOptions(defaultOptions);
           }
+          
           Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
         }
       } catch (e) {
-        console.error(e);
+        console.error('Error in fetch:', e);
       } finally {
         setLoading(false);
       }
     };
+
     fetchItemDetails();
   }, [itemId]);
 
@@ -139,10 +186,10 @@ export default function MenuItemDetailsScreen() {
   const handleAddPiece = () => {
     if (!newPieceType) return;
     
-    const pieceExists = additionalPieces.find(piece => piece.type === newPieceType);
+    const pieceExists = addedPieces.find(piece => piece.type === newPieceType);
     if (pieceExists) {
       // إذا القطعة موجودة مسبقاً، نحدث الكمية فقط
-      setAdditionalPieces(prev => 
+      setAddedPieces(prev => 
         prev.map(piece => 
           piece.type === newPieceType 
             ? { ...piece, quantity: piece.quantity + newPieceQuantity }
@@ -151,7 +198,7 @@ export default function MenuItemDetailsScreen() {
       );
     } else {
       // إذا كانت جديدة، نضيفها للقائمة
-      setAdditionalPieces(prev => [
+      setAddedPieces(prev => [
         ...prev,
         { type: newPieceType, quantity: newPieceQuantity }
       ]);
@@ -164,7 +211,7 @@ export default function MenuItemDetailsScreen() {
   };
 
   const handleRemovePiece = (pieceType: string) => {
-    setAdditionalPieces(prev => prev.filter(piece => piece.type !== pieceType));
+    setAddedPieces(prev => prev.filter(piece => piece.type !== pieceType));
   };
 
   const handleUpdatePieceQuantity = (pieceType: string, newQuantity: number) => {
@@ -173,7 +220,7 @@ export default function MenuItemDetailsScreen() {
       return;
     }
     
-    setAdditionalPieces(prev => 
+    setAddedPieces(prev => 
       prev.map(piece => 
         piece.type === pieceType 
           ? { ...piece, quantity: newQuantity }
@@ -200,7 +247,7 @@ export default function MenuItemDetailsScreen() {
     
     // حساب سعر القطع الإضافية
     let additionalPiecesPrice = 0;
-    additionalPieces.forEach(piece => {
+    addedPieces.forEach(piece => {
       const pieceInfo = availablePieceTypes.find(p => p.id === piece.type);
       if (pieceInfo) {
         additionalPiecesPrice += pieceInfo.price * piece.quantity;
@@ -208,24 +255,42 @@ export default function MenuItemDetailsScreen() {
     });
     
     return (singleItemPrice * quantity) + additionalPiecesPrice;
-  }, [item, selectedOptions, quantity, additionalPieces]);
+  }, [item, selectedOptions, quantity, addedPieces, availablePieceTypes]);
 
   const handleAddToCart = () => {
     if (!item) return;
     
     // تجهيز بيانات القطع الإضافية
-    const additionalPiecesData = additionalPieces.map(piece => {
+    const additionalPiecesData = addedPieces.map(piece => {
       const pieceInfo = availablePieceTypes.find(p => p.id === piece.type);
       return {
         type: piece.type,
-        label: pieceInfo?.label || piece.type,
+        name: pieceInfo?.name_ar || piece.type,
         quantity: piece.quantity,
         price: pieceInfo?.price || 0
       };
     });
     
-    addToCart(item, quantity, selectedOptions, notes, additionalPiecesData);
-    alert(`${item.name} أضيفت إلى السلة!`);
+    console.log('🛒 إضافة إلى السلة:', {
+      item: item.name,
+      quantity,
+      additionalPieces: additionalPiecesData,
+      totalPrice
+    });
+
+    addToCart(
+      item, 
+      quantity, 
+      selectedOptions, 
+      notes,
+      additionalPiecesData
+    );
+    
+    const piecesText = addedPieces.length > 0 
+      ? ` مع ${addedPieces.reduce((sum, piece) => sum + piece.quantity, 0)} قطع إضافية` 
+      : '';
+    
+    alert(`✅ ${item.name} أضيفت إلى السلة!${piecesText}`);
     router.back();
   };
 
@@ -235,14 +300,24 @@ export default function MenuItemDetailsScreen() {
     : [{ id: 0, source: defaultImageSource }];
 
   if (loading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color="#E63946" /></View>;
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#E63946" />
+        <Text style={{ marginTop: 10, color: '#666' }}>جاري تحميل بيانات المنتج...</Text>
+      </View>
+    );
   }
 
   if (!item) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Text>لم يتم العثور على المنتج.</Text>
-        <TouchableOpacity onPress={() => router.back()}><Text style={{ color: '#C62828', marginTop: 10 }}>العودة</Text></TouchableOpacity>
+        <Text style={{ fontSize: 18, marginBottom: 10 }}>لم يتم العثور على المنتج.</Text>
+        <TouchableOpacity 
+          onPress={() => router.back()} 
+          style={styles.backButton}
+        >
+          <Text style={{ color: '#C62828', fontSize: 16 }}>العودة</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -276,20 +351,13 @@ export default function MenuItemDetailsScreen() {
                   style={{ width: screenWidth, height: 300 }}
                 />
               )}
-              // ✅ استخدام Animated.event بشكل صحيح
               onScroll={Animated.event(
                 [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                { 
-                  useNativeDriver: false,
-                  listener: (event: any) => {
-                    // يمكنك إضافة listener إضافي إذا احتجت
-                  }
-                }
+                { useNativeDriver: false }
               )}
               scrollEventThrottle={16}
             />
             
-            {/* ✅ استخدم Pagination الجديد فقط - احذف القديم */}
             {imagesToShow.length > 1 && (
               <Pagination 
                 data={imagesToShow} 
@@ -303,7 +371,8 @@ export default function MenuItemDetailsScreen() {
           <View style={styles.detailsContainer}>
             <Text style={styles.title}>{item.name}</Text>
 
-            {Array.isArray(item.options) && item.options.map(group => {
+            {/* --- خيارات المنتج --- */}
+            {Array.isArray(item.options) && item.options.length > 0 && item.options.map(group => {
               if (!group || !Array.isArray(group.values)) return null;
               return (
                 <View key={group.id} style={styles.optionsSection}>
@@ -317,7 +386,9 @@ export default function MenuItemDetailsScreen() {
                           style={[styles.optionButton, isSelected && styles.optionSelected]}
                           onPress={() => handleOptionSelect(group.id, option.value)}
                         >
-                          <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>{option.label}</Text>
+                          <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                            {option.label}
+                          </Text>
                         </TouchableOpacity>
                       );
                     })}
@@ -332,12 +403,12 @@ export default function MenuItemDetailsScreen() {
               <Text style={styles.sectionTitle}>قطع إضافية</Text>
               
               {/* عرض القطع المضافة */}
-              {additionalPieces.map((piece, index) => {
+              {addedPieces.map((piece, index) => {
                 const pieceInfo = availablePieceTypes.find(p => p.id === piece.type);
                 return (
                   <View key={piece.type} style={styles.addedPieceItem}>
                     <View style={styles.pieceInfo}>
-                      <Text style={styles.pieceName}>{pieceInfo?.label}</Text>
+                      <Text style={styles.pieceName}>{pieceInfo?.name_ar || piece.type}</Text>
                       <Text style={styles.piecePrice}>
                         {pieceInfo ? `(${pieceInfo.price} ₪ للقطعة)` : ''}
                       </Text>
@@ -387,28 +458,32 @@ export default function MenuItemDetailsScreen() {
                   <View style={styles.formRow}>
                     <View style={styles.pieceTypeContainer}>
                       <Text style={styles.formLabel}>نوع القطعة:</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View style={styles.pieceTypesRow}>
-                          {availablePieceTypes.map(piece => (
-                            <TouchableOpacity
-                              key={piece.id}
-                              style={[
-                                styles.pieceTypeButton,
-                                newPieceType === piece.id && styles.pieceTypeSelected
-                              ]}
-                              onPress={() => setNewPieceType(piece.id)}
-                            >
-                              <Text style={[
-                                styles.pieceTypeText,
-                                newPieceType === piece.id && styles.pieceTypeTextSelected
-                              ]}>
-                                {piece.label}
-                              </Text>
-                              <Text style={styles.piecePriceText}>{piece.price} ₪</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </ScrollView>
+                      {loadingPieces ? (
+                        <ActivityIndicator size="small" color="#C62828" style={{ marginVertical: 10 }} />
+                      ) : (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                          <View style={styles.pieceTypesRow}>
+                            {availablePieceTypes.map(piece => (
+                              <TouchableOpacity
+                                key={piece.id}
+                                style={[
+                                  styles.pieceTypeButton,
+                                  newPieceType === piece.id && styles.pieceTypeSelected
+                                ]}
+                                onPress={() => setNewPieceType(piece.id)}
+                              >
+                                <Text style={[
+                                  styles.pieceTypeText,
+                                  newPieceType === piece.id && styles.pieceTypeTextSelected
+                                ]}>
+                                  {piece.name_ar}
+                                </Text>
+                                <Text style={styles.piecePriceText}>{piece.price} ₪</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </ScrollView>
+                      )}
                     </View>
                   </View>
                   
@@ -466,6 +541,7 @@ export default function MenuItemDetailsScreen() {
               placeholder="مثال: بدون بصل، زيادة كاتشاب..."
               style={styles.notesInput}
               multiline
+              textAlign="right"
             />
 
             <View style={styles.separator} />
@@ -478,16 +554,34 @@ export default function MenuItemDetailsScreen() {
 
       <View style={styles.footer}>
         <View style={styles.quantitySelector}>
-          <TouchableOpacity onPress={() => setQuantity(q => Math.max(1, q - 1))} style={styles.quantityButton}>
+          <TouchableOpacity 
+            onPress={() => setQuantity(q => Math.max(1, q - 1))} 
+            style={styles.quantityButton}
+          >
             <Ionicons name="remove" size={24} color="#C62828" />
           </TouchableOpacity>
           <Text style={styles.quantityText}>{quantity}</Text>
-          <TouchableOpacity onPress={() => setQuantity(q => q + 1)} style={styles.quantityButton}>
+          <TouchableOpacity 
+            onPress={() => setQuantity(q => q + 1)} 
+            style={styles.quantityButton}
+          >
             <Ionicons name="add" size={24} color="#C62828" />
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart} activeOpacity={0.8}>
-          <Text style={styles.addToCartButtonText}>أضف للسلة | {totalPrice.toFixed(2)} ₪</Text>
+        
+        <TouchableOpacity 
+          style={styles.addToCartButton} 
+          onPress={handleAddToCart} 
+          activeOpacity={0.8}
+        >
+          <Text style={styles.addToCartButtonText}>
+            أضف للسلة | {totalPrice.toFixed(2)} ₪
+          </Text>
+          {addedPieces.length > 0 && (
+            <Text style={styles.piecesCountText}>
+              ({addedPieces.reduce((sum, piece) => sum + piece.quantity, 0)} قطع إضافية)
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -497,14 +591,18 @@ export default function MenuItemDetailsScreen() {
 // --- التنسيقات النهائية المحسنة ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  centered: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    padding: 20 
+  },
   scrollContent: { paddingBottom: 120 },
   carouselContainer: {
     backgroundColor: '#f0f0f0',
-    height: 250, // ✅ تحديد ارتفاع ثابت
+    height: 250,
     position: 'relative',
   },
-  // ✅ تنسيقات Pagination المحسنة
   paginationContainer: {
     position: 'absolute',
     bottom: 20,
@@ -519,10 +617,9 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginHorizontal: 4,
-    // ✅✅✅ هذا هو الحل العملي ✅✅✅
-    backgroundColor: '#C62828', // اللون الداخلي للنقطة
+    backgroundColor: '#C62828',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.9)', // حدود بيضاء
+    borderColor: 'rgba(255, 255, 255, 0.9)',
   },
   detailsContainer: {
     padding: 20,
@@ -541,11 +638,34 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     zIndex: 10,
   },
-  title: { fontSize: 28, fontFamily: 'Cairo-Bold', color: '#1D3557', marginBottom: 20, textAlign: 'left' },
-  description: { fontSize: 16, fontFamily: 'Cairo-Regular', lineHeight: 24, color: '#444', marginTop: 10, textAlign: 'left' },
-  separator: { height: 1, backgroundColor: '#eee', marginVertical: 20 },
+  title: { 
+    fontSize: 28, 
+    fontFamily: 'Cairo-Bold', 
+    color: '#1D3557', 
+    marginBottom: 20, 
+    textAlign: 'left' 
+  },
+  description: { 
+    fontSize: 16, 
+    fontFamily: 'Cairo-Regular', 
+    lineHeight: 24, 
+    color: '#444', 
+    marginTop: 10, 
+    textAlign: 'left' 
+  },
+  separator: { 
+    height: 1, 
+    backgroundColor: '#eee', 
+    marginVertical: 20 
+  },
   optionsSection: { marginTop: 10 },
-  sectionTitle: { fontSize: 18, fontFamily: 'Cairo-Bold', color: '#333', marginBottom: 15, textAlign: 'left' },
+  sectionTitle: { 
+    fontSize: 18, 
+    fontFamily: 'Cairo-Bold', 
+    color: '#333', 
+    marginBottom: 15, 
+    textAlign: 'left' 
+  },
   optionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -560,9 +680,19 @@ const styles = StyleSheet.create({
     marginStart: 10,
     marginBottom: 10,
   },
-  optionSelected: { backgroundColor: '#1D3557', borderColor: '#1D3557' },
-  optionText: { fontSize: 16, fontFamily: 'Cairo-Regular', fontWeight: '600', color: '#333' },
-  optionTextSelected: { color: '#fff' },
+  optionSelected: { 
+    backgroundColor: '#1D3557', 
+    borderColor: '#1D3557' 
+  },
+  optionText: { 
+    fontSize: 16, 
+    fontFamily: 'Cairo-Regular', 
+    fontWeight: '600', 
+    color: '#333' 
+  },
+  optionTextSelected: { 
+    color: '#fff' 
+  },
   notesInput: {
     backgroundColor: '#F5F5F5',
     borderRadius: 10,
@@ -571,8 +701,10 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     fontSize: 16,
     textAlign: 'right',
+    fontFamily: 'Cairo-Regular',
   },
-  // تنسيقات القطع الإضافية
+  
+  // ✅ تنسيقات القطع الإضافية
   additionalPiecesSection: {
     marginTop: 10,
   },
@@ -584,6 +716,8 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
   },
   pieceInfo: {
     flex: 1,
@@ -793,6 +927,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginHorizontal: 20,
+    fontFamily: 'Cairo-Bold',
   },
   addToCartButton: {
     flex: 1,
@@ -808,6 +943,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Cairo-Bold',
   },
+  piecesCountText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    marginTop: 2,
+  },
 });
-
-//aftermerge

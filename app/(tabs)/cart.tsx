@@ -70,13 +70,30 @@ const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: Car
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.cartItemContainer}>
-      <TouchableOpacity onPress={( ) => onRemove(item.id)} style={styles.deleteButton}>
-        <Ionicons name="close-circle" size={24} color="#999" />
+      <TouchableOpacity onPress={() => onRemove(item.id)} style={styles.deleteButton}>
+        <Ionicons name="close-circle" size={24} color="#e22b2bc9" />
       </TouchableOpacity>
       <Image source={{ uri: imageUrl }} style={styles.itemImage} />
       <View style={styles.itemDetails}>
         <Text style={styles.itemName}>{item.product.name}</Text>
         {optionLabels.length > 0 && (<Text style={styles.optionsText}>{optionLabels}</Text>)}
+        
+        {/* ✅ عرض القطع الإضافية */}
+        {item.additionalPieces && item.additionalPieces.length > 0 && (
+          <View style={styles.additionalPiecesContainer}>
+            {item.additionalPieces.map((piece, index) => (
+              <View key={index} style={styles.additionalPieceRow}>
+                <Text style={styles.additionalPieceText}>
+                  + {piece.quantity} × {piece.name}
+                </Text>
+                <Text style={styles.additionalPiecePrice}>
+                  {(piece.price * piece.quantity).toFixed(2)} ₪
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+        
         {item.notes && (<Text style={styles.notesText}>ملاحظات: {item.notes}</Text>)}
       </View>
       <View style={styles.quantitySelector}>
@@ -185,7 +202,6 @@ const BranchSection = React.memo(({
     </View>
   );
 });
-
 
 export default function CartScreen() {
   const router = useRouter();
@@ -297,7 +313,7 @@ export default function CartScreen() {
     removeFromCart(itemId);
   }, [removeFromCart]);
 
-  // ✅ تحسين الـ handleCheckout
+  // ✅ تحديث الـ handleCheckout لدعم القطع الإضافية
   const handleCheckout = useCallback(async () => {
     if (isPlacingOrder) return;
     
@@ -332,6 +348,7 @@ export default function CartScreen() {
 
       const orderId = orderData.id;
 
+      // ✅ تحديث orderItems لتشمل القطع الإضافية
       const orderItems = items.map(cartItem => ({
         order_id: orderId,
         menu_item_id: cartItem.product.id,
@@ -339,6 +356,9 @@ export default function CartScreen() {
         unit_price: cartItem.product.price,
         options: cartItem.options,
         notes: cartItem.notes,
+        additional_pieces: cartItem.additionalPieces && cartItem.additionalPieces.length > 0 
+          ? cartItem.additionalPieces 
+          : null,
       }));
 
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
@@ -570,9 +590,34 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 20, fontWeight: '600', color: '#555', marginTop: 16 },
   browseButton: { marginTop: 24, backgroundColor: '#C62828', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 30 },
   browseButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  deleteButton: { position: 'absolute', top: 8, left: 8, zIndex: 1 },
+  deleteButton: { position: 'absolute', top: 6, left: 6, zIndex: 1 },
   optionsText: { fontSize: 13, color: '#666', textAlign: 'left', marginTop: 2 },
   notesText: { fontSize: 13, color: '#888', fontStyle: 'italic', textAlign: 'left', marginTop: 4 },
+  
+  // ✅ تنسيقات القطع الإضافية الجديدة
+  additionalPiecesContainer: {
+    marginTop: 6,
+    marginBottom: 4,
+    width: '100%',
+  },
+  additionalPieceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+    width: '100%',
+  },
+  additionalPieceText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  additionalPiecePrice: {
+    fontSize: 11,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  
   wizardModalContainer: {
     width: '100%',
     backgroundColor: '#F9F9F9',

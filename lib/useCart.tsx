@@ -3,17 +3,19 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { randomUUID } from 'expo-crypto';
 
-// ✅✅✅ الخطوة 1: استيراد كل الأنواع من مصدر الحقيقة الواحد ✅✅✅
-import { MenuItem, OrderType, CartItem, Address, Branch } from './types';
-
-// ❌❌❌ الخطوة 2: تم حذف كل التعريفات المكررة من هنا ❌❌❌
-
+// ✅ استيراد الأنواع المحدثة
+import { MenuItem, OrderType, CartItem, Address, Branch, CartAdditionalPiece } from './types';
 
 // --- واجهة السياق (Context Interface) ---
-// الآن تستخدم الأنواع المستوردة بشكل صحيح
 interface CartContextType {
   items: CartItem[];
-  addToCart: (product: MenuItem, quantity: number, options: Record<string, any>, notes?: string) => void;
+  addToCart: (
+    product: MenuItem, 
+    quantity: number, 
+    options: Record<string, any>, 
+    notes?: string,
+    additionalPieces?: CartAdditionalPiece[] // ✅ أضف هذا المعامل
+  ) => void;
   updateQuantity: (cartItemId: string, amount: -1 | 1) => void;
   removeFromCart: (cartItemId: string) => void;
   orderType: OrderType;
@@ -38,28 +40,75 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null);
   const [selectedBranch, setSelectedBranchState] = useState<Branch | null>(null);
 
-  const addToCart = (product: MenuItem, quantity: number, options: Record<string, any>, notes?: string) => {
+  // ✅ تحديث دالة addToCart مع دعم القطع الإضافية
+  const addToCart = (
+    product: MenuItem, 
+    quantity: number, 
+    options: Record<string, any>, 
+    notes?: string,
+    additionalPieces: CartAdditionalPiece[] = [] // ✅ معامل جديد
+  ) => {
     setItems(currentItems => {
-      const existingItem = currentItems.find(item => item.product.id === product.id && JSON.stringify(item.options) === JSON.stringify(options));
+      // ✅ تحديث شرط المقارنة ليشمل القطع الإضافية
+      const existingItem = currentItems.find(item => 
+        item.product.id === product.id && 
+        JSON.stringify(item.options) === JSON.stringify(options) &&
+        JSON.stringify(item.additionalPieces) === JSON.stringify(additionalPieces)
+      );
+      
       if (existingItem) {
         return currentItems.map(item =>
           item.id === existingItem.id
-            ? { ...item, quantity: item.quantity + quantity, totalPrice: (item.totalPrice / item.quantity) * (item.quantity + quantity) }
+            ? { 
+                ...item, 
+                quantity: item.quantity + quantity, 
+                totalPrice: calculateItemTotal({
+                  ...item,
+                  quantity: item.quantity + quantity
+                })
+              }
             : item
         );
       } else {
-        let itemPrice = product.price;
-        if (product.options) {
-          Object.keys(options).forEach(optionId => {
-            const group = product.options?.find(g => g.id === optionId);
-            const value = group?.values.find(v => v.value === options[optionId]);
-            if (value) { itemPrice += value.priceModifier; }
-          });
-        }
-        const newCartItem: CartItem = { id: randomUUID(), product, quantity, options, notes, totalPrice: itemPrice * quantity };
+        const newCartItem: CartItem = { 
+          id: randomUUID(), 
+          product, 
+          quantity, 
+          options, 
+          notes, 
+          additionalPieces, // ✅ إضافة القطع الإضافية
+          totalPrice: 0 // سيتم حسابه في السطر التالي
+        };
+        
+        // ✅ حساب السعر الإجمالي
+        newCartItem.totalPrice = calculateItemTotal(newCartItem);
         return [...currentItems, newCartItem];
       }
     });
+  };
+
+  // ✅ دالة مساعدة لحساب السعر الإجمالي للعنصر
+  const calculateItemTotal = (item: CartItem): number => {
+    let basePrice = item.product.price;
+    
+    // حساب سعر الخيارات الأساسية
+    if (item.product.options) {
+      Object.keys(item.options).forEach(optionId => {
+        const group = item.product.options?.find(g => g.id === optionId);
+        const value = group?.values.find(v => v.value === item.options[optionId]);
+        if (value?.priceModifier) {
+          basePrice += value.priceModifier;
+        }
+      });
+    }
+    
+    // ✅ حساب سعر القطع الإضافية
+    const additionalPiecesPrice = item.additionalPieces.reduce(
+      (total, piece) => total + (piece.price * piece.quantity), 
+      0
+    );
+    
+    return (basePrice * item.quantity) + additionalPiecesPrice;
   };
 
   const updateQuantity = (cartItemId: string, amount: -1 | 1) => {
@@ -68,8 +117,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (item.id === cartItemId) {
           if (item.quantity === 1 && amount === -1) { return item; }
           const newQuantity = item.quantity + amount;
-          const singleItemPrice = item.totalPrice / item.quantity;
-          return { ...item, quantity: newQuantity, totalPrice: singleItemPrice * newQuantity };
+          
+          // ✅ استخدام دالة الحساب الجديدة
+          const newTotalPrice = calculateItemTotal({
+            ...item,
+            quantity: newQuantity
+          });
+          
+          return { ...item, quantity: newQuantity, totalPrice: newTotalPrice };
         }
         return item;
       })

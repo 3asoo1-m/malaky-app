@@ -104,6 +104,7 @@ export interface CartItem {
   options: Record<string, any>;
   notes: string | undefined;
   totalPrice: number;
+  additionalPieces: CartAdditionalPiece[];
 }
 
 
@@ -192,4 +193,22 @@ export interface CategoryChipsProps {
   onCategorySelect: (categoryId: ActiveCategory) => void;
   loading: boolean;
   sectionsWithItems?: number[]; // ✅ خاصية اختيارية للتعامل مع الأقسام الفارغة
+}
+
+
+
+
+//------------------------------------------
+
+export interface AdditionalPieceType {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface CartAdditionalPiece {
+  type: string;
+  name: string;
+  quantity: number;
+  price: number;
 }
