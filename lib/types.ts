@@ -55,7 +55,7 @@ export interface Promotion {
 }
 
 export interface Address {
-  id: string;
+  id: number;
   street_address: string;
   notes: string | null;
   created_at: string;
@@ -65,6 +65,8 @@ export interface Address {
     delivery_price: number;
   } | null;
 }
+
+
 
 export interface Branch {
   id: string;

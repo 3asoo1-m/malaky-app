@@ -17,19 +17,20 @@ import { useAuth } from '@/lib/useAuth';
 import { useCart } from '@/lib/useCart'; // 1. استيراد useCart
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Address } from '@/lib/types';
 
 // واجهة العنوان (يجب أن تكون متطابقة مع بقية التطبيق)
-interface Address {
-  id: number;
-  street_address: string;
-  notes: string | null;
-  created_at: string;
-  delivery_zones: {
-    city: string;
-    area_name: string;
-    delivery_price: number; // تأكد من وجود هذا الحقل
-  } | null;
-}
+// interface Address {
+//   id: number;
+//   street_address: string;
+//   notes: string | null;
+//   created_at: string;
+//   delivery_zones: {
+//     city: string;
+//     area_name: string;
+//     delivery_price: number; // تأكد من وجود هذا الحقل
+//   } | null;
+// }
 
 export default function AddressesScreen() {
   const router = useRouter();
@@ -58,6 +59,7 @@ export default function AddressesScreen() {
             delivery_zones (city, area_name, delivery_price)
           `)
           .eq('user_id', user.id)
+          .is('deleted_at', null) 
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -83,11 +85,15 @@ export default function AddressesScreen() {
         text: 'حذف',
         style: 'destructive',
         onPress: async () => {
-          const { error } = await supabase.from('user_addresses').delete().eq('id', addressId);
+          const { error } = await supabase.rpc('delete_user_address', {
+    address_id_to_delete: addressId
+  });
           if (error) {
+            console.error('RPC Error:', error); // طباعة الخطأ للمطور
             Alert.alert('خطأ', 'لم نتمكن من حذف العنوان.');
           } else {
             setAddresses(prev => prev.filter(addr => addr.id !== addressId));
+            Alert.alert('نجاح', 'تم حذف العنوان بنجاح');
           }
         },
       },
