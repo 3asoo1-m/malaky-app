@@ -53,6 +53,13 @@ const getCachedOrderData = async (orderId: string) => {
 // =================================================================
 // ✅ واجهات البيانات المحدثة
 // =================================================================
+interface AdditionalPiece {
+  type: string;
+  name: string;
+  quantity: number;
+  price: number;
+}
+
 interface OrderDetails {
   id: number;
   created_at: string;
@@ -67,6 +74,7 @@ interface OrderDetails {
     quantity: number;
     notes: string | null;
     options: Record<string, any>;
+    additional_pieces: AdditionalPiece[] | null; // ✅ أضفنا هذا
     menu_items: {
       name: string;
       options: OptionGroup[] | null;
@@ -81,7 +89,6 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 // ✅ مكونات فرعية مع React.memo
 // =================================================================
 const StatusTracker = React.memo(({ currentStatus, orderType }: { currentStatus: string; orderType: 'delivery' | 'pickup' }) => {
-  // ✅ useMemo للحالات
   const statuses = useMemo(() => 
     orderType === 'delivery' 
       ? ['new', 'processing', 'ready', 'delivered']
@@ -126,12 +133,33 @@ const StatusTracker = React.memo(({ currentStatus, orderType }: { currentStatus:
   );
 });
 
+// ✅ مكون جديد لعرض القطع الإضافية
+const AdditionalPiecesDisplay = React.memo(({ additionalPieces }: { additionalPieces: AdditionalPiece[] }) => {
+  if (!additionalPieces || additionalPieces.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.additionalPiecesContainer}>
+      <Text style={styles.additionalPiecesTitle}>القطع الإضافية:</Text>
+      {additionalPieces.map((piece, index) => (
+        <View key={index} style={styles.additionalPieceRow}>
+          <Text style={styles.additionalPieceText}>
+            + {piece.quantity} × {piece.name}
+          </Text>
+          <Text style={styles.additionalPiecePrice}>
+            ₪{(piece.price * piece.quantity).toFixed(2)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+});
+
 const OrderItem = React.memo(({ item }: { item: OrderDetails['order_items'][0] }) => {
-  // ✅ التحقق الأولي لا يزال مفيدًا للخروج المبكر
   if (!item.menu_items) return null;
 
   const optionLabels = useMemo(() => {
-    // ✅✅✅ التحقق من وجود options قبل استخدامها
     if (!item.menu_items?.options || !Array.isArray(item.menu_items.options)) {
       return '';
     }
@@ -156,6 +184,10 @@ const OrderItem = React.memo(({ item }: { item: OrderDetails['order_items'][0] }
       <View style={styles.itemDetails}>
         <Text style={styles.itemName}>{item.quantity}x {item.menu_items.name}</Text>
         {optionLabels.length > 0 && <Text style={styles.optionsText}>{optionLabels}</Text>}
+        
+        {/* ✅ إضافة عرض القطع الإضافية */}
+        <AdditionalPiecesDisplay additionalPieces={item.additional_pieces || []} />
+        
         {item.notes && <Text style={styles.notesText}>ملاحظات: {item.notes}</Text>}
       </View>
     </View>
@@ -173,7 +205,6 @@ export default function OrderDetailsScreen() {
   const [error, setError] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // ✅ useCallback لـ fetchOrderDetails
   const fetchOrderDetails = useCallback(async () => {
     if (!orderId) return;
     
@@ -181,7 +212,6 @@ export default function OrderDetailsScreen() {
     setError(null);
 
     try {
-      // ✅ تحقق من الـ cache أولاً
       const cachedOrder = await getCachedOrderData(orderId as string);
       
       if (cachedOrder) {
@@ -195,7 +225,7 @@ export default function OrderDetailsScreen() {
         return;
       }
 
-      // ✅ جلب البيانات من السيرفر
+      // ✅ تحديث الاستعلام ليشمل additional_pieces
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -203,7 +233,7 @@ export default function OrderDetailsScreen() {
           user_addresses(street_address, delivery_zones(city, area_name)),
           branches(name, address),
           order_items(
-            quantity, notes, options,
+            quantity, notes, options, additional_pieces,
             menu_items(name, options, images:menu_item_images(image_url, display_order))
           )
         `)
@@ -216,7 +246,6 @@ export default function OrderDetailsScreen() {
         const orderData = data as unknown as OrderDetails;
         setOrder(orderData);
         
-        // ✅ خزن البيانات في الـ cache
         await cacheOrderData(orderId as string, orderData);
         
         Animated.timing(fadeAnim, { 
@@ -230,7 +259,6 @@ export default function OrderDetailsScreen() {
       setError(errorMessage);
       console.error('Error fetching order details:', error.message);
       
-      // ✅ fallback إلى البيانات المخزنة
       const cachedOrder = await getCachedOrderData(orderId as string);
       if (cachedOrder) {
         setOrder(cachedOrder);
@@ -244,7 +272,6 @@ export default function OrderDetailsScreen() {
     fetchOrderDetails();
   }, [fetchOrderDetails]);
 
-  // ✅ useCallback للدوال
   const handleBack = useCallback(() => {
     router.back();
   }, [router]);
@@ -253,7 +280,6 @@ export default function OrderDetailsScreen() {
     fetchOrderDetails();
   }, [fetchOrderDetails]);
 
-  // ✅ useMemo للبيانات المشتقة
   const formattedDate = useMemo(() => {
     if (!order) return '';
     return new Date(order.created_at).toLocaleDateString('ar-EG', { 
@@ -265,7 +291,23 @@ export default function OrderDetailsScreen() {
     });
   }, [order?.created_at]);
 
-  // ✅ مكونات الـ render مع useCallback
+  // ✅ دالة مساعدة لحساب مجموع القطع الإضافية
+  const calculateAdditionalPiecesTotal = useCallback((orderItems: OrderDetails['order_items']) => {
+    return orderItems.reduce((total, item) => {
+      if (item.additional_pieces) {
+        return total + item.additional_pieces.reduce((sum, piece) => 
+          sum + (piece.price * piece.quantity), 0
+        );
+      }
+      return total;
+    }, 0);
+  }, []);
+
+  const additionalPiecesTotal = useMemo(() => 
+    order ? calculateAdditionalPiecesTotal(order.order_items) : 0,
+    [order, calculateAdditionalPiecesTotal]
+  );
+
   const renderAddress = useCallback(() => {
     if (!order) return null;
 
@@ -284,16 +326,13 @@ export default function OrderDetailsScreen() {
         <View style={styles.cardContent}>
           {order.order_type === 'delivery' && order.user_addresses ? (
             <>
-      {/* ✅✅✅ السطر الأول: المدينة والمنطقة بخط عريض ✅✅✅ */}
-      <Text style={styles.infoTextBold}>
-        {`${order.user_addresses.delivery_zones?.city} - ${order.user_addresses.delivery_zones?.area_name}`}
-      </Text>
-      
-      {/* ✅✅✅ السطر الثاني: تفاصيل الشارع بخط عادي ✅✅✅ */}
-      <Text style={styles.infoText}>
-        {order.user_addresses.street_address}
-      </Text>
-    </>
+              <Text style={styles.infoTextBold}>
+                {`${order.user_addresses.delivery_zones?.city} - ${order.user_addresses.delivery_zones?.area_name}`}
+              </Text>
+              <Text style={styles.infoText}>
+                {order.user_addresses.street_address}
+              </Text>
+            </>
           ) : order.order_type === 'pickup' && order.branches ? (
             <>
               <Text style={styles.infoTextBold}>{order.branches.name}</Text>
@@ -337,6 +376,15 @@ export default function OrderDetailsScreen() {
             <Text style={styles.priceLabel}>المجموع الفرعي</Text>
             <Text style={styles.priceValue}>{order.subtotal.toFixed(2)} ₪</Text>
           </View>
+          
+          {/* ✅ عرض مجموع القطع الإضافية إذا كان أكبر من صفر */}
+          {additionalPiecesTotal > 0 && (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>القطع الإضافية</Text>
+              <Text style={styles.priceValue}>{additionalPiecesTotal.toFixed(2)} ₪</Text>
+            </View>
+          )}
+          
           {order.order_type === 'delivery' && (
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>سعر التوصيل</Text>
@@ -350,7 +398,7 @@ export default function OrderDetailsScreen() {
         </View>
       </View>
     );
-  }, [order]);
+  }, [order, additionalPiecesTotal]);
 
   if (loading) {
     return (
@@ -426,7 +474,7 @@ export default function OrderDetailsScreen() {
 }
 
 // =================================================================
-// ✅ التنسيقات المحدثة
+// ✅ التنسيقات المحدثة مع إضافة تنسيقات القطع الإضافية
 // =================================================================
 const styles = StyleSheet.create({
   container: { 
@@ -630,6 +678,35 @@ const styles = StyleSheet.create({
     fontStyle: 'italic', 
     marginTop: 2, 
     textAlign: 'right' 
+  },
+  // ✅ تنسيقات جديدة للقطع الإضافية
+  additionalPiecesContainer: {
+    marginTop: 8,
+    paddingStart: 8,
+    borderStartWidth: 2,
+    borderStartColor: '#10B981',
+  },
+  additionalPiecesTitle: {
+    fontSize: 12,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#10B981',
+    marginBottom: 4,
+  },
+  additionalPieceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  additionalPieceText: {
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    color: '#059669',
+  },
+  additionalPiecePrice: {
+    fontSize: 11,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#059669',
   },
   priceRow: { 
     flexDirection: 'row', 
