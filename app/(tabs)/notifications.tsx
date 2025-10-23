@@ -237,7 +237,7 @@ export default function NotificationsScreen() {
     // ✅ توجيه المستخدم إلى الشاشة المناسبة
     if (notification.data?.orderId) {
       router.push({
-        pathname: '/order/[orderId]',
+        pathname: '/orders/[orderId]',
         params: { orderId: notification.data.orderId.toString() }
       });
     } else if (notification.data?.promotionId || notification.data?.type === 'promotion') {

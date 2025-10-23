@@ -13,7 +13,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import MenuItemCard from '@/components/MenuItemCard';
 import CategoryChips from '@/components/CategoryChips';
-import CustomBottomNav from '@/components/CustomBottomNav';
 
 // ✅✅✅ استيراد كل الأنواع من مصدر الحقيقة الواحد ✅✅✅
 import {
@@ -903,10 +902,9 @@ export default function HomeScreen() {
               </Text>
             </View>
           }
-          ListFooterComponent={<View style={{ height: 100 }} />}
+          ListFooterComponent={<View style={{ height: 150 }} />}
         />
       </SafeAreaView>
-      <CustomBottomNav />
     </View>
   );
 }

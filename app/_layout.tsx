@@ -13,6 +13,9 @@ import { useAppConfig } from '@/hooks/useAppConfig';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 import { ForceUpdateScreen } from '@/components/ForceUpdateScreen';
 
+// ✅ استيراد الـ GlobalBottomNav
+import GlobalBottomNav from '@/components/GlobalBottomNav'; // أضف هذا السطر
+
 // ✅ استيراد نظام الإشعارات
 import { 
   registerForPushNotificationsAsync, 
@@ -129,14 +132,18 @@ const AuthGuard = () => {
     );
   }
 
-  return <Slot />;
+  return (
+    <>
+      <Slot />
+      <GlobalBottomNav /> {/* ✅ أضف هذا السطر هنا */}
+    </>
+  );
 };
 
 export default function RootLayout() {
   
   // ✅ إعداد معالجات الإشعارات والتطبيق
-  useEffect(() => {
-    // إعداد معالجات النقر على الإشعارات
+useEffect(() => { // ✅ صحيح    // إعداد معالجات النقر على الإشعارات
     const { removeReceivedListener, removeResponseListener } = setupNotificationHandlers();
 
     // التعامل مع حالة التطبيق (عندما يعود المستخدم للتطبيق)

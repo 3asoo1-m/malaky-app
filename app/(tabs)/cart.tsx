@@ -14,7 +14,6 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCart } from '@/lib/useCart';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-import CustomBottomNav from '@/components/CustomBottomNav';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import { 
@@ -299,7 +298,7 @@ export default function CartScreen() {
   }, [setOrderType, setSelectedAddress, setSelectedBranch]);
 
   const handleAddAddress = useCallback(() => {
-    router.push({ pathname: '/addresses', params: { fromCart: 'true' } });
+    router.push({ pathname: '/profile/addresses', params: { fromCart: 'true' } });
   }, [router]);
 
   const handleItemPress = useCallback((item: CartItem) => {
@@ -550,7 +549,6 @@ export default function CartScreen() {
           </TouchableOpacity>
         </View>
       )}
-      <CustomBottomNav />
     </View>
   );
 }

@@ -17,7 +17,6 @@ import { useFavorites } from '@/lib/useFavorites';
 import { supabase } from '@/lib/supabase';
 import { MenuItem } from '@/lib/types';
 import MenuItemCard from '@/components/MenuItemCard';
-import CustomBottomNav from '@/components/CustomBottomNav';
 import { Ionicons } from '@expo/vector-icons';
 
 // ✅ استيراد نظام التحليلات
@@ -183,7 +182,6 @@ export default function FavoritesScreen() {
             <Text style={styles.loadingText}>جاري تحميل المفضلة...</Text>
           </View>
         </SafeAreaView>
-        <CustomBottomNav />
       </View>
     );
   }
@@ -253,8 +251,7 @@ export default function FavoritesScreen() {
         )}
       </SafeAreaView>
       
-      <CustomBottomNav />
-    </View>
+</View>
   );
 }
 

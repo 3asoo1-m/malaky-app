@@ -94,7 +94,7 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
       order_total: item.total_price
     });
     
-    router.push({ pathname: '/order/[orderId]', params: { orderId: item.id.toString() } });
+    router.push({ pathname: '/orders/[orderId]', params: { orderId: item.id.toString() } });
   }, [router, item.id, item.status, item.total_price]);
 
   const formattedDate = useMemo(() => {
