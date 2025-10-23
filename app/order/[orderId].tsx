@@ -10,13 +10,13 @@ import { MenuItemImage, OptionGroup } from '@/lib/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // =================================================================
-// ✅ دوال الـ Caching لتفاصيل الطلب
+// ✅ دوال الـ Caching لتفاصيل الطلب - تم تقليل المدة
 // =================================================================
 const CACHE_KEYS = {
   ORDER_DETAILS: 'order_details'
 };
 
-const CACHE_DURATION = 1000 * 60 * 15; // 15 دقيقة للطلبات
+const CACHE_DURATION = 1000 * 60 * 2; // 2 دقائق فقط بدلاً من 15
 
 const cacheOrderData = async (orderId: string, data: any) => {
   try {
@@ -74,7 +74,7 @@ interface OrderDetails {
     quantity: number;
     notes: string | null;
     options: Record<string, any>;
-    additional_pieces: AdditionalPiece[] | null; // ✅ أضفنا هذا
+    additional_pieces: AdditionalPiece[] | null;
     menu_items: {
       name: string;
       options: OptionGroup[] | null;
@@ -195,7 +195,7 @@ const OrderItem = React.memo(({ item }: { item: OrderDetails['order_items'][0] }
 });
 
 // =================================================================
-// ✅ المكون الرئيسي المحسن
+// ✅ المكون الرئيسي المحسن مع Real-time Updates
 // =================================================================
 export default function OrderDetailsScreen() {
   const { orderId } = useLocalSearchParams();
@@ -267,6 +267,51 @@ export default function OrderDetailsScreen() {
       setLoading(false);
     }
   }, [orderId, fadeAnim]);
+
+  // ✅ Real-time Subscription للتحديثات التلقائية
+  useEffect(() => {
+    if (!orderId) return;
+
+    console.log('🔔 Setting up real-time subscription for order:', orderId);
+
+    const channel = supabase
+      .channel(`order:${orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${orderId}`
+        },
+        async (payload) => {
+          console.log('🔄 Real-time update received:', payload.new);
+          
+          // تحديث حالة الطلب فوراً
+          setOrder(prev => {
+            if (!prev) return null;
+            
+            const updatedOrder = {
+              ...prev,
+              ...payload.new
+            };
+            
+            // تحديث الكاش بالبيانات الجديدة
+            cacheOrderData(orderId as string, updatedOrder);
+            
+            return updatedOrder;
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Subscription status:', status);
+      });
+
+    return () => {
+      console.log('🧹 Cleaning up real-time subscription');
+      channel.unsubscribe();
+    };
+  }, [orderId]);
 
   useEffect(() => {
     fetchOrderDetails();

@@ -240,6 +240,7 @@ export default function CartScreen() {
       .from('user_addresses')
       .select(`id, street_address, notes, created_at, delivery_zones (city, area_name, delivery_price)`)
       .eq('user_id', user.id)
+      .is('deleted_at', null) 
       .order('created_at', { ascending: false });
     
     if (error) { 
