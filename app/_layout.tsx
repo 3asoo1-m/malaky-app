@@ -14,7 +14,7 @@ import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 import { ForceUpdateScreen } from '@/components/ForceUpdateScreen';
 
 // ✅ استيراد الـ GlobalBottomNav
-import GlobalBottomNav from '@/components/GlobalBottomNav'; // أضف هذا السطر
+import GlobalBottomNav from '@/components/GlobalBottomNav';
 
 // ✅ استيراد نظام الإشعارات
 import { 
@@ -135,7 +135,8 @@ const AuthGuard = () => {
   return (
     <>
       <Slot />
-      <GlobalBottomNav /> {/* ✅ أضف هذا السطر هنا */}
+      {/* ✅ إخفاء التبويبات في شاشات المصادقة والصيانة والتحديث الإجباري */}
+      {segments[0] !== '(auth)' && !showMaintenance && !showForceUpdate && <GlobalBottomNav />}
     </>
   );
 };
@@ -143,7 +144,8 @@ const AuthGuard = () => {
 export default function RootLayout() {
   
   // ✅ إعداد معالجات الإشعارات والتطبيق
-useEffect(() => { // ✅ صحيح    // إعداد معالجات النقر على الإشعارات
+  useEffect(() => {
+    // إعداد معالجات النقر على الإشعارات
     const { removeReceivedListener, removeResponseListener } = setupNotificationHandlers();
 
     // التعامل مع حالة التطبيق (عندما يعود المستخدم للتطبيق)

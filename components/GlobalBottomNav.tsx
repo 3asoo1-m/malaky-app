@@ -4,24 +4,33 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 
+// ✅ تعريف النوع
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
 const navItems = [
   { name: 'home', href: '/(tabs)/', icon: 'home-outline', iconFocused: 'home' },
+  { name: 'favorites', href: '/(tabs)/favorites', icon: 'heart-outline', iconFocused: 'heart' },
   { name: 'cart', href: '/(tabs)/cart', icon: 'cart-outline', iconFocused: 'cart' },
-  { name: 'notifications', href: '/(tabs)/notifications', icon: 'notifications-outline', iconFocused: 'notifications' },
   { name: 'profile', href: '/(tabs)/profile', icon: 'person-outline', iconFocused: 'person' },
-] as const;
+];
 
 export default function GlobalBottomNav() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // ✅ تحديد التبويب النشط بناءً على المسار الحالي
   const getActiveTab = () => {
     if (pathname === '/' || pathname === '/(tabs)') return 'home';
+    if (pathname.includes('favorites')) return 'favorites';
     if (pathname.includes('cart')) return 'cart';
-    if (pathname.includes('notifications')) return 'notifications';
     if (pathname.includes('/profile') || pathname.includes('/orders')) return 'profile';
     return 'home';
+  };
+
+  // ✅ دالة محسنة مع النوع الصحيح
+  const getIconName = (routeName: string, focused: boolean): IconName => {
+    const item = navItems.find(item => item.name === routeName);
+    if (!item) return 'ellipse';
+    return focused ? item.iconFocused as IconName : item.icon as IconName;
   };
 
   const activeTab = getActiveTab();
@@ -38,7 +47,7 @@ export default function GlobalBottomNav() {
             onPress={() => router.push(item.href as any)}
           >
             <Ionicons
-              name={isActive ? item.iconFocused : item.icon}
+              name={isActive ? item.iconFocused as IconName : item.icon as IconName} // ✅ الحل
               size={28}
               color="#fff"
             />
