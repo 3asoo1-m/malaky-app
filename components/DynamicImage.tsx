@@ -1,4 +1,4 @@
-// مسار الملف: components/DynamicImage.tsx
+// مسار الملف:    components/DynamicImage.tsx
 
 import React, { useState, useEffect } from 'react';
 import { Image, StyleSheet, View, ActivityIndicator, ImageSourcePropType, ImageURISource } from 'react-native';
