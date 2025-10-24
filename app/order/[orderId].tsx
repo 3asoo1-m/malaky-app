@@ -318,7 +318,7 @@ export default function OrderDetailsScreen() {
   }, [fetchOrderDetails]);
 
   const handleBack = useCallback(() => {
-    router.back();
+    router.navigate('/orders');
   }, [router]);
 
   const handleRetry = useCallback(() => {

@@ -280,7 +280,7 @@ export default function OrdersScreen() {
   }, [orders]);
 
   const handleBack = useCallback(() => {
-    router.back();
+    router.navigate('/(tabs)/profile');
   }, [router]);
 
   const handleRefresh = useCallback(() => {

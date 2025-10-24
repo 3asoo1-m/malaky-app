@@ -299,8 +299,11 @@ export default function CartScreen() {
   }, [setOrderType, setSelectedAddress, setSelectedBranch]);
 
   const handleAddAddress = useCallback(() => {
-    router.push({ pathname: '/addresses', params: { fromCart: 'true' } });
-  }, [router]);
+  router.push({ 
+    pathname: '/(tabs)/addresses',  // ✅ صحح المسار
+    params: { from: 'cart' }         // ✅ استخدم from بدل fromCart
+  });
+}, [router]);
 
   const handleItemPress = useCallback((item: CartItem) => {
     router.push(`/item/${item.product.id}`);

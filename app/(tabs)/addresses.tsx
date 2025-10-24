@@ -42,7 +42,7 @@ export default function AddressesScreen() {
   // 2. الحصول على دالة التحديث وقراءة معلمات التوجيه
   const { setSelectedAddress } = useCart();
   const params = useLocalSearchParams();
-  const isSelectionMode = params.fromCart === 'true';
+const isSelectionMode = params.from === 'cart';
 
   useFocusEffect(
     useCallback(() => {

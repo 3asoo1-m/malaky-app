@@ -103,7 +103,11 @@ export default function ProfileScreen() {
           <ProfileListItem
             icon={<Ionicons name="location-outline" size={scale(22)} color="#555" />}
             text="عناويني"
-            onPress={() => router.push('/addresses')} />
+             onPress={() => router.push({
+    pathname: '/(tabs)/addresses',
+    params: { from: 'profile' } // ✅ أضف هذا
+  })}
+/>
           <ProfileListItem
             icon={<Ionicons name="heart-outline" size={scale(22)} color="#555" />}
             text="المفضلة"
