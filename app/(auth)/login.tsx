@@ -25,7 +25,7 @@ export default function LoginScreen() {
     // ✅ 2. إضافة حالة جديدة لطريقة التسجيل وحالة للبريد الإلكتروني
     const [authMethod, setAuthMethod] = useState<AuthMethod>('phone');
     const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('+972');
+    const [phone, setPhone] = useState('05');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -45,7 +45,15 @@ export default function LoginScreen() {
                 setErrorText('يرجى إدخال رقم الهاتف وكلمة المرور.');
                 return;
             }
-            credentials = { phone, password };
+
+            const phoneRegex = /^05[0-9]{8}$/;
+        if (!phoneRegex.test(phone)) {
+            setErrorText('الرجاء إدخال رقم هاتف صحيح (يبدأ بـ 05 ويتكون من 10 أرقام)');
+            return;
+        }
+
+            const internationalPhone = phone.replace(/^0/, '+972');
+            credentials = { phone: internationalPhone, password };
         } else {
             if (!email || !password) {
                 setErrorText('يرجى إدخال البريد الإلكتروني وكلمة المرور.');
@@ -140,6 +148,7 @@ export default function LoginScreen() {
                                 autoCapitalize="none"
                                 placeholderTextColor={COLORS.gray}
                                 onFocus={() => handleFocus(phoneRef)}
+                                maxLength={10}
                             />
                         </View>
                     ) : (

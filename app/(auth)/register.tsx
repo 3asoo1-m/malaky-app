@@ -628,13 +628,13 @@ const styles = StyleSheet.create({
     fontSize: 26, 
     fontWeight: 'bold', 
     color: COLORS.darkGray, 
-    textAlign: 'right', 
+    textAlign: 'left', 
     marginBottom: 8 
   },
   subtitle: { 
     fontSize: 16, 
     color: COLORS.gray, 
-    textAlign: 'right', 
+    textAlign: 'left', 
     marginBottom: 20 
   },
 
