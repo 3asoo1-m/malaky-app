@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
     borderBottomWidth: 1, 
     borderBottomColor: '#eee',
-    // التأكد من أن الهيدر ثابت في الأعلى
+    // التأكد من أن الهيدر ثابت في الأعلى اوككيي
   },
     wizardTitle: { fontSize: 16,
     fontWeight: 'bold',
