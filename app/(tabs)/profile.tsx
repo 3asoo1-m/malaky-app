@@ -98,8 +98,7 @@ export default function ProfileScreen() {
           <ProfileListItem
             icon={<Ionicons name="person-outline" size={scale(22)} color="#555" />}
             text="تعديل الملف الشخصي"
-            onPress={() => { /* لاحقًا */ }}
-          />
+            onPress={() => router.push('/(modal)/edit-profile')}/>
           <ProfileListItem
             icon={<Ionicons name="location-outline" size={scale(22)} color="#555" />}
             text="عناويني"

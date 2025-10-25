@@ -95,7 +95,7 @@ export default function RegisterScreen() {
   // ✅ حالات التطبيق
   const [authMethod, setAuthMethod] = useState<AuthMethod>('phone');
   const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('+9725');
+  const [phoneNumber, setPhoneNumber] = useState('05');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -127,7 +127,7 @@ export default function RegisterScreen() {
     const minLength = pass.length >= 8;
     const hasUpper = /[A-Z]/.test(pass);
     const hasLower = /[a-z]/.test(pass);
-    const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    const hasSymbol = /[!@#$%^&*(),.?":{}_|<>]/.test(pass);
 
     setPasswordValidation({ minLength, hasUpper, hasLower, hasSymbol });
     return minLength && hasUpper && hasLower && hasSymbol;
@@ -155,8 +155,8 @@ export default function RegisterScreen() {
 
       case 'phone':
         if (!value.trim()) return 'الرجاء إدخال رقم الهاتف';
-        const phoneRegex = /^\+972[5][0-9]{8}$/;
-        if (!phoneRegex.test(value)) return 'الرجاء إدخال رقم هاتف فلسطيني صحيح (يبدأ بـ +9725)';
+        const phoneRegex = /^05[0-9]{8}$/;
+        if (!phoneRegex.test(value)) return 'الرجاء إدخال رقم هاتف فلسطيني صحيح (يبدأ بـ 05)';
         return '';
 
       case 'password':
@@ -219,7 +219,7 @@ export default function RegisterScreen() {
     setAuthMethod(method);
     // مسح الحقول عند التبديل
     setEmail('');
-    setPhoneNumber('+9725');
+    setPhoneNumber('05');
     setPassword('');
     setConfirmPassword('');
     setFormErrors({});
@@ -277,7 +277,8 @@ export default function RegisterScreen() {
 
       let finalCredentials;
       if (authMethod === 'phone') {
-        finalCredentials = { ...credentials, phone: phoneNumber };
+        const internationalPhone = phoneNumber.replace(/^0/, '+972');
+        finalCredentials = { ...credentials, phone: internationalPhone };
       } else {
         finalCredentials = { ...credentials, email: email.trim() };
       }
@@ -286,7 +287,6 @@ export default function RegisterScreen() {
 
       if (error) {
         let errorMessage = error.message;
-        // تحسين رسائل الخطأ للمستخدم
         if (error.message.includes('already registered')) {
           errorMessage = authMethod === 'email' 
             ? 'هذا البريد الإلكتروني مسجل مسبقاً' 
@@ -297,6 +297,24 @@ export default function RegisterScreen() {
       }
 
       if (data.user) {
+        const internationalPhone = authMethod === 'phone' ? phoneNumber.replace(/^0/, '+972') : null;
+
+        const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: data.user.id,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          full_name: `${firstName.trim()} ${lastName.trim()}`,
+          phone: authMethod === 'phone' ? internationalPhone : null,
+          email: authMethod === 'email' ? email.trim() : null,
+        });
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+        // لا نوقف العملية إذا فشل إنشاء البروفايل، نكتفي بتسجيل الخطأ
+      }
+
         if (authMethod === 'phone') {
           Alert.alert(
             'تم إرسال الرمز', 
@@ -304,7 +322,8 @@ export default function RegisterScreen() {
             [{ text: 'حسناً', onPress: () => {
               router.push({ 
                 pathname: '/(auth)/verify-otp', 
-                params: { phone: phoneNumber, type: 'signup' } 
+                params: { phone: internationalPhone,
+                   type: 'signup' } 
               });
             }}]
           );
@@ -451,7 +470,7 @@ export default function RegisterScreen() {
                 <TextInput
                   ref={phoneRef}
                   style={styles.inputField}
-                  placeholder="رقم الهاتف (+9725xxxxxxxx)"
+                  placeholder="رقم الهاتف (05)"
                   value={phoneNumber}
                   onChangeText={(value) => handleFieldChange('phone', value)}
                   onBlur={() => handleFieldBlur('phone')}
@@ -461,6 +480,7 @@ export default function RegisterScreen() {
                   onFocus={() => handleFocus(phoneRef)}
                   returnKeyType="next"
                   onSubmitEditing={() => passwordRef.current?.focus()}
+                  maxLength={10} 
                 />
               </View>
               <ErrorMessage message={formErrors.phone} />

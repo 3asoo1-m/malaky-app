@@ -14,6 +14,15 @@ export default function ModalLayout() {
           headerShown: false, 
         }} 
       />
+      <Stack.Screen 
+        name="edit-profile" 
+        options={{ 
+          presentation: 'modal',
+          // ✅ إخفاء الهيدر الافتراضي
+          headerShown: false, 
+        }} 
+      />
     </Stack>
+    
   );
 }
