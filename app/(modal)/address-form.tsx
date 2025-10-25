@@ -18,9 +18,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import RNPickerSelect from 'react-native-picker-select'; // ✅ 1. استيراد المكتبة
+import RNPickerSelect from 'react-native-picker-select';
 
-// ✅ 2. تعريف أنواع البيانات التي سنجلبها
 interface Zone {
   id: number;
   city: string;
@@ -32,7 +31,11 @@ export default function AddressFormScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const { address: addressString } = useLocalSearchParams<{ address?: string }>();
+  const params = useLocalSearchParams();
+  const addressString = params.address as string;
+  const returnTo = params.returnTo as string;
+  const fromCart = params.fromCart === 'true';
+  
   const existingAddress = addressString ? JSON.parse(addressString) : null;
   const isEditing = !!existingAddress;
 
@@ -40,7 +43,6 @@ export default function AddressFormScreen() {
   const [streetAddress, setStreetAddress] = useState(existingAddress?.street_address || '');
   const [notes, setNotes] = useState(existingAddress?.notes || '');
   
-  // ✅ 3. حالات جديدة للقوائم المنسدلة
   const [allZones, setAllZones] = useState<Zone[]>([]);
   const [cities, setCities] = useState<{ label: string; value: string }[]>([]);
   const [areas, setAreas] = useState<{ label: string; value: number }[]>([]);
@@ -49,9 +51,34 @@ export default function AddressFormScreen() {
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(existingAddress?.delivery_zone_id || null);
 
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // ✅ 4. جلب جميع المناطق عند تحميل الشاشة
+  // ✅ 1. دالة محسنة للعودة - تأخذ في الاعتبار مصدر الدخول
+  const handleBack = () => {
+    if (fromCart || returnTo === 'cart') {
+      // ✅ إذا أتى من السلة، ارجع مباشرة للسلة
+      router.navigate('/(tabs)/cart');
+    } else {
+      // ✅ وإلا ارجع للشاشة السابقة (العناوين)
+      router.back();
+    }
+  };
+
+  // ✅ 2. دالة محسنة للحفظ الناجح
+  const handleSaveSuccess = () => {
+    if (fromCart) {
+      // ✅ 6. عند العودة للسلة، أضف المعلمة الجديدة
+      router.navigate({
+        pathname: '/(tabs)/cart',
+        params: { reopenWizard: 'true' }
+      });
+    } else {
+      router.back();
+    }
+  };
+
+  // جلب جميع المناطق عند تحميل الشاشة
   useEffect(() => {
     const fetchZones = async () => {
       const { data, error } = await supabase
@@ -83,7 +110,7 @@ export default function AddressFormScreen() {
     fetchZones();
   }, []);
 
-  // ✅ 5. تحديث قائمة المناطق عند تغيير المدينة
+  // تحديث قائمة المناطق عند تغيير المدينة
   useEffect(() => {
     if (selectedCity) {
       const filteredAreas = allZones
@@ -111,7 +138,8 @@ export default function AddressFormScreen() {
 
   const onSubmit = async () => {
     if (!validate() || !user) return;
-    setLoading(true);
+    setSaving(true);
+    
     const addressData = {
       user_id: user.id,
       delivery_zone_id: selectedZoneId,
@@ -119,34 +147,62 @@ export default function AddressFormScreen() {
       notes: notes,
     };
 
-    const { error } = isEditing
-      ? await supabase.from('user_addresses').update(addressData).eq('id', existingAddress.id)
-      : await supabase.from('user_addresses').insert(addressData);
+    try {
+      const { error } = isEditing
+        ? await supabase.from('user_addresses').update(addressData).eq('id', existingAddress.id)
+        : await supabase.from('user_addresses').insert(addressData);
 
-    if (error) {
-      Alert.alert('خطأ', error.message);
-    } else {
-      router.back();
+      if (error) {
+        Alert.alert('خطأ', error.message);
+      } else {
+        Alert.alert(
+          'نجاح',
+          isEditing ? 'تم تحديث العنوان بنجاح' : 'تم إضافة العنوان بنجاح',
+          [
+            {
+              text: 'موافق',
+              onPress: handleSaveSuccess // ✅ استخدام الدالة المحسنة
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert('خطأ', 'حدث خطأ أثناء حفظ العنوان');
+    } finally {
+      setSaving(false);
     }
-    setLoading(false);
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      {/* ✅ 3. تحديث الهيدر لاستخدام دالة handleBack المحسنة */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{isEditing ? 'تعديل العنوان' : 'إضافة عنوان جديد'}</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-          <Ionicons name="close" size={28} color="#333" />
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>{isEditing ? 'تعديل العنوان' : 'إضافة عنوان جديد'}</Text>
+        <View style={{ width: 24 }} />
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {loading ? (
-            <ActivityIndicator size="large" />
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#C62828" />
+              <Text style={styles.loadingText}>جاري تحميل البيانات...</Text>
+            </View>
           ) : (
             <>
-              {/* ✅ 6. استخدام RNPickerSelect للمدينة */}
+              {/* ✅ 4. إضافة مؤشر إذا أتى من السلة */}
+              {(fromCart || returnTo === 'cart') && (
+                <View style={styles.infoBox}>
+                  <Ionicons name="information-circle-outline" size={20} color="#1976D2" />
+                  <Text style={styles.infoText}>
+                    سيتم إرجاعك تلقائيًا لاستكمال الطلب بعد إضافة العنوان
+                  </Text>
+                </View>
+              )}
+
               <Text style={styles.label}>المدينة</Text>
               <RNPickerSelect
                 onValueChange={(value) => setSelectedCity(value)}
@@ -159,7 +215,6 @@ export default function AddressFormScreen() {
               />
               {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
 
-              {/* ✅ 7. استخدام RNPickerSelect للمنطقة */}
               <Text style={styles.label}>المنطقة</Text>
               <RNPickerSelect
                 onValueChange={(value) => setSelectedZoneId(value)}
@@ -167,7 +222,7 @@ export default function AddressFormScreen() {
                 value={selectedZoneId}
                 placeholder={{ label: 'اختر منطقتك...', value: null }}
                 style={pickerSelectStyles}
-                disabled={!selectedCity} // تعطيل حتى يتم اختيار مدينة
+                disabled={!selectedCity}
                 useNativeAndroidPickerStyle={false}
                 Icon={() => <Ionicons name="chevron-down" size={20} color="#888" />}
               />
@@ -187,12 +242,32 @@ export default function AddressFormScreen() {
                 value={notes}
                 onChangeText={setNotes}
                 placeholder="مثال: المدخل خلفي، الطابق الثالث"
-                style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+                style={[styles.input, styles.textArea]}
                 multiline
+                numberOfLines={4}
               />
 
-              <TouchableOpacity style={styles.button} onPress={onSubmit} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isEditing ? 'حفظ التعديلات' : 'إضافة العنوان'}</Text>}
+              <TouchableOpacity 
+                style={[styles.button, saving && styles.buttonDisabled]} 
+                onPress={onSubmit} 
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>
+                    {isEditing ? 'حفظ التعديلات' : 'إضافة العنوان'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {/* ✅ 5. زر إلغاء محسن */}
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={handleBack}
+                disabled={saving}
+              >
+                <Text style={styles.cancelButtonText}>إلغاء</Text>
               </TouchableOpacity>
             </>
           )}
@@ -204,19 +279,114 @@ export default function AddressFormScreen() {
 
 // --- التنسيقات ---
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9F9F9' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', backgroundColor: '#fff' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  closeButton: { position: 'absolute', left: 16 },
-  scrollContainer: { padding: 24, paddingBottom: 50 },
-  label: { fontSize: 15, fontWeight: '600', color: '#555', marginBottom: 8, textAlign: 'left' },
-  input: { backgroundColor: '#fff', padding: 15, borderRadius: 10, fontSize: 16, textAlign: 'right', borderWidth: 1, borderColor: '#ddd', marginBottom: 20 },
-  button: { backgroundColor: '#C62828', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 16 },
-  buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  errorText: { color: '#E53935', marginTop: -10, marginBottom: 10, textAlign: 'left', fontSize: 13 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#F9F9F9' 
+  },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    padding: 16, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#F0F0F0', 
+    backgroundColor: '#fff' 
+  },
+  headerTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: '#333' 
+  },
+  backButton: { 
+    padding: 4 
+  },
+  scrollContainer: { 
+    padding: 24, 
+    paddingBottom: 50 
+  },
+  label: { 
+    fontSize: 15, 
+    fontWeight: '600', 
+    color: '#555', 
+    marginBottom: 8, 
+    textAlign: 'left' 
+  },
+  input: { 
+    backgroundColor: '#fff', 
+    padding: 15, 
+    borderRadius: 10, 
+    fontSize: 16, 
+    textAlign: 'right', 
+    borderWidth: 1, 
+    borderColor: '#ddd', 
+    marginBottom: 20 
+  },
+  textArea: {
+    height: 100, 
+    textAlignVertical: 'top'
+  },
+  button: { 
+    backgroundColor: '#C62828', 
+    padding: 16, 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    marginTop: 16 
+  },
+  buttonDisabled: {
+    backgroundColor: '#BDBDBD'
+  },
+  buttonText: { 
+    color: '#fff', 
+    fontSize: 18, 
+    fontWeight: 'bold' 
+  },
+  cancelButton: {
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 12
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '500'
+  },
+  errorText: { 
+    color: '#E53935', 
+    marginTop: -10, 
+    marginBottom: 10, 
+    textAlign: 'left', 
+    fontSize: 13 
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 16
+  },
+  // ✅ 6. تنسيقات جديدة للمربع المعلوماتي
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
+    marginBottom: 20
+  },
+  infoText: {
+    color: '#1976D2',
+    marginLeft: 8,
+    fontSize: 14,
+    flex: 1
+  }
 });
 
-// ✅ 8. تنسيقات خاصة بمكتبة RNPickerSelect
+// تنسيقات خاصة بمكتبة RNPickerSelect
 const pickerSelectStyles = StyleSheet.create({
   inputIOS: {
     fontSize: 16,
@@ -226,7 +396,7 @@ const pickerSelectStyles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 10,
     color: 'black',
-    paddingRight: 30, // to ensure the text is never behind the icon
+    paddingRight: 30,
     backgroundColor: '#fff',
     marginBottom: 20,
     textAlign: 'right',
@@ -239,7 +409,7 @@ const pickerSelectStyles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 10,
     color: 'black',
-    paddingRight: 30, // to ensure the text is never behind the icon
+    paddingRight: 30,
     backgroundColor: '#fff',
     marginBottom: 20,
     textAlign: 'right',

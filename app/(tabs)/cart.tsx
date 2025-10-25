@@ -1,3 +1,5 @@
+// مسار الملف: app/(tabs)/cart.tsx
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
@@ -11,7 +13,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCart } from '@/lib/useCart';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import CustomBottomNav from '@/components/CustomBottomNav';
@@ -30,7 +32,7 @@ import {
   BranchSectionProps 
 } from '@/lib/types';
 
-//------------------------
+// --- المكونات الفرعية (تبقى كما هي) ---
 const AddressItem = React.memo(({ address, isSelected, onSelect }: AddressItemProps) => (
   <TouchableOpacity
     style={[styles.locationOption, isSelected && styles.locationOptionSelected]}
@@ -40,6 +42,11 @@ const AddressItem = React.memo(({ address, isSelected, onSelect }: AddressItemPr
     <View style={styles.addressTextContainer}>
       <Text style={styles.addressLine1}>{address.delivery_zones?.area_name || 'منطقة غير محددة'}</Text>
       <Text style={styles.addressCity}>{`${address.delivery_zones?.city}, ${address.street_address}`}</Text>
+      {address.delivery_zones?.delivery_price !== undefined && (
+        <Text style={styles.deliveryPrice}>
+          رسوم التوصيل: {address.delivery_zones.delivery_price.toFixed(2)} ₪
+        </Text>
+      )}
     </View>
   </TouchableOpacity>
 ));
@@ -70,7 +77,7 @@ const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: Car
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.cartItemContainer}>
-      <TouchableOpacity onPress={() => onRemove(item.id)} style={styles.deleteButton}>
+      <TouchableOpacity onPress={( ) => onRemove(item.id)} style={styles.deleteButton}>
         <Ionicons name="close-circle" size={24} color="#e22b2bc9" />
       </TouchableOpacity>
       <Image source={{ uri: imageUrl }} style={styles.itemImage} />
@@ -78,7 +85,6 @@ const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: Car
         <Text style={styles.itemName}>{item.product.name}</Text>
         {optionLabels.length > 0 && (<Text style={styles.optionsText}>{optionLabels}</Text>)}
         
-        {/* ✅ عرض القطع الإضافية */}
         {item.additionalPieces && item.additionalPieces.length > 0 && (
           <View style={styles.additionalPiecesContainer}>
             {item.additionalPieces.map((piece, index) => (
@@ -141,30 +147,38 @@ const AddressSection = React.memo(({
   
   if (loadingAddresses) return <ActivityIndicator style={{ marginVertical: 20 }} color="#C62828" />;
   
-  if (availableAddresses.length === 0) {
-    return (
-      <TouchableOpacity style={styles.noAddressContainer} onPress={onAddAddress}>
-        <Ionicons name="add-circle-outline" size={24} color="#C62828" />
-        <Text style={styles.noAddressText}>لا يوجد عناوين. أضف عنوانًا للتوصيل.</Text>
-      </TouchableOpacity>
-    );
-  }
-
   return (
     <View style={styles.addressSectionContainer}>
       <Text style={styles.sectionTitle}>اختر عنوان التوصيل</Text>
-      {availableAddresses.map(address => (
-        <AddressItem
-          key={address.id}
-          address={address}
-          isSelected={selectedAddress?.id === address.id}
-          onSelect={() => onSelectAddress(address)}
-        />
-      ))}
-      <TouchableOpacity style={styles.addAddressButton} onPress={onAddAddress}>
-        <Ionicons name="add" size={20} color="#C62828" />
-        <Text style={styles.addAddressText}>إضافة أو تعديل عنوان</Text>
-      </TouchableOpacity>
+      
+      {!selectedAddress && availableAddresses.length > 0 && (
+        <View style={styles.selectionWarning}>
+          <Ionicons name="warning-outline" size={18} color="#F9A825" />
+          <Text style={styles.selectionWarningText}>يجب اختيار عنوان التوصيل للمتابعة</Text>
+        </View>
+      )}
+      
+      {availableAddresses.length === 0 ? (
+        <TouchableOpacity style={styles.noAddressContainer} onPress={onAddAddress}>
+          <Ionicons name="add-circle-outline" size={24} color="#C62828" />
+          <Text style={styles.noAddressText}>لا يوجد عناوين. أضف عنوانًا للتوصيل.</Text>
+        </TouchableOpacity>
+      ) : (
+        <>
+          {availableAddresses.map(address => (
+            <AddressItem
+              key={address.id}
+              address={address}
+              isSelected={selectedAddress?.id === address.id}
+              onSelect={() => onSelectAddress(address)}
+            />
+          ))}
+          <TouchableOpacity style={styles.addAddressButton} onPress={onAddAddress}>
+            <Ionicons name="add" size={20} color="#C62828" />
+            <Text style={styles.addAddressText}>إضافة عنوان جديد</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 });
@@ -180,32 +194,41 @@ const BranchSection = React.memo(({
   
   if (loadingBranches) return <ActivityIndicator style={{ marginVertical: 20 }} color="#C62828" />;
   
-  if (availableBranches.length === 0) {
-    return (
-      <View style={styles.noAddressContainer}>
-        <Text style={styles.noAddressText}>لا توجد فروع متاحة للاستلام حاليًا.</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.addressSectionContainer}>
       <Text style={styles.sectionTitle}>اختر فرع الاستلام</Text>
-      {availableBranches.map(branch => (
-        <BranchItem
-          key={branch.id}
-          branch={branch}
-          isSelected={selectedBranch?.id === branch.id}
-          onSelect={() => onSelectBranch(branch)}
-        />
-      ))}
+      
+      {!selectedBranch && availableBranches.length > 0 && (
+        <View style={styles.selectionWarning}>
+          <Ionicons name="warning-outline" size={18} color="#F9A825" />
+          <Text style={styles.selectionWarningText}>يجب اختيار فرع الاستلام للمتابعة</Text>
+        </View>
+      )}
+      
+      {availableBranches.length === 0 ? (
+        <View style={styles.noAddressContainer}>
+          <Text style={styles.noAddressText}>لا توجد فروع متاحة للاستلام حاليًا.</Text>
+        </View>
+      ) : (
+        availableBranches.map(branch => (
+          <BranchItem
+            key={branch.id}
+            branch={branch}
+            isSelected={selectedBranch?.id === branch.id}
+            onSelect={() => onSelectBranch(branch)}
+          />
+        ))
+      )}
     </View>
   );
 });
 
+
+// --- المكون الرئيسي (CartScreen) ---
 export default function CartScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const params = useLocalSearchParams(); // ✅ 1. قراءة المعلمات من المسار
 
   const {
     items, updateQuantity, removeFromCart, subtotal,
@@ -213,7 +236,6 @@ export default function CartScreen() {
     selectedBranch, setSelectedBranch, clearCart,
   } = useCart();
 
-  // ✅ احسب الأسعار مباشرة بدون state
   const deliveryPrice = orderType === 'delivery' && selectedAddress?.delivery_zones 
     ? selectedAddress.delivery_zones.delivery_price 
     : 0;
@@ -225,14 +247,30 @@ export default function CartScreen() {
   const [availableBranches, setAvailableBranches] = useState<Branch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [isPlacingOrder, setPlacingOrder] = useState(false);
-
   const [isCheckoutModalVisible, setCheckoutModalVisible] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState(1);
-
-  // ✅ إضافة caching للبيانات
   const [isDataCached, setDataCached] = useState({ addresses: false, branches: false });
 
-  // ✅ استخدام useCallback للـ functions
+  // ✅ 2. تعديل useFocusEffect ليعتمد على params
+  useFocusEffect(
+    useCallback(() => {
+      // التحقق من المعلمة القادمة عند التركيز على الشاشة
+      if (params.reopenWizard === 'true' && items.length > 0 && !isCheckoutModalVisible) {
+        
+        const timer = setTimeout(() => {
+          setCheckoutModalVisible(true);
+          setCheckoutStep(2);
+          
+          // مهم: "تنظيف" المعلمة بعد استخدامها لمنع إعادة الفتح في كل مرة
+          router.setParams({ reopenWizard: 'false' }); 
+          
+        }, 300);
+        
+        return () => clearTimeout(timer);
+      }
+    }, [params.reopenWizard, items.length, isCheckoutModalVisible])
+  );
+
   const fetchAddresses = useCallback(async () => {
     if (!user) return;
     setLoadingAddresses(true);
@@ -251,12 +289,9 @@ export default function CartScreen() {
         delivery_zones: Array.isArray(addr.delivery_zones) ? addr.delivery_zones[0] || null : addr.delivery_zones 
       }));
       setAvailableAddresses(formattedData);
-      if (formattedData.length === 0) { 
-        setSelectedAddress(null); 
-      }
     }
     setLoadingAddresses(false);
-  }, [user, setSelectedAddress]);
+  }, [user]);
 
   const fetchBranches = useCallback(async () => {
     setLoadingBranches(true);
@@ -269,18 +304,14 @@ export default function CartScreen() {
     setLoadingBranches(false);
   }, []);
 
-  // ✅ تحسين useFocusEffect مع caching
   useFocusEffect(useCallback(() => {
-    if (orderType === 'delivery' && !isDataCached.addresses) {
+    if (orderType === 'delivery') {
       fetchAddresses();
-      setDataCached(prev => ({...prev, addresses: true}));
-    } else if (orderType === 'pickup' && !isDataCached.branches) {
+    } else if (orderType === 'pickup') {
       fetchBranches();
-      setDataCached(prev => ({...prev, branches: true}));
     }
-  }, [orderType, fetchAddresses, fetchBranches, isDataCached]));
+  }, [orderType, fetchAddresses, fetchBranches]));
 
-  // ✅ useCallback لـ event handlers
   const handleSelectAddress = useCallback((address: Address) => {
     setSelectedAddress(address);
   }, [setSelectedAddress]);
@@ -298,12 +329,16 @@ export default function CartScreen() {
     }
   }, [setOrderType, setSelectedAddress, setSelectedBranch]);
 
+  // ✅ 3. تبسيط دالة handleAddAddress
   const handleAddAddress = useCallback(() => {
-  router.push({ 
-    pathname: '/(tabs)/addresses',  // ✅ صحح المسار
-    params: { from: 'cart' }         // ✅ استخدم from بدل fromCart
-  });
-}, [router]);
+    setCheckoutModalVisible(false); // أغلق الـ Modal الحالي قبل المغادرة
+    
+    // فقط انتقل، لا حاجة لتحديث أي حالة هنا
+    router.push({ 
+      pathname: '/(tabs)/addresses',
+      params: { fromCart: 'true' }
+    });
+  }, [router]);
 
   const handleItemPress = useCallback((item: CartItem) => {
     router.push(`/item/${item.product.id}`);
@@ -317,7 +352,6 @@ export default function CartScreen() {
     removeFromCart(itemId);
   }, [removeFromCart]);
 
-  // ✅ تحديث الـ handleCheckout لدعم القطع الإضافية
   const handleCheckout = useCallback(async () => {
     if (isPlacingOrder) return;
     
@@ -328,6 +362,16 @@ export default function CartScreen() {
     
     if (items.length === 0) {
       Alert.alert('خطأ', 'سلتك فارغة!');
+      return;
+    }
+
+    if (orderType === 'delivery' && !selectedAddress) {
+      Alert.alert('خطأ', 'يجب اختيار عنوان التوصيل أولاً.');
+      return;
+    }
+
+    if (orderType === 'pickup' && !selectedBranch) {
+      Alert.alert('خطأ', 'يجب اختيار فرع الاستلام أولاً.');
       return;
     }
 
@@ -352,7 +396,6 @@ export default function CartScreen() {
 
       const orderId = orderData.id;
 
-      // ✅ تحديث orderItems لتشمل القطع الإضافية
       const orderItems = items.map(cartItem => ({
         order_id: orderId,
         menu_item_id: cartItem.product.id,
@@ -382,7 +425,6 @@ export default function CartScreen() {
     }
   }, [isPlacingOrder, user, items, totalPrice, subtotal, deliveryPrice, orderType, selectedAddress, selectedBranch, clearCart, router]);
 
-  // ✅ استخدام useMemo للـ list data
   const renderItem = useCallback(({ item }: { item: CartItem }) => (
     <CartItemComponent
       item={item}
@@ -418,14 +460,21 @@ export default function CartScreen() {
           animationType="slide"
           transparent={true}
           visible={true}
-          onRequestClose={() => setCheckoutModalVisible(false)}
+          onRequestClose={() => {
+            setCheckoutModalVisible(false);
+          }}
         >
-          <Pressable style={styles.modalBackdrop} onPress={() => setCheckoutModalVisible(false)}>
+          <Pressable style={styles.modalBackdrop} onPress={() => {
+            setCheckoutModalVisible(false);
+          }}>
             <Pressable style={styles.wizardModalContainer} onPress={(e) => e.stopPropagation()}>
               <View style={styles.wizardHeader}>
                 <TouchableOpacity onPress={() => {
-                  if (checkoutStep > 1) setCheckoutStep(checkoutStep - 1);
-                  else setCheckoutModalVisible(false);
+                  if (checkoutStep > 1) {
+                    setCheckoutStep(checkoutStep - 1);
+                  } else {
+                    setCheckoutModalVisible(false);
+                  }
                 }}>
                   <Ionicons name="arrow-back" size={24} color="#333" />
                 </TouchableOpacity>
@@ -477,9 +526,9 @@ export default function CartScreen() {
                     <TouchableOpacity
                       style={[
                         styles.wizardButton,
-                        (orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch) && styles.disabledButton
+                        (orderType === 'delivery' && !selectedAddress) || (orderType === 'pickup' && !selectedBranch) ? styles.disabledButton : null
                       ]}
-                      disabled={orderType === 'delivery' && !selectedAddress || orderType === 'pickup' && !selectedBranch}
+                      disabled={(orderType === 'delivery' && !selectedAddress) || (orderType === 'pickup' && !selectedBranch)}
                       onPress={() => setCheckoutStep(3)}
                     >
                       <Text style={styles.checkoutButtonText}>التالي</Text>
@@ -558,6 +607,7 @@ export default function CartScreen() {
   );
 }
 
+// ... (التنسيقات تبقى كما هي بدون تغيير)
 const styles = StyleSheet.create({
   disabledButton: { backgroundColor: '#BDBDBD' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
@@ -570,7 +620,17 @@ const styles = StyleSheet.create({
   orderTypeText: { fontSize: 16, fontWeight: '600', color: '#333', marginLeft: 8 },
   orderTypeTextActive: { color: '#fff' },
   addressSectionContainer: { marginTop: 16, marginBottom: 16 },
-  noAddressContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFBEB', padding: 12, borderRadius: 10, marginTop: 10 },
+  noAddressContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#FFFBEB', 
+    padding: 16, 
+    borderRadius: 12, 
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#F9A825',
+    borderStyle: 'dashed',
+  },
   noAddressText: { color: '#F9A825', marginLeft: 8, fontWeight: '500' },
   cartItemContainer: { backgroundColor: '#fff', borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#eee' },
   itemImage: { width: 70, height: 70, borderRadius: 10 },
@@ -598,7 +658,6 @@ const styles = StyleSheet.create({
   optionsText: { fontSize: 13, color: '#666', textAlign: 'left', marginTop: 2 },
   notesText: { fontSize: 13, color: '#888', fontStyle: 'italic', textAlign: 'left', marginTop: 4 },
   
-  // ✅ تنسيقات القطع الإضافية الجديدة
   additionalPiecesContainer: {
     marginTop: 6,
     marginBottom: 4,
@@ -678,6 +737,7 @@ const styles = StyleSheet.create({
     borderColor: '#C62828',
     borderStyle: 'dashed',
     marginTop: 8,
+    backgroundColor: '#FFF8F8',
   },
   addAddressText: {
     color: '#C62828',
@@ -687,4 +747,26 @@ const styles = StyleSheet.create({
   addressTextContainer: { flex: 1, marginLeft: 12, alignItems: 'flex-start' },
   addressLine1: { fontSize: 15, fontWeight: '600', color: '#333', textAlign: 'left' },
   addressCity: { fontSize: 13, color: '#777', marginTop: 2, textAlign: 'left' },
+  deliveryPrice: {
+    fontSize: 12,
+    color: '#4CAF50',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  selectionWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F9A825',
+    marginBottom: 12,
+  },
+  selectionWarningText: {
+    color: '#F9A825',
+    fontWeight: '500',
+    marginLeft: 8,
+    fontSize: 14,
+  },
 });
