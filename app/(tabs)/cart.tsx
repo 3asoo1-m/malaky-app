@@ -18,7 +18,7 @@ import { useCart } from '@/lib/useCart';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
-import { SafeAreaView } from 'react-native-safe-area-context'; // ✅ 1. استيراد SafeAreaView
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   CartItem, 
   OrderType, 
@@ -444,7 +444,6 @@ export default function CartScreen() {
             {items.length > 0 && <Text style={styles.itemsCount}>{items.length} منتجات</Text>}
         </View>
 
-        // في جزء الـ Modal داخل return
 {isCheckoutModalVisible && (
   <Modal
     animationType="slide"
