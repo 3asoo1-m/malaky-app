@@ -16,9 +16,9 @@ import {
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCart } from '@/lib/useCart';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-import CustomBottomNav from '@/components/CustomBottomNav';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
+import { SafeAreaView } from 'react-native-safe-area-context'; // ✅ 1. استيراد SafeAreaView
 import { 
   CartItem, 
   OrderType, 
@@ -31,6 +31,7 @@ import {
   AddressSectionProps,
   BranchSectionProps 
 } from '@/lib/types';
+import CustomBottomNav from '@/components/CustomBottomNav';
 
 // --- المكونات الفرعية (تبقى كما هي) ---
 const AddressItem = React.memo(({ address, isSelected, onSelect }: AddressItemProps) => (
@@ -228,7 +229,7 @@ const BranchSection = React.memo(({
 export default function CartScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const params = useLocalSearchParams(); // ✅ 1. قراءة المعلمات من المسار
+  const params = useLocalSearchParams();
 
   const {
     items, updateQuantity, removeFromCart, subtotal,
@@ -249,23 +250,15 @@ export default function CartScreen() {
   const [isPlacingOrder, setPlacingOrder] = useState(false);
   const [isCheckoutModalVisible, setCheckoutModalVisible] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState(1);
-  const [isDataCached, setDataCached] = useState({ addresses: false, branches: false });
 
-  // ✅ 2. تعديل useFocusEffect ليعتمد على params
   useFocusEffect(
     useCallback(() => {
-      // التحقق من المعلمة القادمة عند التركيز على الشاشة
       if (params.reopenWizard === 'true' && items.length > 0 && !isCheckoutModalVisible) {
-        
         const timer = setTimeout(() => {
           setCheckoutModalVisible(true);
           setCheckoutStep(2);
-          
-          // مهم: "تنظيف" المعلمة بعد استخدامها لمنع إعادة الفتح في كل مرة
           router.setParams({ reopenWizard: 'false' }); 
-          
         }, 300);
-        
         return () => clearTimeout(timer);
       }
     }, [params.reopenWizard, items.length, isCheckoutModalVisible])
@@ -329,11 +322,8 @@ export default function CartScreen() {
     }
   }, [setOrderType, setSelectedAddress, setSelectedBranch]);
 
-  // ✅ 3. تبسيط دالة handleAddAddress
   const handleAddAddress = useCallback(() => {
-    setCheckoutModalVisible(false); // أغلق الـ Modal الحالي قبل المغادرة
-    
-    // فقط انتقل، لا حاجة لتحديث أي حالة هنا
+    setCheckoutModalVisible(false);
     router.push({ 
       pathname: '/(tabs)/addresses',
       params: { fromCart: 'true' }
@@ -436,13 +426,6 @@ export default function CartScreen() {
 
   const keyExtractor = useCallback((item: CartItem) => item.id, []);
 
-  const listHeaderComponent = useMemo(() => (
-    <>
-      <Text style={styles.headerTitle}>سلتي</Text>
-      {items.length > 0 && <Text style={styles.sectionTitle}>المنتجات</Text>}
-    </>
-  ), [items.length]);
-
   const listEmptyComponent = useMemo(() => (
     <View style={styles.emptyContainer}>
       <Ionicons name="cart-outline" size={80} color="#ccc" />
@@ -454,166 +437,202 @@ export default function CartScreen() {
   ), [router]);
 
   return (
-    <View style={styles.container}>
-      {isCheckoutModalVisible && (
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={true}
-          onRequestClose={() => {
-            setCheckoutModalVisible(false);
-          }}
-        >
-          <Pressable style={styles.modalBackdrop} onPress={() => {
-            setCheckoutModalVisible(false);
-          }}>
-            <Pressable style={styles.wizardModalContainer} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.wizardHeader}>
-                <TouchableOpacity onPress={() => {
-                  if (checkoutStep > 1) {
-                    setCheckoutStep(checkoutStep - 1);
-                  } else {
-                    setCheckoutModalVisible(false);
-                  }
-                }}>
-                  <Ionicons name="arrow-back" size={24} color="#333" />
-                </TouchableOpacity>
-                <Text style={styles.wizardTitle}>
-                  {checkoutStep === 1 && 'اختر نوع الطلب'}
-                  {checkoutStep === 2 && (orderType === 'delivery' ? 'اختر عنوان التوصيل' : 'اختر فرع الاستلام')}
-                  {checkoutStep === 3 && 'تأكيد الطلب'}
-                </Text>
-                <View style={{ width: 24 }} />
-              </View>
-
-              <View style={styles.wizardContent}>
-                {checkoutStep === 1 && (
-                  <View>
-                    <OrderTypeSelector 
-                      orderType={orderType} 
-                      onTypeChange={handleOrderTypeChange} 
-                    />
-                    <TouchableOpacity
-                      style={[styles.wizardButton, !orderType && styles.disabledButton]}
-                      disabled={!orderType}
-                      onPress={() => setCheckoutStep(2)}
-                    >
-                      <Text style={styles.checkoutButtonText}>التالي</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {checkoutStep === 2 && (
-                  <View>
-                    {orderType === 'delivery' ? (
-                      <AddressSection
-                        orderType={orderType}
-                        loadingAddresses={loadingAddresses}
-                        availableAddresses={availableAddresses}
-                        selectedAddress={selectedAddress}
-                        onSelectAddress={handleSelectAddress}
-                        onAddAddress={handleAddAddress}
-                      />
-                    ) : (
-                      <BranchSection
-                        orderType={orderType}
-                        loadingBranches={loadingBranches}
-                        availableBranches={availableBranches}
-                        selectedBranch={selectedBranch}
-                        onSelectBranch={handleSelectBranch}
-                      />
-                    )}
-                    <TouchableOpacity
-                      style={[
-                        styles.wizardButton,
-                        (orderType === 'delivery' && !selectedAddress) || (orderType === 'pickup' && !selectedBranch) ? styles.disabledButton : null
-                      ]}
-                      disabled={(orderType === 'delivery' && !selectedAddress) || (orderType === 'pickup' && !selectedBranch)}
-                      onPress={() => setCheckoutStep(3)}
-                    >
-                      <Text style={styles.checkoutButtonText}>التالي</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {checkoutStep === 3 && (
-                  <View>
-                    <View style={styles.priceSummary}>
-                      <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>المجموع الفرعي</Text>
-                        <Text style={styles.priceValue}>{subtotal.toFixed(2)} ₪</Text>
-                      </View>
-                      {orderType === 'delivery' && (
-                        <View style={styles.priceRow}>
-                          <Text style={styles.priceLabel}>سعر التوصيل</Text>
-                          <Text style={styles.priceValue}>{deliveryPrice.toFixed(2)} ₪</Text>
-                        </View>
-                      )}
-                      <View style={[styles.priceRow, styles.totalRow]}>
-                        <Text style={styles.totalLabel}>المجموع الكلي</Text>
-                        <Text style={styles.totalPrice}>{totalPrice.toFixed(2)} ₪</Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.wizardButton, isPlacingOrder && styles.disabledButton]}
-                      disabled={isPlacingOrder}
-                      onPress={handleCheckout}
-                    >
-                      {isPlacingOrder ? <ActivityIndicator color="#fff" /> : <Text style={styles.checkoutButtonText}>تأكيد الطلب الآن</Text>}
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
-      )}
-
-      <FlatList
-        data={items}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={5}
-        updateCellsBatchingPeriod={50}
-        initialNumToRender={7}
-        windowSize={5}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 180 }}
-        ListHeaderComponent={listHeaderComponent}
-        ListEmptyComponent={listEmptyComponent}
-      />
-      
-      {items.length > 0 && (
-        <View style={styles.footer}>
-          <View style={styles.priceSummary}>
-            <View style={[styles.priceRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>المجموع الكلي</Text>
-              <Text style={styles.totalPrice}>{totalPrice.toFixed(2)} ₪</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.checkoutButton}
-            onPress={() => {
-              setCheckoutModalVisible(true);
-              setCheckoutStep(1);
-            }}
-          >
-            <Text style={styles.checkoutButtonText}>إتمام الطلب</Text>
-          </TouchableOpacity>
+    <View style={styles.fullScreen}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.header}>
+            <Text style={styles.headerTitle}>سلتي</Text>
+            {items.length > 0 && <Text style={styles.itemsCount}>{items.length} منتجات</Text>}
         </View>
-      )}
-      <CustomBottomNav />
+
+        {isCheckoutModalVisible && (
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={true}
+            onRequestClose={() => setCheckoutModalVisible(false)}
+          >
+            <Pressable style={styles.modalBackdrop} onPress={() => setCheckoutModalVisible(false)}>
+              <Pressable style={styles.wizardModalContainer} onPress={(e) => e.stopPropagation()}>
+                <View style={styles.wizardHeader}>
+                  <TouchableOpacity onPress={() => {
+                    if (checkoutStep > 1) setCheckoutStep(checkoutStep - 1);
+                    else setCheckoutModalVisible(false);
+                  }}>
+                    <Ionicons name="arrow-back" size={24} color="#333" />
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>
+                    {checkoutStep === 1 && 'اختر نوع الطلب'}
+                    {checkoutStep === 2 && (orderType === 'delivery' ? 'اختر عنوان التوصيل' : 'اختر فرع الاستلام')}
+                    {checkoutStep === 3 && 'تأكيد الطلب'}
+                  </Text>
+                  <View style={{ width: 24 }} />
+                </View>
+                <View style={styles.wizardContent}>
+                  {checkoutStep === 1 && (
+                    <View>
+                      <OrderTypeSelector orderType={orderType} onTypeChange={handleOrderTypeChange} />
+                      <TouchableOpacity
+                        style={[styles.wizardButton, !orderType && styles.disabledButton]}
+                        disabled={!orderType}
+                        onPress={() => setCheckoutStep(2)}
+                      >
+                        <Text style={styles.checkoutButtonText}>التالي</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {checkoutStep === 2 && (
+                    <View>
+                      {orderType === 'delivery' ? (
+                        <AddressSection
+                          orderType={orderType}
+                          loadingAddresses={loadingAddresses}
+                          availableAddresses={availableAddresses}
+                          selectedAddress={selectedAddress}
+                          onSelectAddress={handleSelectAddress}
+                          onAddAddress={handleAddAddress}
+                        />
+                      ) : (
+                        <BranchSection
+                          orderType={orderType}
+                          loadingBranches={loadingBranches}
+                          availableBranches={availableBranches}
+                          selectedBranch={selectedBranch}
+                          onSelectBranch={handleSelectBranch}
+                        />
+                      )}
+                      <TouchableOpacity
+                        style={[
+                          styles.wizardButton,
+                          (orderType === 'delivery' && !selectedAddress) || (orderType === 'pickup' && !selectedBranch) ? styles.disabledButton : null
+                        ]}
+                        disabled={(orderType === 'delivery' && !selectedAddress) || (orderType === 'pickup' && !selectedBranch)}
+                        onPress={() => setCheckoutStep(3)}
+                      >
+                        <Text style={styles.checkoutButtonText}>التالي</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {checkoutStep === 3 && (
+                    <View>
+                      <View style={styles.priceSummary}>
+                        <View style={styles.priceRow}>
+                          <Text style={styles.priceLabel}>المجموع الفرعي</Text>
+                          <Text style={styles.priceValue}>{subtotal.toFixed(2)} ₪</Text>
+                        </View>
+                        {orderType === 'delivery' && (
+                          <View style={styles.priceRow}>
+                            <Text style={styles.priceLabel}>سعر التوصيل</Text>
+                            <Text style={styles.priceValue}>{deliveryPrice.toFixed(2)} ₪</Text>
+                          </View>
+                        )}
+                        <View style={[styles.priceRow, styles.totalRow]}>
+                          <Text style={styles.totalLabel}>المجموع الكلي</Text>
+                          <Text style={styles.totalPrice}>{totalPrice.toFixed(2)} ₪</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.wizardButton, isPlacingOrder && styles.disabledButton]}
+                        disabled={isPlacingOrder}
+                        onPress={handleCheckout}
+                      >
+                        {isPlacingOrder ? <ActivityIndicator color="#fff" /> : <Text style={styles.checkoutButtonText}>تأكيد الطلب الآن</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
+
+        <FlatList
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={5}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={7}
+          windowSize={5}
+          contentContainerStyle={styles.listContentContainer}
+          ListHeaderComponent={
+            items.length > 0 ? <Text style={styles.sectionTitle}>المنتجات</Text> : null
+          }
+          ListEmptyComponent={listEmptyComponent}
+        />
+        
+        {items.length > 0 && (
+          <View style={styles.footer}>
+            <View style={styles.priceSummary}>
+              <View style={[styles.priceRow, styles.totalRow]}>
+                <Text style={styles.totalLabel}>المجموع الكلي</Text>
+                <Text style={styles.totalPrice}>{totalPrice.toFixed(2)} ₪</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.checkoutButton}
+              onPress={() => {
+                setCheckoutModalVisible(true);
+                setCheckoutStep(1);
+              }}
+            >
+              <Text style={styles.checkoutButtonText}>إتمام الطلب</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </SafeAreaView>
+       <CustomBottomNav />
     </View>
   );
 }
 
-// ... (التنسيقات تبقى كما هي بدون تغيير)
+// --- التنسيقات (Styles) ---
 const styles = StyleSheet.create({
+  fullScreen: {
+    flex: 1,
+    backgroundColor: '#F9F9F9',
+  },
+  safeArea: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontFamily: 'Cairo-Bold',
+    color: '#1A1A1A',
+  },
+  itemsCount: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular',
+    color: '#666',
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  sectionTitle: { 
+    fontSize: 18, 
+    fontWeight: '600', 
+    textAlign: 'left', 
+    marginBottom: 12, 
+    marginTop: 10,
+    color: '#333',
+    paddingHorizontal: 10,
+  },
+  listContentContainer: {
+    paddingHorizontal: 16, 
+    paddingBottom: 200,
+  },
   disabledButton: { backgroundColor: '#BDBDBD' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   container: { flex: 1, backgroundColor: '#F9F9F9' },
-  headerTitle: { fontSize: 32, fontWeight: 'bold', textAlign: 'left', marginBottom: 16, color: '#1A1A1A', marginTop: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', textAlign: 'left', marginBottom: 12, marginTop: 24, color: '#333' },
   orderTypeContainer: { flexDirection: 'row', backgroundColor: '#EFEFEF', borderRadius: 30, padding: 4 },
   orderTypeButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 26 },
   orderTypeActive: { backgroundColor: '#C62828' },
@@ -640,7 +659,18 @@ const styles = StyleSheet.create({
   quantityButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FEECEB', justifyContent: 'center', alignItems: 'center' },
   quantityText: { fontSize: 16, fontWeight: 'bold', marginHorizontal: 12 },
   itemPriceText: { fontSize: 15, fontWeight: 'bold', color: '#C62828', position: 'absolute', bottom: 7, right: 28 },
-  footer: { position: 'absolute', bottom: 85, left: 0, right: 0, backgroundColor: '#fff', padding: 16, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#eee', elevation: 10 },
+  footer: { 
+    position: 'absolute', 
+    bottom: 85, 
+    left: 0, 
+    right: 0, 
+    backgroundColor: '#fff', 
+    padding: 16, 
+    paddingTop: 20, 
+    borderTopWidth: 1, 
+    borderTopColor: '#eee', 
+    elevation: 10 
+  },
   priceSummary: { marginBottom: 16 },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   priceLabel: { fontSize: 15, color: '#666' },
@@ -657,62 +687,15 @@ const styles = StyleSheet.create({
   deleteButton: { position: 'absolute', top: 6, left: 6, zIndex: 1 },
   optionsText: { fontSize: 13, color: '#666', textAlign: 'left', marginTop: 2 },
   notesText: { fontSize: 13, color: '#888', fontStyle: 'italic', textAlign: 'left', marginTop: 4 },
-  
-  additionalPiecesContainer: {
-    marginTop: 6,
-    marginBottom: 4,
-    width: '100%',
-  },
-  additionalPieceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 2,
-    width: '100%',
-  },
-  additionalPieceText: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '500',
-  },
-  additionalPiecePrice: {
-    fontSize: 11,
-    color: '#4CAF50',
-    fontWeight: 'bold',
-  },
-  
-  wizardModalContainer: {
-    width: '100%',
-    backgroundColor: '#F9F9F9',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    position: 'absolute',
-    bottom: 0,
-  },
-  wizardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  wizardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  wizardContent: {
-    paddingVertical: 20,
-  },
-  wizardButton: {
-    backgroundColor: '#C62828',
-    padding: 16,
-    borderRadius: 15,
-    alignItems: 'center',
-    marginTop: 20,
-  },
+  additionalPiecesContainer: { marginTop: 6, marginBottom: 4, width: '100%', },
+  additionalPieceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, width: '100%', },
+  additionalPieceText: { fontSize: 12, color: '#4CAF50', fontWeight: '500', },
+  additionalPiecePrice: { fontSize: 11, color: '#4CAF50', fontWeight: 'bold', },
+  wizardModalContainer: { width: '100%', backgroundColor: '#F9F9F9', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, position: 'absolute', bottom: 0, },
+  wizardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#eee', },
+  wizardTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', },
+  wizardContent: { paddingVertical: 20, },
+  wizardButton: { backgroundColor: '#C62828', padding: 16, borderRadius: 15, alignItems: 'center', marginTop: 20, },
   locationOption: {
     flexDirection: 'row',
     alignItems: 'center',
