@@ -59,6 +59,8 @@ export interface Address {
   street_address: string;
   notes: string | null;
   created_at: string;
+  is_default: boolean;
+  address_name: string | null;
   delivery_zones: {
     city: string;
     area_name: string;

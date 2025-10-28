@@ -1,15 +1,26 @@
 // مسار الملف: app/(tabs)/orders.tsx
 
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Animated } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  ActivityIndicator, 
+  TouchableOpacity, 
+  Animated,
+  Image,
+  ScrollView
+} from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 
 // ✅ استيراد نظام التحليلات
 import { trackEvent, AnalyticsEvents } from '@/lib/analytics';
+import { scale, fontScale } from '@/lib/responsive';
 
 // =================================================================
 // ✅ واجهة الطلب والمكونات الفرعية
@@ -20,9 +31,47 @@ interface Order {
   total_price: number;
   status: string;
   items_count?: number;
+  delivery_address?: string;
 }
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// ✅ مكون البطاقة المخصصة
+const Card = ({ children, style }: { children: React.ReactNode; style?: any }) => (
+  <View style={[styles.card, style]}>{children}</View>
+);
+
+// ✅ مكون البادج
+const Badge = ({ text, style, textStyle }: { text: string; style?: any; textStyle?: any }) => (
+  <View style={[styles.badge, style]}>
+    <Text style={[styles.badgeText, textStyle]}>{text}</Text>
+  </View>
+);
+
+// ✅ مكون التبويبات
+const TabButton = ({ 
+  title, 
+  isActive, 
+  onPress,
+  count 
+}: { 
+  title: string; 
+  isActive: boolean; 
+  onPress: () => void;
+  count?: number;
+}) => (
+  <TouchableOpacity
+    style={[styles.tabButton, isActive && styles.tabButtonActive]}
+    onPress={onPress}
+  >
+    <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
+      {title}
+      {count !== undefined && count > 0 && (
+        <Text style={styles.tabCount}> ({count})</Text>
+      )}
+    </Text>
+  </TouchableOpacity>
+);
 
 // ✅ مكون OrderCard مع React.memo
 const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) => {
@@ -59,31 +108,68 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
     return translations[status.toLowerCase()] || status;
   }, []);
 
-  const getStatusStyle = useCallback((status: string): { 
+  const getStatusConfig = useCallback((status: string): { 
     icon: IoniconName; 
     color: string; 
     backgroundColor: string; 
-    borderColor: string 
+    borderColor: string;
+    label: string;
   } => {
     switch (status.toLowerCase()) {
       case 'processing':
       case 'preparing':
-        return { icon: 'hourglass-outline', color: '#D97706', backgroundColor: '#FEF3C7', borderColor: '#FBBF24' };
+        return { 
+          icon: 'time-outline', 
+          color: '#F97316', 
+          backgroundColor: '#FFF7ED', 
+          borderColor: '#FDBA74',
+          label: 'قيد التحضير'
+        };
       case 'delivered':
-        return { icon: 'checkmark-done-circle-outline', color: '#16A34A', backgroundColor: '#DCFCE7', borderColor: '#86EFAC' };
+        return { 
+          icon: 'checkmark-done-circle-outline', 
+          color: '#16A34A', 
+          backgroundColor: '#F0FDF4', 
+          borderColor: '#86EFAC',
+          label: 'تم التوصيل'
+        };
       case 'ready':
-        return { icon: 'checkmark-circle-outline', color: '#2563EB', backgroundColor: '#DBEAFE', borderColor: '#93C5FD' };
+        return { 
+          icon: 'checkmark-circle-outline', 
+          color: '#2563EB', 
+          backgroundColor: '#EFF6FF', 
+          borderColor: '#93C5FD',
+          label: 'جاهز'
+        };
       case 'on_the_way':
-        return { icon: 'bicycle-outline', color: '#7C3AED', backgroundColor: '#F3E8FF', borderColor: '#C4B5FD' };
+        return { 
+          icon: 'bicycle-outline', 
+          color: '#7C3AED', 
+          backgroundColor: '#FAF5FF', 
+          borderColor: '#C4B5FD',
+          label: 'في الطريق'
+        };
       case 'cancelled':
-        return { icon: 'close-circle-outline', color: '#DC2626', backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' };
+        return { 
+          icon: 'close-circle-outline', 
+          color: '#DC2626', 
+          backgroundColor: '#FEF2F2', 
+          borderColor: '#FCA5A5',
+          label: 'ملغي'
+        };
       case 'new':
       default:
-        return { icon: 'receipt-outline', color: '#4B5563', backgroundColor: '#F3F4F6', borderColor: '#D1D5DB' };
+        return { 
+          icon: 'receipt-outline', 
+          color: '#6B7280', 
+          backgroundColor: '#F9FAFB', 
+          borderColor: '#D1D5DB',
+          label: 'جديد'
+        };
     }
   }, []);
 
-  const statusStyle = useMemo(() => getStatusStyle(item.status), [item.status, getStatusStyle]);
+  const statusConfig = useMemo(() => getStatusConfig(item.status), [item.status, getStatusConfig]);
   const translatedStatus = useMemo(() => translateStatus(item.status), [item.status, translateStatus]);
 
   const handlePress = useCallback(() => {
@@ -107,43 +193,96 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
     });
   }, [item.created_at]);
 
+  // الوقت المقدر للتوصيل (محاكاة)
+  const getEstimatedTime = useCallback(() => {
+    switch (item.status.toLowerCase()) {
+      case 'processing':
+      case 'preparing':
+        return '20-25 دقيقة';
+      case 'on_the_way':
+        return '10-15 دقيقة';
+      default:
+        return null;
+    }
+  }, [item.status]);
+
+  const estimatedTime = useMemo(() => getEstimatedTime(), [getEstimatedTime]);
+
   return (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-      <TouchableOpacity
-        style={styles.orderCard}
-        onPress={handlePress}
-        activeOpacity={0.9}
-      >
-        <View style={styles.cardTopSection}>
-          <View style={styles.orderInfo}>
-            <Text style={styles.orderId}>طلب #{item.id}</Text>
-            <Text style={styles.orderDate}>{formattedDate}</Text>
-            {item.items_count && (
-              <Text style={styles.itemsCount}>{item.items_count} عنصر</Text>
-            )}
+      <Card style={styles.orderCard}>
+        {/* الهيدر مع التدرج اللوني */}
+        <View style={styles.orderHeader}>
+          <View style={styles.orderNumberContainer}>
+            <MaterialCommunityIcons name="package-variant" size={scale(18)} color="#DC2626" />
+            <Text style={styles.orderNumber}>طلب #{item.id}</Text>
           </View>
-          <View style={[
-            styles.statusContainer, 
-            { 
-              backgroundColor: statusStyle.backgroundColor, 
-              borderColor: statusStyle.borderColor 
-            }
-          ]}>
-            <Ionicons name={statusStyle.icon} size={16} color={statusStyle.color} />
-            <Text style={[styles.statusText, { color: statusStyle.color }]}>
-              {translatedStatus}
+          <Badge 
+            text={statusConfig.label}
+            style={{
+              backgroundColor: statusConfig.backgroundColor,
+              borderColor: statusConfig.borderColor,
+            }}
+            textStyle={{ color: statusConfig.color }}
+          />
+        </View>
+
+        {/* معلومات التاريخ والوقت */}
+        <View style={styles.orderMeta}>
+          <Text style={styles.orderDate}>{formattedDate}</Text>
+        </View>
+
+        {/* معلومات العناصر */}
+        <View style={styles.orderItems}>
+          <View style={styles.itemsCount}>
+            <Ionicons name="fast-food-outline" size={scale(16)} color="#6B7280" />
+            <Text style={styles.itemsCountText}>{item.items_count || 0} عنصر</Text>
+          </View>
+          <Text style={styles.orderTotal}>{item.total_price.toFixed(2)} ₪</Text>
+        </View>
+
+        {/* العنوان */}
+        {item.delivery_address && (
+          <View style={styles.addressContainer}>
+            <Ionicons name="location-outline" size={scale(16)} color="#9CA3AF" />
+            <Text style={styles.addressText} numberOfLines={2}>
+              {item.delivery_address}
             </Text>
           </View>
-        </View>
-        <View style={styles.separator} />
-        <View style={styles.cardBottomSection}>
-          <Text style={styles.orderTotal}>{item.total_price.toFixed(2)} ₪</Text>
-          <View style={styles.detailsButton}>
-            <Text style={styles.detailsButtonText}>عرض التفاصيل</Text>
-            <Ionicons name="chevron-forward-outline" size={16} color="#C62828" />
+        )}
+
+        {/* الوقت المقدر للطلبات النشطة */}
+        {estimatedTime && (
+          <View style={styles.estimatedTimeContainer}>
+            <View style={styles.estimatedTimeContent}>
+              <Ionicons name="time-outline" size={scale(16)} color="#F97316" />
+              <View style={styles.estimatedTimeTexts}>
+                <Text style={styles.estimatedTimeLabel}>الوقت المقدر للتوصيل</Text>
+                <Text style={styles.estimatedTimeValue}>{estimatedTime}</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.callButton}>
+              <Ionicons name="call-outline" size={scale(16)} color="#F97316" />
+            </TouchableOpacity>
           </View>
+        )}
+
+        {/* الفوتر مع زر التفاصيل */}
+        <View style={styles.orderFooter}>
+          <View style={styles.totalContainer}>
+            <Text style={styles.totalLabel}>المبلغ الإجمالي</Text>
+            <Text style={styles.totalAmount}>{item.total_price.toFixed(2)} ₪</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.detailsButton}
+            onPress={handlePress}
+          >
+            <MaterialCommunityIcons name="receipt-text-outline" size={scale(16)} color="white" />
+            <Text style={styles.detailsButtonText}>عرض التفاصيل</Text>
+            <Ionicons name="chevron-forward-outline" size={scale(16)} color="white" />
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </Card>
     </Animated.View>
   );
 });
@@ -159,16 +298,16 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ✅ useCallback لـ fetchOrders بدون caching
+  // ✅ useCallback لـ fetchOrders
   const fetchOrders = useCallback(async (isRefreshing = false, isAutoRefresh = false) => {
     if (!user) {
       setLoading(false);
       return;
     }
 
-    // لا تعرض loading في التحديث التلقائي
     if (!isAutoRefresh) {
       setError(null);
       if (isRefreshing) {
@@ -181,7 +320,6 @@ export default function OrdersScreen() {
     try {
       console.log('🌐 Fetching fresh orders data from server');
       
-      // ✅ جلب البيانات مع معلومات إضافية
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -189,6 +327,7 @@ export default function OrdersScreen() {
           created_at, 
           total_price, 
           status,
+          delivery_address,
           order_items(count)
         `)
         .eq('user_id', user.id)
@@ -198,18 +337,17 @@ export default function OrdersScreen() {
         throw new Error(error.message);
       }
       
-      // ✅ معالجة البيانات لإضافة items_count
       const processedOrders: Order[] = (data || []).map(order => ({
         id: order.id,
         created_at: order.created_at,
         total_price: order.total_price,
         status: order.status,
+        delivery_address: order.delivery_address,
         items_count: order.order_items?.[0]?.count || 0
       }));
       
       setOrders(processedOrders);
 
-      // ✅ تتبع نجاح جلب الطلبات
       if (!isAutoRefresh) {
         trackEvent(AnalyticsEvents.DATA_FETCH_SUCCESS, {
           screen: 'orders',
@@ -223,7 +361,6 @@ export default function OrdersScreen() {
       setError(errorMessage);
       console.error('Error fetching orders:', err.message);
       
-      // ✅ تتبع الأخطاء
       trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
         screen: 'orders',
         error_type: 'fetch_orders_failed',
@@ -240,7 +377,6 @@ export default function OrdersScreen() {
   // ✅ useFocusEffect محسن
   useFocusEffect(
     useCallback(() => {
-      // ✅ تتبع فتح شاشة الطلبات
       trackEvent('orders_screen_viewed', {
         user_id: user?.id,
         has_previous_orders: orders.length > 0
@@ -248,7 +384,6 @@ export default function OrdersScreen() {
 
       fetchOrders();
 
-      // ✅ بدء التحديث التلقائي كل 30 ثانية للطلبات النشطة
       refreshIntervalRef.current = setInterval(() => {
         const hasActiveOrders = orders.some(order => 
           ['new', 'processing', 'preparing', 'on_the_way'].includes(order.status.toLowerCase())
@@ -258,10 +393,9 @@ export default function OrdersScreen() {
           console.log('🔄 Auto-refreshing active orders...');
           fetchOrders(false, true);
         }
-      }, 30000); // 30 ثانية
+      }, 30000);
 
       return () => {
-        // ✅ تنظيف الـ interval عند مغادرة الشاشة
         if (refreshIntervalRef.current) {
           clearInterval(refreshIntervalRef.current);
           refreshIntervalRef.current = null;
@@ -270,21 +404,11 @@ export default function OrdersScreen() {
     }, [fetchOrders, user, orders.length])
   );
 
-  // ✅ تأثير إضافي للتحديث عند تغيير حالة الطلبات
-  useEffect(() => {
-    // ✅ تتبع تغيير حالة الطلبات
-    const orderStatuses = orders.map(order => order.status);
-    console.log('📊 Current orders statuses:', orderStatuses);
-    
-    // يمكن إضافة تحليلات إضافية هنا
-  }, [orders]);
-
   const handleBack = useCallback(() => {
     router.navigate('/(tabs)/profile');
   }, [router]);
 
   const handleRefresh = useCallback(() => {
-    // ✅ تتبع السحب للتحديث
     trackEvent(AnalyticsEvents.PULL_TO_REFRESH, {
       screen: 'orders',
       current_orders_count: orders.length
@@ -294,7 +418,6 @@ export default function OrdersScreen() {
   }, [fetchOrders, orders.length]);
 
   const handleRetry = useCallback(() => {
-    // ✅ تتبع إعادة المحاولة
     trackEvent('orders_retry_attempt', {
       previous_error: error
     });
@@ -303,7 +426,6 @@ export default function OrdersScreen() {
   }, [fetchOrders, error]);
 
   const handleBrowseMenu = useCallback(() => {
-    // ✅ تتبع الانتقال للقائمة
     trackEvent('browse_menu_from_orders', {
       source: 'empty_orders',
       user_id: user?.id
@@ -312,55 +434,110 @@ export default function OrdersScreen() {
     router.push('/');
   }, [router, user]);
 
-  // ✅ useCallback لـ renderItem و keyExtractor
+  // ✅ تصفية الطلبات حسب التبويب
+  const filteredOrders = useMemo(() => {
+    switch (activeTab) {
+      case 'active':
+        return orders.filter(order => 
+          ['new', 'processing', 'preparing', 'on_the_way'].includes(order.status.toLowerCase())
+        );
+      case 'completed':
+        return orders.filter(order => 
+          ['delivered', 'ready'].includes(order.status.toLowerCase())
+        );
+      case 'cancelled':
+        return orders.filter(order => 
+          order.status.toLowerCase() === 'cancelled'
+        );
+      default:
+        return orders;
+    }
+  }, [orders, activeTab]);
+
+  // ✅ إحصائيات التبويبات
+  const tabStats = useMemo(() => ({
+    all: orders.length,
+    active: orders.filter(order => 
+      ['new', 'processing', 'preparing', 'on_the_way'].includes(order.status.toLowerCase())
+    ).length,
+    completed: orders.filter(order => 
+      ['delivered', 'ready'].includes(order.status.toLowerCase())
+    ).length,
+    cancelled: orders.filter(order => 
+      order.status.toLowerCase() === 'cancelled'
+    ).length,
+  }), [orders]);
+
   const renderOrderItem = useCallback(({ item, index }: { item: Order; index: number }) => (
     <OrderCard item={item} index={index} />
   ), []);
 
   const keyExtractor = useCallback((item: Order) => item.id.toString(), []);
 
-  // ✅ useMemo للبيانات المشتقة
-  const hasOrders = useMemo(() => orders.length > 0, [orders.length]);
-  
-  const activeOrdersCount = useMemo(() => 
-    orders.filter(order => 
-      ['new', 'processing', 'preparing', 'on_the_way'].includes(order.status.toLowerCase())
-    ).length, 
-    [orders]
-  );
-
   return (
     <View style={styles.container}>
-      {/* ✅ رأس الصفحة المحسن */}
+      {/* ✅ الهيدر الجديد مع التدرج اللوني */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>طلباتي</Text>
-          {activeOrdersCount > 0 && (
-            <View style={styles.activeOrdersBadge}>
-              <Text style={styles.activeOrdersText}>{activeOrdersCount} نشط</Text>
-            </View>
-          )}
+        <View style={styles.headerBackground} />
+        <View style={styles.headerContent}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={scale(24)} color="white" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>طلباتي</Text>
+            <TouchableOpacity 
+              onPress={handleRefresh} 
+              style={styles.refreshButton}
+              disabled={refreshing}
+            >
+              <Ionicons 
+                name="refresh" 
+                size={scale(22)} 
+                color={refreshing ? "rgba(255,255,255,0.5)" : "white"} 
+              />
+            </TouchableOpacity>
+          </View>
         </View>
-        <TouchableOpacity 
-          onPress={handleRefresh} 
-          style={styles.refreshButton}
-          disabled={refreshing}
+      </View>
+
+      {/* ✅ تبويبات التصفية */}
+      <View style={styles.tabsContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsScrollContent}
         >
-          <Ionicons 
-            name="refresh" 
-            size={22} 
-            color={refreshing ? "#999" : "#C62828"} 
+          <TabButton
+            title="الكل"
+            isActive={activeTab === 'all'}
+            onPress={() => setActiveTab('all')}
+            count={tabStats.all}
           />
-        </TouchableOpacity>
+          <TabButton
+            title="نشطة"
+            isActive={activeTab === 'active'}
+            onPress={() => setActiveTab('active')}
+            count={tabStats.active}
+          />
+          <TabButton
+            title="مكتملة"
+            isActive={activeTab === 'completed'}
+            onPress={() => setActiveTab('completed')}
+            count={tabStats.completed}
+          />
+          <TabButton
+            title="ملغاة"
+            isActive={activeTab === 'cancelled'}
+            onPress={() => setActiveTab('cancelled')}
+            count={tabStats.cancelled}
+          />
+        </ScrollView>
       </View>
 
       {/* ✅ عرض الخطأ إذا وجد */}
       {error && (
         <View style={styles.errorContainer}>
-          <Ionicons name="warning-outline" size={20} color="#D32F2F" />
+          <Ionicons name="warning-outline" size={scale(20)} color="#DC2626" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
             <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
@@ -371,24 +548,24 @@ export default function OrdersScreen() {
       {/* ✅ مؤشر التحديث التلقائي */}
       {refreshing && (
         <View style={styles.autoRefreshIndicator}>
-          <ActivityIndicator size="small" color="#C62828" />
+          <ActivityIndicator size="small" color="#DC2626" />
           <Text style={styles.autoRefreshText}>جاري تحديث الطلبات...</Text>
         </View>
       )}
 
       {loading && !refreshing ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#C62828" />
+          <ActivityIndicator size="large" color="#DC2626" />
           <Text style={styles.loadingText}>جاري تحميل الطلبات...</Text>
         </View>
       ) : (
         <FlatList
-          data={orders}
+          data={filteredOrders}
           renderItem={renderOrderItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={[
             styles.listContainer,
-            !hasOrders && styles.emptyListContainer
+            filteredOrders.length === 0 && styles.emptyListContainer
           ]}
           refreshing={refreshing}
           onRefresh={handleRefresh}
@@ -400,19 +577,31 @@ export default function OrdersScreen() {
           initialNumToRender={6}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="receipt-outline" size={80} color="#E5E7EB" />
-              <Text style={styles.emptyText}>لا توجد طلبات سابقة</Text>
-              <Text style={styles.emptySubText}>ابدأ أول طلب لك من قائمة الطعام!</Text>
-              <TouchableOpacity 
-                style={styles.browseButton}
-                onPress={handleBrowseMenu}
-              >
-                <Text style={styles.browseButtonText}>تصفح القائمة</Text>
-                <Ionicons name="fast-food-outline" size={18} color="#fff" style={styles.browseIcon} />
-              </TouchableOpacity>
+              <View style={styles.emptyIcon}>
+                <MaterialCommunityIcons name="package-variant" size={scale(80)} color="#E5E7EB" />
+              </View>
+              <Text style={styles.emptyText}>
+                {activeTab === 'all' ? 'لا توجد طلبات سابقة' : 
+                 activeTab === 'active' ? 'لا توجد طلبات نشطة' :
+                 activeTab === 'completed' ? 'لا توجد طلبات مكتملة' : 'لا توجد طلبات ملغاة'}
+              </Text>
+              <Text style={styles.emptySubText}>
+                {activeTab === 'all' ? 'ابدأ أول طلب لك من قائمة الطعام!' :
+                 activeTab === 'active' ? 'الطلبات النشطة ستظهر هنا' :
+                 activeTab === 'completed' ? 'الطلبات المكتملة ستظهر هنا' : 'الطلبات الملغاة ستظهر هنا'}
+              </Text>
+              {activeTab === 'all' && (
+                <TouchableOpacity 
+                  style={styles.browseButton}
+                  onPress={handleBrowseMenu}
+                >
+                  <Text style={styles.browseButtonText}>تصفح القائمة</Text>
+                  <Ionicons name="fast-food-outline" size={scale(18)} color="#fff" style={styles.browseIcon} />
+                </TouchableOpacity>
+              )}
             </View>
           }
-          ListFooterComponent={hasOrders ? <View style={styles.listFooter} /> : null}
+          ListFooterComponent={filteredOrders.length > 0 ? <View style={styles.listFooter} /> : null}
         />
       )}
     </View>
@@ -425,231 +614,378 @@ export default function OrdersScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#F5F5F5' 
+    backgroundColor: '#F8FAFC' 
   },
+  
+  // الهيدر
   header: {
+    height: scale(160),
+    position: 'relative',
+  },
+  headerBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#DC2626',
+    borderBottomLeftRadius: scale(30),
+    borderBottomRightRadius: scale(30),
+  },
+  headerContent: {
+    paddingHorizontal: scale(20),
+    paddingTop: scale(50),
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   backButton: {
-    padding: 8,
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: scale(8),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(20),
   },
   headerTitle: {
-    fontSize: 22,
-    fontFamily: 'Cairo-Bold',
-    color: '#1A1A1A',
-    marginRight: 8,
-  },
-  activeOrdersBadge: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FBBF24',
-  },
-  activeOrdersText: {
-    fontSize: 12,
-    fontFamily: 'Cairo-SemiBold',
-    color: '#D97706',
+    fontSize: fontScale(24),
+    fontWeight: 'bold',
+    color: 'white',
   },
   refreshButton: {
-    padding: 8,
+    padding: scale(8),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(20),
   },
-  errorContainer: {
-    backgroundColor: '#FFEBEE',
-    padding: 16,
-    margin: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#D32F2F',
+
+  // التبويبات
+  tabsContainer: {
+    backgroundColor: 'white',
+    paddingHorizontal: scale(20),
+    paddingVertical: scale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  tabsScrollContent: {
     flexDirection: 'row',
+    gap: scale(8),
+  },
+  tabButton: {
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(8),
+    borderRadius: scale(20),
+    backgroundColor: '#F9FAFB',
+    minWidth: scale(80),
     alignItems: 'center',
   },
+  tabButtonActive: {
+    backgroundColor: '#DC2626',
+  },
+  tabButtonText: {
+    fontSize: fontScale(14),
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  tabButtonTextActive: {
+    color: 'white',
+  },
+  tabCount: {
+    fontSize: fontScale(12),
+    opacity: 0.8,
+  },
+
+  // البطاقات والمكونات
+  card: {
+    backgroundColor: 'white',
+    borderRadius: scale(16),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  badge: {
+    paddingHorizontal: scale(12),
+    paddingVertical: scale(6),
+    borderRadius: scale(12),
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  badgeText: {
+    fontSize: fontScale(12),
+    fontWeight: '600',
+  },
+
+  // بطاقة الطلب
+  orderCard: {
+    marginHorizontal: scale(20),
+    marginBottom: scale(16),
+    overflow: 'hidden',
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: scale(16),
+    backgroundColor: '#FEF2F2',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FECACA',
+  },
+  orderNumberContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
+  },
+  orderNumber: {
+    fontSize: fontScale(16),
+    fontWeight: '600',
+    color: '#374151',
+  },
+  orderMeta: {
+    paddingHorizontal: scale(16),
+    paddingTop: scale(12),
+  },
+  orderDate: {
+    fontSize: fontScale(14),
+    color: '#6B7280',
+  },
+  orderItems: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: scale(16),
+  },
+  itemsCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
+  },
+  itemsCountText: {
+    fontSize: fontScale(14),
+    color: '#6B7280',
+  },
+  orderTotal: {
+    fontSize: fontScale(16),
+    fontWeight: '600',
+    color: '#374151',
+  },
+  addressContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: scale(8),
+    paddingHorizontal: scale(16),
+    paddingBottom: scale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  addressText: {
+    flex: 1,
+    fontSize: fontScale(14),
+    color: '#6B7280',
+    lineHeight: scale(20),
+  },
+  estimatedTimeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: scale(16),
+    backgroundColor: '#FFF7ED',
+    borderRadius: scale(12),
+    margin: scale(16),
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+  },
+  estimatedTimeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
+    flex: 1,
+  },
+  estimatedTimeTexts: {
+    flex: 1,
+  },
+  estimatedTimeLabel: {
+    fontSize: fontScale(14),
+    color: '#9A3412',
+    fontWeight: '500',
+  },
+  estimatedTimeValue: {
+    fontSize: fontScale(12),
+    color: '#EA580C',
+  },
+  callButton: {
+    padding: scale(8),
+    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+    borderRadius: scale(20),
+  },
+  orderFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: scale(16),
+    backgroundColor: '#F9FAFB',
+  },
+  totalContainer: {
+    flex: 1,
+  },
+  totalLabel: {
+    fontSize: fontScale(12),
+    color: '#6B7280',
+    marginBottom: scale(4),
+  },
+  totalAmount: {
+    fontSize: fontScale(18),
+    fontWeight: 'bold',
+    color: '#DC2626',
+  },
+  detailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
+    backgroundColor: '#DC2626',
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(10),
+    borderRadius: scale(12),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  detailsButtonText: {
+    color: 'white',
+    fontSize: fontScale(14),
+    fontWeight: '600',
+  },
+
+  // حالات التحميل والخطأ
+  errorContainer: {
+    backgroundColor: '#FEF2F2',
+    padding: scale(16),
+    margin: scale(20),
+    borderRadius: scale(12),
+    borderLeftWidth: scale(4),
+    borderLeftColor: '#DC2626',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(12),
+  },
   errorText: {
-    color: '#D32F2F',
-    fontSize: 14,
+    color: '#DC2626',
+    fontSize: fontScale(14),
     flex: 1,
     textAlign: 'right',
-    fontFamily: 'Cairo-Regular',
-    marginRight: 8,
   },
   retryButton: {
-    backgroundColor: '#D32F2F',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(8),
+    borderRadius: scale(8),
   },
   retryButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontWeight: 'bold',
-    fontFamily: 'Cairo-SemiBold',
   },
   autoRefreshIndicator: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
-    paddingVertical: 8,
+    paddingVertical: scale(8),
+    gap: scale(8),
   },
   autoRefreshText: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: '#6B7280',
-    fontFamily: 'Cairo-Regular',
-    marginLeft: 8,
   },
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: scale(16),
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-    fontFamily: 'Cairo-Regular',
+    fontSize: fontScale(16),
+    color: '#6B7280',
   },
   listContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    paddingTop: 16,
+    paddingTop: scale(16),
+    paddingBottom: scale(20),
   },
   emptyListContainer: {
     flex: 1,
     justifyContent: 'center',
   },
-  orderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    overflow: 'hidden',
-  },
-  cardTopSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 16,
-  },
-  orderInfo: {
-    alignItems: 'flex-start',
-    flex: 1,
-  },
-  orderId: {
-    fontSize: 16,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-  },
-  orderDate: {
-    fontSize: 13,
-    color: '#888',
-    fontFamily: 'Cairo-Regular',
-    marginTop: 4,
-  },
-  itemsCount: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontFamily: 'Cairo-Regular',
-    marginTop: 2,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    minWidth: 100,
-    justifyContent: 'center',
-    borderWidth: 1.5,
-  },
-  statusText: {
-    fontFamily: 'Cairo-SemiBold',
-    fontSize: 12,
-    marginStart: 6,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#F0F0F0',
-  },
-  cardBottomSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FAFAFA',
-    padding: 16,
-  },
-  orderTotal: {
-    fontSize: 18,
-    fontFamily: 'Cairo-Bold',
-    color: '#C62828',
-  },
-  detailsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  detailsButtonText: {
-    color: '#333',
-    fontFamily: 'Cairo-SemiBold',
-    fontSize: 14,
-    marginEnd: 4,
-  },
   emptyContainer: { 
     flex: 1, 
     justifyContent: 'center', 
     alignItems: 'center', 
-    paddingTop: '20%' 
+    paddingTop: '20%',
+    paddingHorizontal: scale(40),
+  },
+  emptyIcon: {
+    backgroundColor: 'white',
+    width: scale(120),
+    height: scale(120),
+    borderRadius: scale(60),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: scale(24),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   emptyText: { 
-    fontSize: 20, 
-    fontFamily: 'Cairo-Bold', 
-    color: '#555', 
-    marginTop: 16 
+    fontSize: fontScale(20),
+    fontWeight: 'bold',
+    color: '#374151', 
+    marginBottom: scale(8),
+    textAlign: 'center',
   },
   emptySubText: { 
-    fontSize: 14, 
-    color: '#999', 
-    marginTop: 8, 
-    textAlign: 'center', 
-    fontFamily: 'Cairo-Regular' 
+    fontSize: fontScale(14), 
+    color: '#6B7280', 
+    textAlign: 'center',
+    lineHeight: scale(20),
   },
   browseButton: {
-    marginTop: 20,
-    backgroundColor: '#C62828',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 25,
+    marginTop: scale(24),
+    backgroundColor: '#DC2626',
+    paddingVertical: scale(12),
+    paddingHorizontal: scale(24),
+    borderRadius: scale(25),
     flexDirection: 'row',
     alignItems: 'center',
+    gap: scale(8),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   browseButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontSize: fontScale(16),
+    fontWeight: 'bold',
   },
   browseIcon: {
-    marginRight: 8,
+    marginRight: scale(8),
   },
   listFooter: {
-    height: 20,
+    height: scale(20),
   },
 });

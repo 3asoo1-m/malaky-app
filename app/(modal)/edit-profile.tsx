@@ -94,7 +94,7 @@ export default function EditProfileModal() {
     <View style={styles.container}>
       {/* الهيدر */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.navigate('/(tabs)/profile')} style={styles.backButton}>
           <Ionicons name="close" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>تعديل الملف الشخصي</Text>
