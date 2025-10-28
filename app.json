@@ -2,7 +2,7 @@
   "expo": {
     "name": "الدجاج الملكي",
     "slug": "almalaky-broast-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "scheme": "malakyapp",
     "userInterfaceStyle": "light",
@@ -18,7 +18,8 @@
       "color": "#D32F2F" 
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "buildNumber": "2" 
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +29,8 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.x3asoo1.malakyapp",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro",

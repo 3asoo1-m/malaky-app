@@ -32,6 +32,18 @@ interface Order {
   status: string;
   items_count?: number;
   delivery_address?: string;
+  order_type: string;
+  subtotal: number;
+  delivery_price: number;
+  user_address_id?: number;
+  branch_id?: number;
+  user_address?: {
+    street_address: string;
+    delivery_zones?: {
+      area_name: string;
+      city: string;
+    } | null;
+  } | null;
 }
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -108,6 +120,7 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
     return translations[status.toLowerCase()] || status;
   }, []);
 
+  // ✅ إصلاح الأيقونة لـ 'ready'
   const getStatusConfig = useCallback((status: string): { 
     icon: IoniconName; 
     color: string; 
@@ -193,6 +206,17 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
     });
   }, [item.created_at]);
 
+  // ✅ الحصول على العنوان من الجدول المرتبط
+  const deliveryAddress = useMemo(() => {
+    if (item.user_address) {
+      const zoneInfo = item.user_address.delivery_zones 
+        ? `${item.user_address.delivery_zones.area_name}, ${item.user_address.delivery_zones.city}`
+        : '';
+      return `${item.user_address.street_address} ${zoneInfo}`.trim();
+    }
+    return 'لم يتم تحديد العنوان';
+  }, [item.user_address]);
+
   // الوقت المقدر للتوصيل (محاكاة)
   const getEstimatedTime = useCallback(() => {
     switch (item.status.toLowerCase()) {
@@ -230,6 +254,9 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
         {/* معلومات التاريخ والوقت */}
         <View style={styles.orderMeta}>
           <Text style={styles.orderDate}>{formattedDate}</Text>
+          <Text style={styles.orderType}>
+            {item.order_type === 'delivery' ? 'توصيل' : 'استلام من الفرع'}
+          </Text>
         </View>
 
         {/* معلومات العناصر */}
@@ -241,12 +268,12 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
           <Text style={styles.orderTotal}>{item.total_price.toFixed(2)} ₪</Text>
         </View>
 
-        {/* العنوان */}
-        {item.delivery_address && (
+        {/* العنوان - فقط للطلبات التوصيل */}
+        {item.order_type === 'delivery' && (
           <View style={styles.addressContainer}>
             <Ionicons name="location-outline" size={scale(16)} color="#9CA3AF" />
             <Text style={styles.addressText} numberOfLines={2}>
-              {item.delivery_address}
+              {deliveryAddress}
             </Text>
           </View>
         )}
@@ -301,7 +328,7 @@ export default function OrdersScreen() {
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ✅ useCallback لـ fetchOrders
+  // ✅ useCallback لـ fetchOrders - تم التحديث ليتناسب مع هيكل الجدول
   const fetchOrders = useCallback(async (isRefreshing = false, isAutoRefresh = false) => {
     if (!user) {
       setLoading(false);
@@ -320,6 +347,7 @@ export default function OrdersScreen() {
     try {
       console.log('🌐 Fetching fresh orders data from server');
       
+      // ✅ استعلام محدث ليناسب هيكل الجدول
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -327,8 +355,22 @@ export default function OrdersScreen() {
           created_at, 
           total_price, 
           status,
-          delivery_address,
-          order_items(count)
+          order_type,
+          subtotal,
+          delivery_price,
+          user_address_id,
+          branch_id,
+          user_addresses (
+            street_address,
+            delivery_zones (
+              area_name,
+              city
+            )
+          ),
+          order_items (
+            id,
+            quantity
+          )
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -337,13 +379,23 @@ export default function OrdersScreen() {
         throw new Error(error.message);
       }
       
+      // ✅ معالجة البيانات لتناسب الواجهة
       const processedOrders: Order[] = (data || []).map(order => ({
         id: order.id,
         created_at: order.created_at,
         total_price: order.total_price,
         status: order.status,
-        delivery_address: order.delivery_address,
-        items_count: order.order_items?.[0]?.count || 0
+        order_type: order.order_type,
+        subtotal: order.subtotal,
+        delivery_price: order.delivery_price,
+        user_address_id: order.user_address_id,
+        branch_id: order.branch_id,
+        items_count: Array.isArray(order.order_items) 
+          ? order.order_items.reduce((total, item) => total + (item.quantity || 1), 0)
+          : 0,
+        user_address: Array.isArray(order.user_addresses) 
+          ? order.user_addresses[0] || null
+          : order.user_addresses || null
       }));
       
       setOrders(processedOrders);
@@ -722,7 +774,6 @@ const styles = StyleSheet.create({
   orderCard: {
     marginHorizontal: scale(20),
     marginBottom: scale(16),
-    overflow: 'hidden',
   },
   orderHeader: {
     flexDirection: 'row',
@@ -744,12 +795,23 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   orderMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: scale(16),
     paddingTop: scale(12),
   },
   orderDate: {
     fontSize: fontScale(14),
     color: '#6B7280',
+  },
+  orderType: {
+    fontSize: fontScale(12),
+    color: '#DC2626',
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(4),
+    borderRadius: scale(6),
   },
   orderItems: {
     flexDirection: 'row',

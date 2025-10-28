@@ -138,17 +138,31 @@ export default function ProfileScreen() {
     await supabase.auth.signOut();
   };
 
-  // ✅ إعدادات مستويات الولاء
-  const loyaltyTiers = {
-    bronze: { name: 'برونزي', next: 'silver', goal: 100, color: '#CD7F32' },
-    silver: { name: 'فضي', next: 'gold', goal: 500, color: '#C0C0C0' },
-    gold: { name: 'ذهبي', next: 'platinum', goal: 1000, color: '#FFD700' },
-    platinum: { name: 'بلاتيني', next: null, goal: Infinity, color: '#E5E4E2' },
-  };
+// ✅ إعدادات مستويات الولاء مع TypeScript آمن
+interface LoyaltyTier {
+  name: string;
+  next: string | null;
+  goal: number;
+  color: string;
+}
 
-  const currentTier = profile ? loyaltyTiers[profile.loyalty_level] : loyaltyTiers.bronze;
-  const nextTier = currentTier.next ? loyaltyTiers[currentTier.next] : null;
+interface LoyaltyTiers {
+  bronze: LoyaltyTier;
+  silver: LoyaltyTier;
+  gold: LoyaltyTier;
+  platinum: LoyaltyTier;
+}
 
+const loyaltyTiers: LoyaltyTiers = {
+  bronze: { name: 'برونزي', next: 'silver', goal: 100, color: '#CD7F32' },
+  silver: { name: 'فضي', next: 'gold', goal: 500, color: '#C0C0C0' },
+  gold: { name: 'ذهبي', next: 'platinum', goal: 1000, color: '#FFD700' },
+  platinum: { name: 'بلاتيني', next: null, goal: Infinity, color: '#E5E4E2' },
+};
+
+// ✅ الحصول على التيار الحالي بطريقة آمنة
+  const currentTier = profile ? loyaltyTiers[profile.loyalty_level as keyof LoyaltyTiers] : loyaltyTiers.bronze;
+  const nextTier = currentTier.next ? loyaltyTiers[currentTier.next as keyof LoyaltyTiers] : null;
   const loyaltyProgress = profile ? (profile.points / currentTier.goal) * 100 : 0;
 
   if (initialLoading || loadingProfile) {
@@ -167,6 +181,54 @@ export default function ProfileScreen() {
   const displayPhone = profile.phone ? profile.phone.replace(/^\+972/, '0') : 'لا يوجد رقم هاتف';
   const initials = (profile.first_name?.[0] || '') + (profile.last_name?.[0] || '');
 
+  const showComingSoonAlert = (featureName: string) => {
+  alert(`🚧 ${featureName} - قريباً!\n\nهذه الميزة قيد التطوير وسيتم إضافتها قريباً.`);
+};
+
+  // ✅ مكون مساعد لإنشاء أزرار القائمة مع دعم علامة "قريباً"
+const ProfileListItem = ({ 
+  icon, 
+  text, 
+  onPress, 
+  color = '#333', 
+  badge, 
+  iconBgColor = '#f8f9fa',
+  comingSoon = false // ✅ إضافة خاصية جديدة
+}: { 
+  icon: React.ReactNode; 
+  text: string; 
+  onPress: () => void; 
+  color?: string; 
+  badge?: string; 
+  iconBgColor?: string;
+  comingSoon?: boolean; // ✅ خاصية جديدة
+}) => (
+  <TouchableOpacity 
+    style={[styles.listItem, comingSoon && styles.comingSoonItem]} 
+    onPress={comingSoon ? () => {} : onPress} // ✅ تعطيل الضغط إذا كانت قريباً
+    disabled={comingSoon} // ✅ تعطيل الزر
+  >
+    <View style={styles.listItemContent}>
+      <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
+        {icon}
+      </View>
+      <Text style={[styles.listItemText, { color }, comingSoon && styles.comingSoonText]}>{text}</Text>
+    </View>
+    <View style={styles.listItemRight}>
+      {comingSoon ? (
+        <Badge text="قريباً" style={styles.comingSoonBadge} />
+      ) : (
+        <>
+          {badge && <Badge text={badge} style={styles.listItemBadge} />}
+          <Ionicons name="chevron-forward-outline" size={scale(18)} color="#A0A0A0" />
+        </>
+      )}
+    </View>
+  </TouchableOpacity>
+);
+
+
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -177,7 +239,7 @@ export default function ProfileScreen() {
                 <View style={styles.headerTop}>
                     <Text style={styles.headerTitle}>الملف الشخصي</Text>
                     <View style={styles.headerIcons}>
-                        <TouchableOpacity style={styles.iconButton}><Ionicons name="notifications-outline" size={scale(20)} color="white" /></TouchableOpacity>
+                        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/(tabs)/notifications')}><Ionicons name="notifications-outline" size={scale(20)} color="white" /></TouchableOpacity>
                         <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/(modal)/edit-profile')}><Ionicons name="settings-outline" size={scale(20)} color="white" /></TouchableOpacity>
                     </View>
                 </View>
@@ -264,45 +326,60 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.menuSection}>
-          <Card style={styles.menuCard}>
-            <ProfileListItem
-              icon={<MaterialCommunityIcons name="receipt-text-outline" size={scale(20 )} color="#F97316" />}
-              text="طلباتي" onPress={() => router.push('/(tabs)/orders')}
-              badge={profile.orders_count > 0 ? profile.orders_count.toString() : undefined}
-              iconBgColor="#FFF7ED"
-            />
-            <View style={styles.separator} />
-            <ProfileListItem
-              icon={<Ionicons name="heart-outline" size={scale(20)} color="#EC4899" />}
-              text="المفضلة" onPress={() => router.push('/(tabs)/favorites')} iconBgColor="#FDF2F8"
-            />
-            <View style={styles.separator} />
-            <ProfileListItem
-              icon={<Ionicons name="card-outline" size={scale(20)} color="#3B82F6" />}
-              text="طرق الدفع" onPress={() => router.push('/(modal)/payment-methods')} iconBgColor="#EFF6FF"
-            />
-            <View style={styles.separator} />
-            <ProfileListItem
-              icon={<Ionicons name="location-outline" size={scale(20)} color="#10B981" />}
-              text="عناويني" onPress={() => router.push({ pathname: '/(tabs)/addresses', params: { from: 'profile' } })} iconBgColor="#ECFDF5"
-            />
-            <View style={styles.separator} />
-            <ProfileListItem
-              icon={<FontAwesome5 name="gift" size={scale(18)} color="#8B5CF6" />}
-              text="المكافآت والعروض" onPress={() => router.push('/(modal)/rewards')} badge="2" iconBgColor="#FAF5FF"
-            />
-            <View style={styles.separator} />
-            <ProfileListItem
-              icon={<Ionicons name="person-outline" size={scale(20)} color="#6B7280" />}
-              text="ملفي الشخصي" onPress={() => router.push('/(modal)/edit-profile')} iconBgColor="#F9FAFB"
-            />
-            <View style={styles.separator} />
-            <ProfileListItem
-              icon={<Ionicons name="help-circle-outline" size={scale(20)} color="#14B8A6" />}
-              text="المساعدة والدعم" onPress={() => router.push('/(modal)/support')} iconBgColor="#F0FDFA"
-            />
-          </Card>
-        </View>
+  <Card style={styles.menuCard}>
+    <ProfileListItem
+      icon={<Ionicons name="person-outline" size={scale(20)} color="#6B7280" />}
+      text="ملفي الشخصي" 
+      onPress={() => router.push('/(modal)/edit-profile')} 
+      iconBgColor="#F9FAFB"
+    />
+    <ProfileListItem
+      icon={<MaterialCommunityIcons name="receipt-text-outline" size={scale(20)} color="#F97316" />}
+      text="طلباتي" 
+      onPress={() => router.push('/(tabs)/orders')}
+      badge={profile.orders_count > 0 ? profile.orders_count.toString() : undefined}
+      iconBgColor="#FFF7ED"
+    />
+    <View style={styles.separator} />
+    <ProfileListItem
+      icon={<Ionicons name="heart-outline" size={scale(20)} color="#EC4899" />}
+      text="المفضلة" 
+      onPress={() => router.push('/(tabs)/favorites')} 
+      iconBgColor="#FDF2F8"
+    />
+    <View style={styles.separator} />
+    <ProfileListItem
+      icon={<Ionicons name="location-outline" size={scale(20)} color="#10B981" />}
+      text="عناويني" 
+      onPress={() => router.push({ pathname: '/(tabs)/addresses', params: { from: 'profile' } })} 
+      iconBgColor="#ECFDF5"
+    />
+    <View style={styles.separator} />
+    <ProfileListItem
+      icon={<Ionicons name="card-outline" size={scale(20)} color="#3B82F6" />}
+      text="طرق الدفع" 
+      onPress={() => showComingSoonAlert('طرق الدفع')} 
+      iconBgColor="#EFF6FF"
+      comingSoon={true} // ✅ إضافة علامة قريباً
+    />
+    <View style={styles.separator} />
+    <ProfileListItem
+      icon={<FontAwesome5 name="gift" size={scale(18)} color="#8B5CF6" />}
+      text="المكافآت والعروض" 
+      onPress={() => showComingSoonAlert('المكافآت والعروض')}       badge="2" 
+      iconBgColor="#FAF5FF"
+      comingSoon={true} // ✅ إضافة علامة قريباً
+    />
+    <View style={styles.separator} />
+    <View style={styles.separator} />
+    <ProfileListItem
+      icon={<Ionicons name="help-circle-outline" size={scale(20)} color="#14B8A6" />}
+      text="المساعدة والدعم" 
+      onPress={() => router.push('/(modal)/support')} 
+      iconBgColor="#F0FDFA"
+    />
+  </Card>
+</View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={scale(20)} color="#DC2626" />
@@ -706,5 +783,16 @@ const styles = StyleSheet.create({
     fontSize: fontScale(12),
     fontWeight: '600',
     color: 'white',
+  }, 
+  comingSoonItem: {
+    opacity: 0.6,
+  },
+  comingSoonText: {
+    color: '#9CA3AF',
+  },
+  comingSoonBadge: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(4),
   },
 });

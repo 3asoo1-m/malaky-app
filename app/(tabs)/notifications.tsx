@@ -1,21 +1,42 @@
 // مسار الملف: app/notifications.tsx
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { 
+  View, 
+  Text, 
+  FlatList, 
+  StyleSheet, 
+  ActivityIndicator, 
+  RefreshControl, 
+  TouchableOpacity,
+  Animated,
+  LayoutAnimation,
+  Platform,
+  UIManager
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { scale, fontScale } from '@/lib/responsive';
+
+// ✅ تفعيل LayoutAnimation للأندرويد
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 // ✅ استيراد نظام التحليلات
 import { trackEvent, AnalyticsEvents } from '@/lib/analytics';
 
 // =================================================================
-// ✅ تعريف نوع بيانات الإشعار
+// ✅ تعريف نوع بيانات الإشعار المحدث
 // =================================================================
+type NotificationType = "order" | "delivery" | "promotion" | "system" | "review";
+
 type Notification = {
   id: number;
   title: string;
@@ -24,15 +45,46 @@ type Notification = {
   is_read: boolean;
   data: {
     orderId?: number;
-    type?: string;
+    type?: NotificationType;
     promotionId?: number;
   } | null;
 };
 
 // =================================================================
-// ✅ مكون NotificationItem مع React.memo
+// ✅ مكون البطاقة المخصصة
 // =================================================================
-const NotificationItem = React.memo(({ item, onPress }: { item: Notification; onPress: (notification: Notification) => void }) => {
+const Card = ({ children, style }: { children: React.ReactNode; style?: any }) => (
+  <View style={[styles.card, style]}>{children}</View>
+);
+
+// =================================================================
+// ✅ مكون البادج
+// =================================================================
+const Badge = ({ text, style, textStyle }: { text: string; style?: any; textStyle?: any }) => (
+  <View style={[styles.badge, style]}>
+    <Text style={[styles.badgeText, textStyle]}>{text}</Text>
+  </View>
+);
+
+// =================================================================
+// ✅ مكون NotificationCard المحسن
+// =================================================================
+const NotificationCard = React.memo(({ 
+  item, 
+  index, 
+  onPress, 
+  onMarkAsRead, 
+  onDelete 
+}: { 
+  item: Notification; 
+  index: number;
+  onPress: (notification: Notification) => void;
+  onMarkAsRead: (id: number) => void;
+  onDelete: (id: number) => void;
+}) => {
+  const [showActions, setShowActions] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
   const formattedDate = useMemo(() => {
     return formatDistanceToNow(new Date(item.created_at), { 
       addSuffix: true, 
@@ -40,34 +92,168 @@ const NotificationItem = React.memo(({ item, onPress }: { item: Notification; on
     });
   }, [item.created_at]);
 
-  const iconName = useMemo(() => 
-    item.is_read ? "notifications-outline" : "notifications", 
-    [item.is_read]
-  );
+  // ✅ الحصول على الأيقونة واللون بناءً على نوع الإشعار
+  const getNotificationConfig = useCallback((notification: Notification) => {
+    const type = notification.data?.type || 'system';
+    
+    switch (type) {
+      case 'order':
+        return {
+          icon: 'cube-outline' as const,
+          color: '#3B82F6',
+          bgColor: '#EFF6FF',
+          iconComponent: MaterialCommunityIcons
+        };
+      case 'delivery':
+        return {
+          icon: 'bicycle' as const,
+          color: '#F97316',
+          bgColor: '#FFF7ED',
+          iconComponent: Ionicons
+        };
+      case 'promotion':
+        return {
+          icon: 'gift' as const,
+          color: '#8B5CF6',
+          bgColor: '#FAF5FF',
+          iconComponent: FontAwesome5
+        };
+      case 'review':
+        return {
+          icon: 'star' as const,
+          color: '#EAB308',
+          bgColor: '#FEFCE8',
+          iconComponent: Ionicons
+        };
+      default:
+        return {
+          icon: 'notifications' as const,
+          color: '#6B7280',
+          bgColor: '#F9FAFB',
+          iconComponent: Ionicons
+        };
+    }
+  }, []);
+
+  const config = getNotificationConfig(item);
+
+  useEffect(() => {
+    if (showActions) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showActions, fadeAnim]);
 
   const handlePress = useCallback(() => {
+    if (!item.is_read) {
+      onMarkAsRead(item.id);
+    }
     onPress(item);
-  }, [onPress, item]);
+  }, [onPress, onMarkAsRead, item]);
+
+  const handleMorePress = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowActions(!showActions);
+  }, [showActions]);
+
+  const handleMarkAsRead = useCallback(() => {
+    if (!item.is_read) {
+      onMarkAsRead(item.id);
+    }
+    setShowActions(false);
+  }, [onMarkAsRead, item]);
+
+  const handleDelete = useCallback(() => {
+    onDelete(item.id);
+    setShowActions(false);
+  }, [onDelete, item]);
+
+  const IconComponent = config.iconComponent;
 
   return (
-    <TouchableOpacity 
-      activeOpacity={0.7} 
-      onPress={handlePress}
-      style={[styles.notificationItem, !item.is_read && styles.unreadItem]}
+    <Animated.View 
+      style={[
+        styles.notificationCard,
+        { opacity: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1] }) }
+      ]}
     >
-      <View style={styles.iconContainer}>
-        <Ionicons name={iconName} size={24} color="#c02626ff" />
-        {!item.is_read && <View style={styles.unreadDot} />}
-      </View>
-      <View style={styles.textContainer}>
-        <Text style={styles.notificationTitle}>{item.title}</Text>
-        <Text style={styles.notificationBody}>{item.body}</Text>
-        <Text style={styles.notificationDate}>{formattedDate}</Text>
-      </View>
-      {(item.data?.orderId || item.data?.promotionId) && (
-        <Ionicons name="chevron-forward" size={16} color="#999" style={styles.chevron} />
-      )}
-    </TouchableOpacity>
+      <Card style={[
+        styles.cardContainer,
+        !item.is_read && styles.unreadCard
+      ]}>
+        {/* ✅ مؤشر غير مقروء */}
+        {!item.is_read && (
+          <View style={styles.unreadIndicator} />
+        )}
+
+        <TouchableOpacity 
+          activeOpacity={0.7} 
+          onPress={handlePress}
+          style={styles.notificationContent}
+        >
+          {/* ✅ الأيقونة */}
+          <View style={[styles.iconContainer, { backgroundColor: config.bgColor }]}>
+            <IconComponent name={config.icon} size={scale(20)} color={config.color} />
+          </View>
+
+          {/* ✅ المحتوى */}
+          <View style={styles.textContainer}>
+            <View style={styles.titleRow}>
+              <Text style={[styles.notificationTitle, !item.is_read && styles.unreadTitle]}>
+                {item.title}
+              </Text>
+              <TouchableOpacity onPress={handleMorePress} style={styles.moreButton}>
+                <Ionicons name="ellipsis-vertical" size={scale(16)} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.notificationBody} numberOfLines={2}>
+              {item.body}
+            </Text>
+            <View style={styles.footerRow}>
+              <Text style={styles.notificationDate}>{formattedDate}</Text>
+              {!item.is_read && (
+                <Badge text="جديد" style={styles.newBadge} />
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* ✅ أزرار الإجراءات */}
+        {showActions && (
+          <Animated.View 
+            style={[styles.actionsContainer, { opacity: fadeAnim }]}
+          >
+            <View style={styles.actionsRow}>
+              {!item.is_read && (
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.markReadButton]}
+                  onPress={handleMarkAsRead}
+                >
+                  <Ionicons name="checkmark-circle" size={scale(14)} color="#10B981" />
+                  <Text style={[styles.actionText, styles.markReadText]}>تعيين كمقروء</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.deleteButton]}
+                onPress={handleDelete}
+              >
+                <Ionicons name="trash-outline" size={scale(14)} color="#DC2626" />
+                <Text style={[styles.actionText, styles.deleteText]}>حذف</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
+      </Card>
+    </Animated.View>
   );
 });
 
@@ -82,21 +268,19 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const hasFetchedRef = useRef(false); // ✅ منع إعادة التحميل المتكرر
+  const hasFetchedRef = useRef(false);
 
-  // ✅ useCallback لـ fetchNotifications بدون caching
+  // ✅ useCallback لـ fetchNotifications
   const fetchNotifications = useCallback(async (isRefreshing = false, isAutoRefresh = false) => {
     if (!user) {
       setLoading(false);
       return;
     }
 
-    // ✅ منع إعادة التحميل إذا كانت البيانات موجودة مسبقاً
     if (!isRefreshing && !isAutoRefresh && hasFetchedRef.current) {
       return;
     }
 
-    // لا تعرض loading في التحديث التلقائي
     if (!isAutoRefresh) {
       setError(null);
       if (isRefreshing) {
@@ -119,9 +303,8 @@ export default function NotificationsScreen() {
       
       const notificationsData = data || [];
       setNotifications(notificationsData);
-      hasFetchedRef.current = true; // ✅ وضع علامة أن البيانات تم جلبها
+      hasFetchedRef.current = true;
 
-      // ✅ تتبع نجاح جلب الإشعارات
       if (!isAutoRefresh) {
         trackEvent('notifications_fetched', {
           notifications_count: notificationsData.length,
@@ -135,7 +318,6 @@ export default function NotificationsScreen() {
       setError(errorMessage);
       console.error("Error fetching notifications:", err);
       
-      // ✅ تتبع الأخطاء
       trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
         screen: 'notifications',
         error_type: 'fetch_notifications_failed',
@@ -149,50 +331,43 @@ export default function NotificationsScreen() {
     }
   }, [user]);
 
-  // ✅ useEffect للتحديث التلقائي - منفصل عن useFocusEffect
+  // ✅ useEffect للتحديث التلقائي
   useEffect(() => {
-    // ✅ بدء التحديث التلقائي كل 30 ثانية فقط إذا كان هناك إشعارات غير مقروءة
     const hasUnreadNotifications = notifications.some(n => !n.is_read);
     
     if (hasUnreadNotifications) {
       refreshIntervalRef.current = setInterval(() => {
         console.log('🔄 Auto-refreshing notifications...');
         fetchNotifications(false, true);
-      }, 30000); // 30 ثانية
+      }, 30000);
     }
 
     return () => {
-      // ✅ تنظيف الـ interval عند تغيير notifications
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
         refreshIntervalRef.current = null;
       }
     };
-  }, [notifications, fetchNotifications]); // ✅ يعتمد على notifications الحالية
+  }, [notifications, fetchNotifications]);
 
-  // ✅ useFocusEffect مبسط - للتحميل الأولي فقط
+  // ✅ useFocusEffect للتحميل الأولي
   useFocusEffect(
     useCallback(() => {
-      // ✅ تتبع فتح شاشة الإشعارات
       trackEvent('notifications_screen_viewed', {
         user_id: user?.id,
         has_unread_notifications: notifications.some(n => !n.is_read)
       });
 
-      // ✅ جلب البيانات فقط إذا لم تكن محملة مسبقاً
       if (!hasFetchedRef.current) {
         fetchNotifications();
       }
 
-      return () => {
-        // ✅ لا تقم بتنظيف الـ interval هنا لأنه في useEffect منفصل
-      };
+      return () => {};
     }, [fetchNotifications, user, notifications])
   );
 
   // ✅ useCallback لـ handleNotificationPress
   const handleNotificationPress = useCallback(async (notification: Notification) => {
-    // ✅ تتبع النقر على الإشعار
     trackEvent('notification_tapped', {
       notification_id: notification.id,
       notification_title: notification.title,
@@ -200,61 +375,136 @@ export default function NotificationsScreen() {
       has_action: !!(notification.data?.orderId || notification.data?.promotionId)
     });
 
-    // ✅ تحديث حالة القراءة محلياً للاستجابة الفورية
-    if (!notification.is_read) {
-      setNotifications(currentNotifications =>
-        currentNotifications.map(n =>
-          n.id === notification.id ? { ...n, is_read: true } : n
-        )
-      );
-
-      // ✅ تحديث قاعدة البيانات في الخلفية
-      try {
-        const { error } = await supabase
-          .from('notifications')
-          .update({ is_read: true })
-          .eq('id', notification.id);
-
-        if (error) throw error;
-        
-        console.log(`✅ Notification ${notification.id} marked as read`);
-        
-        // ✅ تتبع تحديث حالة القراءة
-        trackEvent('notification_marked_read', {
-          notification_id: notification.id
-        });
-      } catch (err) {
-        console.error("Failed to mark notification as read:", err);
-        // ✅ استعادة الحالة في حالة الفشل
-        setNotifications(currentNotifications =>
-          currentNotifications.map(n =>
-            n.id === notification.id ? { ...n, is_read: false } : n
-          )
-        );
-      }
-    }
-
-    // ✅ توجيه المستخدم إلى الشاشة المناسبة
     if (notification.data?.orderId) {
       router.push({
         pathname: '/order/[orderId]',
         params: { orderId: notification.data.orderId.toString() }
       });
     } else if (notification.data?.promotionId || notification.data?.type === 'promotion') {
-      // ✅ توجيه كل ما يتعلق بالعروض إلى الصفحة الرئيسية
       router.push('/');
     }
   }, [router]);
 
+  // ✅ useCallback لـ handleMarkAsRead
+  const handleMarkAsRead = useCallback(async (id: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    
+    setNotifications(currentNotifications =>
+      currentNotifications.map(n =>
+        n.id === id ? { ...n, is_read: true } : n
+      )
+    );
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      console.log(`✅ Notification ${id} marked as read`);
+      
+      trackEvent('notification_marked_read', {
+        notification_id: id
+      });
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+      setNotifications(currentNotifications =>
+        currentNotifications.map(n =>
+          n.id === id ? { ...n, is_read: false } : n
+        )
+      );
+    }
+  }, []);
+
+  // ✅ useCallback لـ handleDelete
+  const handleDelete = useCallback(async (id: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    
+    const notificationToDelete = notifications.find(n => n.id === id);
+    setNotifications(currentNotifications =>
+      currentNotifications.filter(n => n.id !== id)
+    );
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      console.log(`🗑️ Notification ${id} deleted`);
+      
+      trackEvent('notification_deleted', {
+        notification_id: id
+      });
+    } catch (err) {
+      console.error("Failed to delete notification:", err);
+      if (notificationToDelete) {
+        setNotifications(currentNotifications => [...currentNotifications, notificationToDelete]);
+      }
+    }
+  }, [notifications]);
+
+  // ✅ useCallback لـ handleMarkAllAsRead
+  const handleMarkAllAsRead = useCallback(async () => {
+    trackEvent('mark_all_notifications_read', {
+      total_notifications: notifications.length,
+      unread_count: unreadCount
+    });
+
+    try {
+      const unreadNotifications = notifications.filter(n => !n.is_read);
+      
+      if (unreadNotifications.length === 0) return;
+
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      
+      setNotifications(currentNotifications =>
+        currentNotifications.map(n => ({ ...n, is_read: true }))
+      );
+
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', user?.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      console.log(`✅ Marked ${unreadNotifications.length} notifications as read`);
+      
+      trackEvent('all_notifications_marked_read', {
+        marked_count: unreadNotifications.length
+      });
+
+    } catch (err) {
+      console.error("Failed to mark all notifications as read:", err);
+      setNotifications(currentNotifications =>
+        currentNotifications.map(n => {
+          const original = notifications.find(original => original.id === n.id);
+          return original ? { ...n, is_read: original.is_read } : n;
+        })
+      );
+    }
+  }, [notifications, user]);
+
   // ✅ useCallback لـ renderItem و keyExtractor
-  const renderNotificationItem = useCallback(({ item }: { item: Notification }) => (
-    <NotificationItem item={item} onPress={handleNotificationPress} />
-  ), [handleNotificationPress]);
+  const renderNotificationItem = useCallback(({ item, index }: { item: Notification; index: number }) => (
+    <NotificationCard 
+      item={item} 
+      index={index}
+      onPress={handleNotificationPress}
+      onMarkAsRead={handleMarkAsRead}
+      onDelete={handleDelete}
+    />
+  ), [handleNotificationPress, handleMarkAsRead, handleDelete]);
 
   const keyExtractor = useCallback((item: Notification) => item.id.toString(), []);
 
   const handleRefresh = useCallback(() => {
-    // ✅ تتبع السحب للتحديث
     trackEvent(AnalyticsEvents.PULL_TO_REFRESH, {
       screen: 'notifications',
       current_notifications_count: notifications.length
@@ -264,7 +514,6 @@ export default function NotificationsScreen() {
   }, [fetchNotifications, notifications.length]);
 
   const handleRetry = useCallback(() => {
-    // ✅ تتبع إعادة المحاولة
     trackEvent('notifications_retry_attempt', {
       previous_error: error
     });
@@ -276,51 +525,6 @@ export default function NotificationsScreen() {
     router.back();
   }, [router]);
 
-  const handleMarkAllAsRead = useCallback(async () => {
-    // ✅ تتبع محاولة تعيين الكل كمقروء
-    trackEvent('mark_all_notifications_read', {
-      total_notifications: notifications.length,
-      unread_count: unreadCount
-    });
-
-    try {
-      const unreadNotifications = notifications.filter(n => !n.is_read);
-      
-      if (unreadNotifications.length === 0) return;
-
-      // ✅ تحديث محلي فوري
-      setNotifications(currentNotifications =>
-        currentNotifications.map(n => ({ ...n, is_read: true }))
-      );
-
-      // ✅ تحديث قاعدة البيانات
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', user?.id)
-        .eq('is_read', false);
-
-      if (error) throw error;
-
-      console.log(`✅ Marked ${unreadNotifications.length} notifications as read`);
-      
-      // ✅ تتبع النجاح
-      trackEvent('all_notifications_marked_read', {
-        marked_count: unreadNotifications.length
-      });
-
-    } catch (err) {
-      console.error("Failed to mark all notifications as read:", err);
-      // ✅ استعادة الحالة في حالة الفشل
-      setNotifications(currentNotifications =>
-        currentNotifications.map(n => {
-          const original = notifications.find(original => original.id === n.id);
-          return original ? { ...n, is_read: original.is_read } : n;
-        })
-      );
-    }
-  }, [notifications, user]);
-
   // ✅ useMemo للبيانات المشتقة
   const unreadCount = useMemo(() => 
     notifications.filter(n => !n.is_read).length, 
@@ -329,101 +533,124 @@ export default function NotificationsScreen() {
 
   const hasNotifications = useMemo(() => notifications.length > 0, [notifications.length]);
 
+  // ✅ تجميع الإشعارات حسب الوقت
+  const groupedNotifications = useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    return {
+      today: notifications.filter(n => new Date(n.created_at) >= today),
+      yesterday: notifications.filter(n => {
+        const notificationDate = new Date(n.created_at);
+        return notificationDate >= yesterday && notificationDate < today;
+      }),
+      earlier: notifications.filter(n => new Date(n.created_at) < yesterday)
+    };
+  }, [notifications]);
+
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#c02626ff" />
+        <ActivityIndicator size="large" color="#DC2626" />
         <Text style={styles.loadingText}>جاري تحميل الإشعارات...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* ✅ رأس الصفحة المحسن */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>الإشعارات</Text>
-          {unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+    <View style={styles.container}>
+      {/* ✅ الهيدر الجديد مع التدرج اللوني */}
+      <LinearGradient
+        colors={['#DC2626', '#DC2626', '#B91C1C']}
+        style={styles.headerGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        {/* ✅ العناصر الزخرفية */}
+        <View style={styles.decorativeCircle1} />
+        <View style={styles.decorativeCircle2} />
+        
+        <View style={styles.headerContent}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={scale(20)} color="white" />
+            </TouchableOpacity>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerTitle}>الإشعارات</Text>
+              {unreadCount > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>{unreadCount} جديد</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
-        <View style={styles.headerActions}>
+          </View>
+
+          {/* ✅ زر تعيين الكل كمقروء */}
           {unreadCount > 0 && (
-            <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
+            <TouchableOpacity 
+              style={styles.markAllButton}
+              onPress={handleMarkAllAsRead}
+            >
+              <Ionicons name="checkmark-circle" size={scale(16)} color="white" />
               <Text style={styles.markAllText}>تعيين الكل كمقروء</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity 
-            onPress={handleRefresh} 
-            style={styles.refreshButton}
-            disabled={refreshing}
-          >
-            <Ionicons 
-              name="refresh" 
-              size={20} 
-              color={refreshing ? "#999" : "#c02626ff"} 
-            />
-          </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
 
-      {/* ✅ عرض الخطأ إذا وجد */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Ionicons name="warning-outline" size={20} color="#c02626ff" />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-            <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* ✅ مؤشر التحديث التلقائي */}
-      {refreshing && (
-        <View style={styles.autoRefreshIndicator}>
-          <ActivityIndicator size="small" color="#c02626ff" />
-          <Text style={styles.autoRefreshText}>جاري تحديث الإشعارات...</Text>
-        </View>
-      )}
-
-      <FlatList
-        data={notifications}
-        keyExtractor={keyExtractor}
-        renderItem={renderNotificationItem}
-        contentContainerStyle={[
-          styles.listContainer,
-          !hasNotifications && styles.emptyListContainer
-        ]}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={handleRefresh} 
-            colors={["#c02626ff"]} 
-            tintColor="#c02626ff"
-          />
-        }
-        showsVerticalScrollIndicator={false}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={12}
-        updateCellsBatchingPeriod={100}
-        windowSize={9}
-        initialNumToRender={8}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="notifications-off-outline" size={80} color="#E5E7EB" />
-            <Text style={styles.emptyText}>لا توجد إشعارات لعرضها</Text>
-            <Text style={styles.emptySubText}>سيظهر هنا أي إشعارات جديدة تتلقاها</Text>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        {/* ✅ عرض الخطأ إذا وجد */}
+        {error && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="warning-outline" size={scale(20)} color="#DC2626" />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+              <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
+            </TouchableOpacity>
           </View>
-        }
-        ListFooterComponent={hasNotifications ? <View style={styles.listFooter} /> : null}
-      />
-    </SafeAreaView>
+        )}
+
+        {/* ✅ مؤشر التحديث */}
+        {refreshing && (
+          <View style={styles.refreshIndicator}>
+            <ActivityIndicator size="small" color="#DC2626" />
+            <Text style={styles.refreshText}>جاري تحديث الإشعارات...</Text>
+          </View>
+        )}
+
+        <FlatList
+          data={[
+            ...groupedNotifications.today.map(n => ({ ...n, _section: 'today' })),
+            ...groupedNotifications.yesterday.map(n => ({ ...n, _section: 'yesterday' })),
+            ...groupedNotifications.earlier.map(n => ({ ...n, _section: 'earlier' }))
+          ]}
+          keyExtractor={keyExtractor}
+          renderItem={renderNotificationItem}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh} 
+              colors={["#DC2626"]} 
+              tintColor="#DC2626"
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="notifications-off-outline" size={scale(80)} color="#E5E7EB" />
+              </View>
+              <Text style={styles.emptyText}>لا توجد إشعارات</Text>
+              <Text style={styles.emptySubText}>أنت على اطلاع بكل شيء!</Text>
+            </View>
+          }
+          ListFooterComponent={<View style={styles.listFooter} />}
+        />
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -433,210 +660,332 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#F5F5F5' 
+    backgroundColor: '#F8FAFC'
   },
-  header: {
+  safeArea: {
+    flex: 1,
+  },
+  
+  // ✅ الهيدر الجديد
+  headerGradient: {
+    height: scale(180),
+    borderBottomLeftRadius: scale(30),
+    borderBottomRightRadius: scale(30),
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  decorativeCircle1: {
+    position: 'absolute',
+    top: -scale(80),
+    right: -scale(80),
+    width: scale(200),
+    height: scale(200),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(100),
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    bottom: -scale(60),
+    left: -scale(60),
+    width: scale(150),
+    height: scale(150),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(75),
+  },
+  headerContent: {
+    paddingHorizontal: scale(20),
+    paddingTop: scale(50),
+    paddingBottom: scale(20),
+  },
+  headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    marginBottom: scale(16),
   },
   backButton: {
-    padding: 8,
+    padding: scale(8),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(20),
+    marginRight: scale(12),
   },
   headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
-  headerTitle: { 
-    fontSize: 22, 
-    fontFamily: 'Cairo-Bold', 
-    color: '#1A1A1A',
-    marginRight: 8,
+  headerTitle: {
+    fontSize: fontScale(24),
+    fontWeight: 'bold',
+    color: 'white',
+    marginRight: scale(12),
   },
   unreadBadge: {
-    backgroundColor: '#c02626ff',
-    borderRadius: 12,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: scale(12),
+    paddingHorizontal: scale(12),
+    paddingVertical: scale(4),
+    backdropFilter: 'blur(10px)',
   },
   unreadBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'Cairo-Bold',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    color: 'white',
+    fontSize: fontScale(12),
+    fontWeight: '600',
   },
   markAllButton: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginRight: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: scale(8),
   },
   markAllText: {
-    color: '#6B7280',
-    fontSize: 12,
-    fontFamily: 'Cairo-SemiBold',
+    color: 'white',
+    fontSize: fontScale(14),
+    opacity: 0.9,
   },
-  refreshButton: {
-    padding: 6,
-  },
+
+  // ✅ عرض الخطأ
   errorContainer: {
-    backgroundColor: '#FFEBEE',
-    padding: 16,
-    margin: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#c02626ff',
+    backgroundColor: '#FEF2F2',
+    padding: scale(16),
+    margin: scale(16),
+    borderRadius: scale(12),
+    borderLeftWidth: scale(4),
+    borderLeftColor: '#DC2626',
     flexDirection: 'row',
     alignItems: 'center',
   },
   errorText: {
-    color: '#c02626ff',
-    fontSize: 14,
+    color: '#DC2626',
+    fontSize: fontScale(14),
     flex: 1,
     textAlign: 'right',
-    fontFamily: 'Cairo-Regular',
-    marginRight: 8,
+    marginRight: scale(8),
   },
   retryButton: {
-    backgroundColor: '#c02626ff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(8),
+    borderRadius: scale(8),
   },
   retryButtonText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    fontFamily: 'Cairo-SemiBold',
+    fontSize: fontScale(14),
+    fontWeight: '600',
   },
-  autoRefreshIndicator: {
+
+  // ✅ مؤشر التحديث
+  refreshIndicator: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
-    paddingVertical: 8,
+    paddingVertical: scale(8),
   },
-  autoRefreshText: {
-    fontSize: 12,
+  refreshText: {
+    fontSize: fontScale(12),
     color: '#6B7280',
-    fontFamily: 'Cairo-Regular',
-    marginLeft: 8,
+    marginLeft: scale(8),
   },
+
+  // ✅ القائمة
+  listContainer: {
+    paddingHorizontal: scale(16),
+    paddingTop: scale(20),
+    paddingBottom: scale(20),
+  },
+
+  // ✅ بطاقة الإشعار
+  notificationCard: {
+    marginBottom: scale(12),
+  },
+  cardContainer: {
+    borderRadius: scale(16),
+    backgroundColor: 'white',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  unreadCard: {
+    backgroundColor: '#FFFFFF',
+  },
+  unreadIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: scale(4),
+    backgroundColor: '#DC2626',
+  },
+  notificationContent: {
+    flexDirection: 'row',
+    padding: scale(16),
+  },
+  iconContainer: {
+    width: scale(44),
+    height: scale(44),
+    borderRadius: scale(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: scale(12),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: scale(4),
+  },
+  notificationTitle: {
+    fontSize: fontScale(16),
+    fontWeight: '600',
+    color: '#6B7280',
+    flex: 1,
+    marginRight: scale(8),
+  },
+  unreadTitle: {
+    color: '#1F2937',
+  },
+  moreButton: {
+    padding: scale(4),
+  },
+  notificationBody: {
+    fontSize: fontScale(14),
+    color: '#6B7280',
+    lineHeight: scale(20),
+    marginBottom: scale(8),
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
+  },
+  notificationDate: {
+    fontSize: fontScale(12),
+    color: '#9CA3AF',
+  },
+  newBadge: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(2),
+  },
+
+  // ✅ أزرار الإجراءات
+  actionsContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    padding: scale(12),
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: scale(8),
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scale(6),
+    paddingVertical: scale(10),
+    borderRadius: scale(8),
+  },
+  markReadButton: {
+    backgroundColor: '#ECFDF5',
+  },
+  deleteButton: {
+    backgroundColor: '#FEF2F2',
+  },
+  actionText: {
+    fontSize: fontScale(12),
+    fontWeight: '600',
+  },
+  markReadText: {
+    color: '#10B981',
+  },
+  deleteText: {
+    color: '#DC2626',
+  },
+
+  // ✅ الحالات الفارغة والتحميل
   centered: { 
     flex: 1, 
     justifyContent: 'center', 
-    alignItems: 'center' 
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-    fontFamily: 'Cairo-Regular',
+    marginTop: scale(16),
+    fontSize: fontScale(16),
+    color: '#6B7280',
   },
-  listContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    paddingTop: 16,
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: scale(80),
+    paddingHorizontal: scale(20),
   },
-  emptyListContainer: {
-    flex: 1,
+  emptyIcon: {
+    width: scale(100),
+    height: scale(100),
+    borderRadius: scale(50),
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
-  },
-  notificationItem: { 
-    flexDirection: 'row', 
-    backgroundColor: '#fff', 
-    padding: 16, 
-    borderRadius: 12, 
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: scale(16),
   },
-  unreadItem: { 
-    backgroundColor: '#fff8f8', 
-    borderWidth: 1, 
-    borderColor: '#ffe0e0' 
-  },
-  iconContainer: { 
-    marginRight: 16, 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    position: 'relative',
-  },
-  unreadDot: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#c02626ff',
-  },
-  textContainer: { 
-    flex: 1, 
-    alignItems: 'flex-start' 
-  },
-  notificationTitle: { 
-    fontSize: 16, 
-    fontFamily: 'Cairo-Bold', 
-    color: '#333',
-    marginBottom: 4,
-  },
-  notificationBody: { 
-    fontSize: 14, 
-    fontFamily: 'Cairo-Regular', 
-    color: '#666', 
-    marginBottom: 6,
-    lineHeight: 20,
-  },
-  notificationDate: { 
-    fontSize: 12, 
-    color: '#999',
-    fontFamily: 'Cairo-Regular',
-  },
-  chevron: {
-    marginLeft: 8,
-  },
-  emptyContainer: { 
-    alignItems: 'center', 
-    paddingHorizontal: 20,
-  },
-  emptyText: { 
-    marginTop: 16, 
-    fontSize: 18, 
-    color: '#555',
-    fontFamily: 'Cairo-Bold',
+  emptyText: {
+    fontSize: fontScale(18),
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: scale(8),
     textAlign: 'center',
   },
-  emptySubText: { 
-    marginTop: 8, 
-    fontSize: 14, 
-    color: '#999', 
-    textAlign: 'center', 
-    fontFamily: 'Cairo-Regular',
-    lineHeight: 20,
+  emptySubText: {
+    fontSize: fontScale(14),
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: scale(20),
   },
   listFooter: {
-    height: 20,
+    height: scale(20),
+  },
+
+  // ✅ المكونات العامة
+  card: {
+    backgroundColor: 'white',
+    borderRadius: scale(12),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  badge: {
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(4),
+    borderRadius: scale(12),
+    backgroundColor: '#DC2626',
+  },
+  badgeText: {
+    fontSize: fontScale(12),
+    fontWeight: '600',
+    color: 'white',
   },
 });

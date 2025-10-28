@@ -10,8 +10,8 @@ import { CartProvider } from '@/lib/useCart';
 
 // ✅ استيراد نظام الصيانة والتحديثات
 import { useAppConfig } from '@/hooks/useAppConfig';
-import { MaintenanceScreen } from '@/components/MaintenanceScreen';
-import { ForceUpdateScreen } from '@/components/ForceUpdateScreen';
+import MaintenanceScreen from './maintenance';
+import ForceUpdateScreen from './force-update';
 
 // ✅ استيراد نظام الإشعارات
 import { 
@@ -115,19 +115,16 @@ const AuthGuard = () => {
   }
 
   // ✅ عرض شاشة الصيانة
-  if (showMaintenance) {
-    return <MaintenanceScreen message={appConfig.maintenance_message} />;
-  }
+ // ✅ عرض شاشة الصيانة
+// ✅ عرض شاشة الصيانة
+if (showMaintenance) {
+  return <MaintenanceScreen />;
+}
 
-  // ✅ عرض شاشة التحديث الإجباري
-  if (showForceUpdate) {
-    return (
-      <ForceUpdateScreen 
-        message={appConfig.force_update_message || 'يوجد تحديث جديد مطلوب'}
-        onUpdate={handleUpdate}
-      />
-    );
-  }
+// ✅ عرض شاشة التحديث الإجباري
+if (showForceUpdate) {
+  return <ForceUpdateScreen />;
+}
 
   return <Slot />;
 };
