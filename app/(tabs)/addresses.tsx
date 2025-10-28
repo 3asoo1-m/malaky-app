@@ -169,23 +169,23 @@ export default function AddressesScreen() {
   };
 
   // ✅ استخراج اسم العنوان ونوعه من الملاحظات
-  const extractAddressInfo = (notes: string) => {
-    if (!notes) return { name: '', type: 'other' };
-    
-    const parts = notes.split(' • ');
-    const name = parts[0] || '';
-    const type = parts[1] || 'other';
-    
-    return { name, type };
-  };
+const extractAddressInfo = (notes: string) => {
+  if (!notes) return { name: '', type: 'other' };
+  
+  const parts = notes.split(' • ');
+  const name = parts[0] || '';
+  const type = parts[1] || 'other';
+  
+  return { name, type };
+};
 
-  // ✅ دالة مساعدة للحصول على اسم العرض
-  const getDisplayName = (item: Address): string => {
-    return item.address_name || 
-           extractAddressInfo(item.notes).name || 
-           item.delivery_zones?.area_name || 
-           'عنوان غير مسمى';
-  };
+// ✅ دالة مساعدة للحصول على اسم العرض
+const getDisplayName = (item: Address): string => {
+  return item.address_name || 
+         extractAddressInfo(item.notes || '').name || 
+         item.delivery_zones?.area_name || 
+         'عنوان غير مسمى';
+};
 
   // ✅ الحصول على اسم العنوان الافتراضي
   const getDefaultAddressName = (): string => {
@@ -200,7 +200,7 @@ export default function AddressesScreen() {
     const isCurrentlySelected = selectedAddress?.id === item.id;
     
     // ✅ استخدام الحقل الجديد address_name أو استخراجه من الملاحظات
-    const addressInfo = extractAddressInfo(item.notes);
+    const addressInfo = extractAddressInfo(item.notes || '');
     const displayName = getDisplayName(item);
     const addressType = addressInfo.type;
     
@@ -448,7 +448,7 @@ export default function AddressesScreen() {
                 if (isSelectionMode) {
                   router.navigate('/(tabs)/cart');
                 } else {
-                  router.back();
+                  router.navigate('/(tabs)/profile');
                 }
               }} 
               style={styles.backButton}
