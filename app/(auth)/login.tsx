@@ -14,12 +14,37 @@ import {
   StatusBar, 
   ScrollView, 
   Image,
-  Dimensions 
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withRepeat, 
+  withTiming, 
+  withSequence,
+  withDelay,
+  Easing,
+  interpolate,
+  useAnimatedProps,
+  withSpring,
+  runOnJS
+} from 'react-native-reanimated';
+import { 
+  Mail, 
+  Phone, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  Crown,
+  LogIn,
+  Sparkles,
+  Star,
+  ChevronRight
+} from 'lucide-react-native';
+import Svg, { Circle, Rect } from 'react-native-svg';
 
 // الألوان المستوحاة من التصميم الجديد
 const COLORS = {
@@ -27,18 +52,277 @@ const COLORS = {
   emailSecondary: '#c91920',
   phonePrimary: '#2D4A9E',
   phoneSecondary: '#1e3a7a',
+  yellow: '#FDB913',
   white: '#FFFFFF',
   lightGray: '#F5F5F5',
   gray: '#6B7280',
   darkGray: '#374151',
-  background: '#FEF7ED',
+  background: '#FFF5F5',
   border: '#E5E7EB',
+  blueBackground: '#F0F4FF',
 };
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ✅ تعريف أنواع البيانات
 type AuthMethod = 'phone' | 'email';
+
+// ✅ مكون الخلفية المتحركة
+const AnimatedBackground = () => {
+  const scale1 = useSharedValue(1);
+  const scale2 = useSharedValue(1);
+  const scale3 = useSharedValue(1);
+  const opacity1 = useSharedValue(0.1);
+  const opacity2 = useSharedValue(0.1);
+  const opacity3 = useSharedValue(0.05);
+
+  const floatAnimation = useSharedValue(0);
+
+  React.useEffect(() => {
+    // تحريك الدوائر الخلفية
+    scale1.value = withRepeat(
+      withSequence(
+        withTiming(1.2, { duration: 4000 }),
+        withTiming(1, { duration: 4000 })
+      ),
+      -1,
+      true
+    );
+
+    scale2.value = withRepeat(
+      withSequence(
+        withDelay(1000, withTiming(1.3, { duration: 5000 })),
+        withTiming(1, { duration: 5000 })
+      ),
+      -1,
+      true
+    );
+
+    scale3.value = withRepeat(
+      withSequence(
+        withDelay(2000, withTiming(1.1, { duration: 3500 })),
+        withTiming(1, { duration: 3500 })
+      ),
+      -1,
+      true
+    );
+
+    opacity1.value = withRepeat(
+      withSequence(
+        withTiming(0.15, { duration: 4000 }),
+        withTiming(0.1, { duration: 4000 })
+      ),
+      -1,
+      true
+    );
+
+    opacity2.value = withRepeat(
+      withSequence(
+        withDelay(1000, withTiming(0.15, { duration: 5000 })),
+        withTiming(0.1, { duration: 5000 })
+      ),
+      -1,
+      true
+    );
+
+    opacity3.value = withRepeat(
+      withSequence(
+        withDelay(2000, withTiming(0.1, { duration: 3500 })),
+        withTiming(0.05, { duration: 3500 })
+      ),
+      -1,
+      true
+    );
+
+    // تحريك الأشكال العائمة
+    floatAnimation.value = withRepeat(
+      withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+  }, []);
+
+  const circle1Style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale1.value }],
+    opacity: opacity1.value,
+  }));
+
+  const circle2Style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale2.value }],
+    opacity: opacity2.value,
+  }));
+
+  const circle3Style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale3.value }],
+    opacity: opacity3.value,
+  }));
+
+  const floatingShape1Style = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(floatAnimation.value, [0, 1], [0, -20]) },
+      { rotate: interpolate(floatAnimation.value, [0, 1], [0, 5]) + 'deg' }
+    ],
+  }));
+
+  const floatingShape2Style = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(floatAnimation.value, [0, 1], [0, -20]) },
+    ],
+  }));
+
+  const floatingShape3Style = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(floatAnimation.value, [0, 1], [0, -20]) },
+    ],
+  }));
+
+  return (
+    <View style={styles.backgroundContainer}>
+      {/* Red Circle - Top Right */}
+      <Animated.View style={[styles.circle, styles.circleRed, circle1Style]} />
+      
+      {/* Blue Circle - Bottom Left */}
+      <Animated.View style={[styles.circle, styles.circleBlue, circle2Style]} />
+      
+      {/* Yellow Circle - Middle */}
+      <Animated.View style={[styles.circle, styles.circleYellow, circle3Style]} />
+
+      {/* Floating Shapes */}
+      <Animated.View style={[styles.floatingShape, styles.floatingShape1, floatingShape1Style]} />
+      <Animated.View style={[styles.floatingShape, styles.floatingShape2, floatingShape2Style]} />
+      <Animated.View style={[styles.floatingShape, styles.floatingShape3, floatingShape3Style]} />
+    </View>
+  );
+};
+
+// ✅ مكون الشعار المتحرك
+const AnimatedLogo = () => {
+  const scale = useSharedValue(0);
+  const rotate = useSharedValue(-180);
+  const sparkleRotate = useSharedValue(0);
+  const starRotate = useSharedValue(0);
+  const sparkleScale = useSharedValue(1);
+  const starScale = useSharedValue(1);
+
+  React.useEffect(() => {
+    scale.value = withSpring(1, { damping: 15, stiffness: 120 });
+    rotate.value = withSpring(0, { damping: 15, stiffness: 120 });
+    
+    sparkleRotate.value = withRepeat(
+      withTiming(360, { duration: 20000, easing: Easing.linear }),
+      -1,
+      false
+    );
+    
+    starRotate.value = withRepeat(
+      withTiming(-360, { duration: 15000, easing: Easing.linear }),
+      -1,
+      false
+    );
+
+    sparkleScale.value = withRepeat(
+      withSequence(
+        withTiming(1.2, { duration: 2000 }),
+        withTiming(1, { duration: 2000 })
+      ),
+      -1,
+      true
+    );
+
+    starScale.value = withRepeat(
+      withSequence(
+        withDelay(500, withTiming(1.2, { duration: 2500 })),
+        withTiming(1, { duration: 2500 })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const logoStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }, { rotate: rotate.value + 'deg' }],
+  }));
+
+  const sparkleStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: sparkleRotate.value + 'deg' }, { scale: sparkleScale.value }],
+  }));
+
+  const starStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: starRotate.value + 'deg' }, { scale: starScale.value }],
+  }));
+
+  return (
+    <Animated.View style={[styles.logoContainer, logoStyle]}>
+      <Image 
+        source={require('@/assets/images/malakylogo.png')} 
+        style={styles.logoImage} 
+      />
+      
+      {/* Sparkle decoration */}
+      <Animated.View style={[styles.sparkleDecoration, styles.sparkleTopRight, sparkleStyle]}>
+        <Sparkles size={24} color={COLORS.yellow} fill={COLORS.yellow} />
+      </Animated.View>
+      
+      {/* Star decoration */}
+      <Animated.View style={[styles.sparkleDecoration, styles.starBottomLeft, starStyle]}>
+        <Star size={20} color={COLORS.emailPrimary} fill={COLORS.emailPrimary} />
+      </Animated.View>
+    </Animated.View>
+  );
+};
+
+// ✅ مكون الزر المتحرك
+const AnimatedButton = ({ 
+  children, 
+  onPress, 
+  colors, 
+  disabled = false 
+}: { 
+  children: React.ReactNode; 
+  onPress: () => void; 
+  colors: { primary: string; secondary: string };
+  disabled?: boolean;
+}) => {
+  const scale = useSharedValue(1);
+  const pressProgress = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(pressProgress.value, [0, 1], [-200, 200]) }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.98);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1);
+  };
+
+  return (
+    <TouchableOpacity
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.8}
+    >
+      <Animated.View style={[styles.animatedButton, { backgroundColor: colors.primary }, animatedStyle]}>
+        <Animated.View 
+          style={[
+            styles.buttonShimmer, 
+            { backgroundColor: 'rgba(255,255,255,0.2)' },
+            shimmerStyle
+          ]} 
+        />
+        {children}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -58,6 +342,15 @@ export default function LoginScreen() {
   const phoneRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
+
+  // ✅ الحصول على الألوان الحالية بناءً على طريقة المصادقة
+  const getCurrentColors = () => {
+    return authMethod === 'email' 
+      ? { primary: COLORS.emailPrimary, secondary: COLORS.emailSecondary }
+      : { primary: COLORS.phonePrimary, secondary: COLORS.phoneSecondary };
+  };
+
+  const colors = getCurrentColors();
 
   // ✅ دالة تسجيل الدخول
   const handleLogin = async () => {
@@ -130,28 +423,16 @@ export default function LoginScreen() {
 
   // ✅ مكون التبويبات
   const AuthTabs = () => {
-    const getTabColors = () => {
-      return authMethod === 'email' 
-        ? { primary: COLORS.emailPrimary, secondary: COLORS.emailSecondary }
-        : { primary: COLORS.phonePrimary, secondary: COLORS.phoneSecondary };
-    };
-
-    const colors = getTabColors();
-
     return (
       <View style={styles.tabsContainer}>
         <TouchableOpacity
           style={[
             styles.tabButton,
-            authMethod === 'email' && [styles.tabButtonActive, { backgroundColor: colors.primary }]
+            authMethod === 'email' && [styles.tabButtonActive, { backgroundColor: COLORS.emailPrimary }]
           ]}
           onPress={() => setAuthMethod('email')}
         >
-          <Ionicons 
-            name="mail-outline" 
-            size={20} 
-            color={authMethod === 'email' ? COLORS.white : COLORS.gray} 
-          />
+          <Mail size={20} color={authMethod === 'email' ? COLORS.white : COLORS.gray} />
           <Text style={[
             styles.tabText,
             authMethod === 'email' && styles.tabTextActive
@@ -163,38 +444,51 @@ export default function LoginScreen() {
         <TouchableOpacity
           style={[
             styles.tabButton,
-            authMethod === 'phone' && [styles.tabButtonActive, { backgroundColor: colors.primary }]
+            authMethod === 'phone' && [styles.tabButtonActive, { backgroundColor: COLORS.phonePrimary }]
           ]}
           onPress={() => setAuthMethod('phone')}
         >
-          <Ionicons 
-            name="call-outline" 
-            size={20} 
-            color={authMethod === 'phone' ? COLORS.white : COLORS.gray} 
-          />
+          <Phone size={20} color={authMethod === 'phone' ? COLORS.white : COLORS.gray} />
           <Text style={[
             styles.tabText,
             authMethod === 'phone' && styles.tabTextActive
           ]}>
-            رقم الهاتف
+            رقم الجوال
           </Text>
         </TouchableOpacity>
       </View>
     );
   };
 
-  // ✅ الحصول على الألوان الحالية بناءً على طريقة المصادقة
-  const getCurrentColors = () => {
-    return authMethod === 'email' 
-      ? { primary: COLORS.emailPrimary, secondary: COLORS.emailSecondary }
-      : { primary: COLORS.phonePrimary, secondary: COLORS.phoneSecondary };
-  };
+  // ✅ مكون الشارات المتحركة
+  const AnimatedBadge = ({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) => {
+    const opacity = useSharedValue(0);
+    const scale = useSharedValue(0.8);
 
-  const colors = getCurrentColors();
+    React.useEffect(() => {
+      opacity.value = withDelay(delay, withSpring(1));
+      scale.value = withDelay(delay, withSpring(1));
+    }, []);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+      opacity: opacity.value,
+      transform: [{ scale: scale.value }],
+    }));
+
+    return (
+      <Animated.View style={[styles.badge, animatedStyle]}>
+        {children}
+      </Animated.View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent />
+      
+      {/* الخلفية المتحركة */}
+      <AnimatedBackground />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingContainer}
@@ -207,18 +501,29 @@ export default function LoginScreen() {
         >
           {/* الهيدر */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Image 
-                source={require('@/assets/images/malakylogo.png')} 
-                style={styles.logo} 
-              />
+            <AnimatedLogo />
+            
+            <View style={styles.titleContainer}>
+              <Text style={styles.title}>مرحباً بك!</Text>
+              <Text style={styles.subtitle}>سجل دخولك للاستمتاع بالذ الوجبات الملكية !</Text>
             </View>
-            <Text style={styles.title}>أهلاً بعودتك!</Text>
-            <Text style={styles.subtitle}>سجل الدخول للاستمتاع بوجبات الدجاج الملكي اللذيذة</Text>
+
+            {/* الشارات الإحصائية */}
+            <View style={styles.badgesContainer}>
+              <AnimatedBadge delay={200}>
+                <Star size={12} color={COLORS.yellow} fill={COLORS.yellow} />
+                <Text style={styles.badgeText}>نكهة أبدية</Text>
+              </AnimatedBadge>
+              <AnimatedBadge>
+                <Crown size={12} color={COLORS.emailPrimary} />
+                <Text style={styles.badgeText}>جودة ملكية</Text>
+              </AnimatedBadge>
+              
+            </View>
           </View>
 
-          {/* البطاقة الرئيسية */}
-          <View style={styles.card}>
+          {/* بطاقة تسجيل الدخول */}
+          <Animated.View style={styles.loginCard}>
             {/* التبويبات */}
             <AuthTabs />
 
@@ -231,16 +536,11 @@ export default function LoginScreen() {
                     styles.inputContainer,
                     errorText && styles.inputContainerError
                   ]}>
-                    <Ionicons 
-                      name="call-outline" 
-                      size={22} 
-                      color={errorText ? COLORS.emailPrimary : COLORS.gray} 
-                      style={styles.inputIcon} 
-                    />
+                    <Phone size={20} color={errorText ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                     <TextInput
                       ref={phoneRef}
                       style={styles.inputField}
-                      placeholder="رقم الهاتف (05)"
+                      placeholder="05X XXX XXXX"
                       value={phone}
                       onChangeText={handlePhoneChange}
                       keyboardType="phone-pad"
@@ -257,16 +557,11 @@ export default function LoginScreen() {
                     styles.inputContainer,
                     errorText && styles.inputContainerError
                   ]}>
-                    <Ionicons 
-                      name="mail-outline" 
-                      size={22} 
-                      color={errorText ? COLORS.emailPrimary : COLORS.gray} 
-                      style={styles.inputIcon} 
-                    />
+                    <Mail size={20} color={errorText ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                     <TextInput
                       ref={emailRef}
                       style={styles.inputField}
-                      placeholder="البريد الإلكتروني"
+                      placeholder="example@email.com"
                       value={email}
                       onChangeText={handleEmailChange}
                       keyboardType="email-address"
@@ -284,16 +579,11 @@ export default function LoginScreen() {
                   styles.inputContainer,
                   errorText && styles.inputContainerError
                 ]}>
-                  <Ionicons 
-                    name="lock-closed-outline" 
-                    size={22} 
-                    color={errorText ? colors.primary : COLORS.gray} 
-                    style={styles.inputIcon} 
-                  />
+                  <Lock size={20} color={errorText ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                   <TextInput
                     ref={passwordRef}
                     style={styles.inputField}
-                    placeholder="كلمة المرور"
+                    placeholder="••••••••"
                     value={password}
                     onChangeText={handlePasswordChange}
                     secureTextEntry={!isPasswordVisible}
@@ -306,11 +596,10 @@ export default function LoginScreen() {
                     onPress={() => setIsPasswordVisible(!isPasswordVisible)}
                     style={styles.visibilityButton}
                   >
-                    <Ionicons 
-                      name={isPasswordVisible ? "eye-off-outline" : "eye-outline"} 
-                      size={24} 
-                      color={COLORS.gray} 
-                    />
+                    {isPasswordVisible ? 
+                      <EyeOff size={20} color={COLORS.gray} /> : 
+                      <Eye size={20} color={COLORS.gray} />
+                    }
                   </TouchableOpacity>
                 </View>
               </View>
@@ -318,8 +607,7 @@ export default function LoginScreen() {
               {/* رسالة الخطأ */}
               {errorText && (
                 <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle-outline" size={20} color={colors.primary} />
-                  <Text style={styles.errorText}>{errorText}</Text>
+                  <Text style={[styles.errorText, { color: colors.primary }]}>{errorText}</Text>
                 </View>
               )}
 
@@ -334,52 +622,57 @@ export default function LoginScreen() {
                     rememberMe && [styles.checkboxChecked, { backgroundColor: colors.primary }]
                   ]}>
                     {rememberMe && (
-                      <Ionicons name="checkmark" size={16} color={COLORS.white} />
+                      <Text style={styles.checkmark}>✓</Text>
                     )}
                   </View>
                   <Text style={styles.rememberMeText}>تذكرني</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity>
-                  <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
-                    نسيت كلمة المرور؟
-                  </Text>
+                  <View style={styles.forgotPasswordContainer}>
+                    <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+                      نسيت كلمة المرور؟
+                    </Text>
+                    <ChevronRight size={12} color={colors.primary} />
+                  </View>
                 </TouchableOpacity>
               </View>
 
               {/* زر تسجيل الدخول */}
-              <TouchableOpacity 
-                style={[
-                  styles.button, 
-                  { backgroundColor: colors.primary },
-                  loading && styles.buttonDisabled
-                ]} 
+              <AnimatedButton 
                 onPress={handleLogin} 
+                colors={colors}
                 disabled={loading}
               >
-                <Ionicons name="log-in-outline" size={20} color={COLORS.white} style={styles.buttonIcon} />
+                <LogIn size={20} color={COLORS.white} />
                 <Text style={styles.buttonText}>
                   {loading ? 'جاري التسجيل...' : 'تسجيل الدخول'}
                 </Text>
-              </TouchableOpacity>
+              </AnimatedButton>
             </View>
 
             {/* الفاصل */}
             <View style={styles.separatorContainer}>
               <View style={styles.separatorLine} />
-              <Text style={styles.separatorText}>أو تابع باستخدام</Text>
+              <Text style={styles.separatorText}>أو تسجيل الدخول عبر</Text>
               <View style={styles.separatorLine} />
             </View>
 
             {/* تسجيل الدخول الاجتماعي */}
             <View style={styles.socialContainer}>
               <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-google" size={20} color="#DB4437" />
+                {/* أيقونة Google */}
+                <View style={styles.googleIcon}>
+                  <Text style={styles.googleIconText}>G</Text>
+                </View>
                 <Text style={styles.socialText}>Google</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-facebook" size={20} color="#1877F2" />
+                {/* أيقونة Facebook */}
+                <View style={styles.facebookIcon}>
+                  <Text style={styles.facebookIconText}>f</Text>
+                </View>
                 <Text style={styles.socialText}>Facebook</Text>
               </TouchableOpacity>
             </View>
@@ -388,24 +681,32 @@ export default function LoginScreen() {
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>
                 ليس لديك حساب؟{' '}
-                <Text 
-                  style={[styles.signupLink, { color: colors.primary }]}
-                  onPress={() => router.replace('/(auth)/register')}
-                >
-                  أنشئ حساباً
-                </Text>
               </Text>
+              <TouchableOpacity onPress={() => router.replace('/(auth)/register')}>
+                <View style={styles.signupLinkContainer}>
+                  <Text style={[styles.signupLink, { color: colors.primary }]}>
+                    إنشاء حساب جديد
+                  </Text>
+                  <ChevronRight size={12} color={colors.primary} />
+                </View>
+              </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
 
           {/* التذييل */}
           <View style={styles.footer}>
             <View style={styles.footerRow}>
-              <Ionicons name="sparkles" size={16} color={COLORS.emailPrimary} />
-              <Text style={styles.footerText}>دجاج بروست بجودة ممتازة</Text>
+              <Crown size={16} color={COLORS.emailPrimary} />
+              <Text style={styles.footerText}>دجاج بروستد بجودة ملكية</Text>
             </View>
+            
+            <View style={styles.footerBadge}>
+              <Sparkles size={12} color={COLORS.yellow} />
+              <Text style={styles.footerBadgeText}>طعم لا يُنسى منذ سنوات</Text>
+            </View>
+            
             <Text style={styles.footerCopyright}>
-              © 2025 الدجاج الملكي. جميع الحقوق محفوظة.
+              © 2025 ملكي بروست تشكن. جميع الحقوق محفوظة
             </Text>
           </View>
         </ScrollView>
@@ -414,7 +715,7 @@ export default function LoginScreen() {
   );
 }
 
-// ✅ التنسيقات الجديدة
+// ✅ التنسيقات
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
@@ -425,11 +726,78 @@ const styles = StyleSheet.create({
   },
   scrollContainer: { 
     flexGrow: 1, 
-    paddingHorizontal: 25, 
+    paddingHorizontal: 20, 
     paddingVertical: 20,
     justifyContent: 'center',
   },
   
+  // الخلفية المتحركة
+  backgroundContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  circle: {
+    position: 'absolute',
+    borderRadius: 500,
+    opacity: 0.1,
+  },
+  circleRed: {
+    width: 384,
+    height: 384,
+    backgroundColor: COLORS.emailPrimary,
+    top: -80,
+    right: -80,
+  },
+  circleBlue: {
+    width: 384,
+    height: 384,
+    backgroundColor: COLORS.phonePrimary,
+    bottom: -128,
+    left: -128,
+  },
+  circleYellow: {
+    width: 384,
+    height: 384,
+    backgroundColor: COLORS.yellow,
+    top: '50%',
+    left: '50%',
+    marginLeft: -192,
+    marginTop: -192,
+  },
+  floatingShape: {
+    position: 'absolute',
+  },
+  floatingShape1: {
+    width: 64,
+    height: 64,
+    borderWidth: 4,
+    borderColor: 'rgba(227, 30, 36, 0.2)',
+    borderRadius: 16,
+    top: 80,
+    right: 160,
+  },
+  floatingShape2: {
+    width: 48,
+    height: 48,
+    backgroundColor: 'rgba(45, 74, 158, 0.1)',
+    borderRadius: 24,
+    bottom: 128,
+    left: 128,
+  },
+  floatingShape3: {
+    width: 32,
+    height: 32,
+    backgroundColor: 'rgba(253, 185, 19, 0.2)',
+    borderRadius: 8,
+    top: 160,
+    left: 80,
+    transform: [{ rotate: '45deg' }],
+  },
+
   // الهيدر
   header: { 
     alignItems: 'center', 
@@ -437,11 +805,28 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginBottom: 16,
+    position: 'relative',
   },
-  logo: { 
-    width: 80, 
-    height: 80, 
-    resizeMode: 'contain' 
+  logoImage: { 
+    width: 96, 
+    height: 96, 
+    resizeMode: 'contain',
+    borderRadius: 48,
+  },
+  sparkleDecoration: {
+    position: 'absolute',
+  },
+  sparkleTopRight: {
+    top: -8,
+    right: -8,
+  },
+  starBottomLeft: {
+    bottom: -8,
+    left: -8,
+  },
+  titleContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
   },
   title: { 
     fontSize: 28, 
@@ -455,10 +840,30 @@ const styles = StyleSheet.create({
     color: COLORS.gray, 
     textAlign: 'center',
   },
+  badgesContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 4,
+  },
+  badgeText: {
+    fontSize: 12,
+    color: COLORS.darkGray,
+    fontWeight: '500',
+  },
 
-  // البطاقة الرئيسية
-  card: {
-    backgroundColor: COLORS.white,
+  // بطاقة تسجيل الدخول
+  loginCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     borderRadius: 24,
     padding: 24,
     marginBottom: 20,
@@ -468,15 +873,16 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 8,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    overflow: 'hidden',
   },
 
   // التبويبات
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: 'rgba(243, 244, 246, 0.8)',
     borderRadius: 16,
-    padding: 4,
+    padding: 6,
     marginBottom: 24,
   },
   tabButton: {
@@ -496,7 +902,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   tabText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: COLORS.gray,
   },
@@ -514,17 +920,12 @@ const styles = StyleSheet.create({
   inputContainer: { 
     flexDirection: 'row-reverse', 
     alignItems: 'center', 
-    backgroundColor: COLORS.white, 
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     borderRadius: 12, 
     paddingHorizontal: 16, 
     height: 56,
     borderWidth: 1,
     borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
   },
   inputContainerError: {
     borderColor: COLORS.emailPrimary,
@@ -544,15 +945,11 @@ const styles = StyleSheet.create({
 
   // رسائل الخطأ
   errorContainer: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
     marginBottom: 16,
     paddingHorizontal: 4,
-    gap: 8,
   },
   errorText: {
     fontSize: 14,
-    color: COLORS.emailPrimary,
     textAlign: 'right',
     fontWeight: '500',
   },
@@ -581,9 +978,19 @@ const styles = StyleSheet.create({
   checkboxChecked: {
     borderColor: 'transparent',
   },
+  checkmark: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   rememberMeText: {
     fontSize: 14,
     color: COLORS.gray,
+  },
+  forgotPasswordContainer: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
   },
   forgotPasswordText: {
     fontSize: 14,
@@ -591,7 +998,7 @@ const styles = StyleSheet.create({
   },
 
   // زر تسجيل الدخول
-  button: { 
+  animatedButton: {
     flexDirection: 'row-reverse',
     paddingVertical: 16, 
     borderRadius: 16, 
@@ -603,18 +1010,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
+    overflow: 'hidden',
+    gap: 8,
   },
   buttonText: { 
     color: COLORS.white, 
     fontSize: 18, 
     fontWeight: 'bold',
-    marginRight: 8,
   },
-  buttonIcon: {
-    marginLeft: 8,
+  buttonShimmer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 
   // الفاصل
@@ -632,7 +1041,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.gray,
     marginHorizontal: 12,
-    backgroundColor: COLORS.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     paddingHorizontal: 8,
   },
 
@@ -651,7 +1060,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     gap: 8,
   },
   socialText: {
@@ -659,20 +1068,54 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     fontWeight: '500',
   },
+  googleIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#4285F4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  googleIconText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  facebookIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#1877F2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  facebookIconText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
 
   // رابط إنشاء حساب
   signupContainer: {
+    flexDirection: 'row-reverse',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+    gap: 4,
   },
   signupText: {
     fontSize: 14,
     color: COLORS.gray,
-    textAlign: 'center',
+  },
+  signupLinkContainer: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 2,
   },
   signupLink: {
+    fontSize: 14,
     fontWeight: 'bold',
   },
 
@@ -689,6 +1132,23 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     color: COLORS.gray,
+  },
+  footerBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 4,
+    marginBottom: 8,
+  },
+  footerBadgeText: {
+    fontSize: 12,
+    color: COLORS.darkGray,
+    fontWeight: '500',
   },
   footerCopyright: {
     fontSize: 12,
