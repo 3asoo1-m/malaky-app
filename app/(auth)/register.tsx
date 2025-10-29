@@ -14,24 +14,29 @@ import {
   StatusBar, 
   ScrollView, 
   Image,
-  Linking 
+  Linking,
+  Dimensions 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 
-// تعريف الألوان المستوحاة من الشعار
+// تعريف الألوان المستوحاة من التصميم الجديد
 const COLORS = {
-  primary: '#0033A0',
-  secondary: '#E4002B',
+  primary: '#DC2626', // الأحمر الأساسي
+  primaryGradient: ['#DC2626', '#EA580C'], // التدرج من الأحمر إلى البرتقالي
+  secondary: '#FEF2F2',
   white: '#FFFFFF',
   lightGray: '#F5F5F5',
-  gray: '#A9A9A9',
-  darkGray: '#333333',
+  gray: '#6B7280',
+  darkGray: '#374151',
   success: '#22C55E',
   error: '#EF4444',
+  background: '#FEF7ED', // خلفية كريمي فاتح
 };
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ✅ تعريف أنواع البيانات
 type AuthMethod = 'phone' | 'email';
@@ -44,8 +49,7 @@ interface PasswordValidationState {
 }
 
 interface FormErrors {
-  firstName?: string;
-  lastName?: string;
+  fullName?: string;
   email?: string;
   phone?: string;
   password?: string;
@@ -89,6 +93,77 @@ const ErrorMessage = ({ message }: { message?: string }) => {
   );
 };
 
+// ✅ مكون التبويبات
+const AuthTabs = ({ activeTab, onTabChange }: { activeTab: AuthMethod; onTabChange: (tab: AuthMethod) => void }) => (
+  <View style={styles.tabsContainer}>
+    <TouchableOpacity
+      style={[
+        styles.tabButton,
+        activeTab === 'email' && styles.tabButtonActive
+      ]}
+      onPress={() => onTabChange('email')}
+    >
+      <Ionicons 
+        name="mail-outline" 
+        size={20} 
+        color={activeTab === 'email' ? COLORS.white : COLORS.gray} 
+      />
+      <Text style={[
+        styles.tabText,
+        activeTab === 'email' && styles.tabTextActive
+      ]}>
+        البريد الإلكتروني
+      </Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={[
+        styles.tabButton,
+        activeTab === 'phone' && styles.tabButtonActive
+      ]}
+      onPress={() => onTabChange('phone')}
+    >
+      <Ionicons 
+        name="call-outline" 
+        size={20} 
+        color={activeTab === 'phone' ? COLORS.white : COLORS.gray} 
+      />
+      <Text style={[
+        styles.tabText,
+        activeTab === 'phone' && styles.tabTextActive
+      ]}>
+        رقم الهاتف
+      </Text>
+    </TouchableOpacity>
+  </View>
+);
+
+// ✅ مكون فوائد التسجيل
+const BenefitsSection = () => {
+  const benefits = [
+    "عروض حصرية وخصومات",
+    "تجربة دفع سريعة",
+    "تتبع طلباتك في الوقت الحقيقي",
+    "حفظ العناصر المفضلة لديك"
+  ];
+
+  return (
+    <View style={styles.benefitsContainer}>
+      <Text style={styles.benefitsTitle}>لماذا تنضم إلى الدجاج الملكي؟</Text>
+      <View style={styles.benefitsList}>
+        {benefits.map((benefit, index) => (
+          <View key={index} style={styles.benefitItem}>
+            <View style={styles.benefitIcon}>
+              <Ionicons name="checkmark" size={16} color={COLORS.primary} />
+            </View>
+            <Text style={styles.benefitText}>{benefit}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
 export default function RegisterScreen() {
   const router = useRouter();
   
@@ -98,13 +173,13 @@ export default function RegisterScreen() {
   const [phoneNumber, setPhoneNumber] = useState('05');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const [passwordValidation, setPasswordValidation] = useState<PasswordValidationState>({
     minLength: false,
@@ -115,8 +190,7 @@ export default function RegisterScreen() {
 
   // ✅ المراجع
   const scrollViewRef = useRef<ScrollView>(null);
-  const firstNameRef = useRef<TextInput>(null);
-  const lastNameRef = useRef<TextInput>(null);
+  const fullNameRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -135,16 +209,10 @@ export default function RegisterScreen() {
 
   const validateField = (field: string, value: string): string => {
     switch (field) {
-      case 'firstName':
-        if (!value.trim()) return 'الرجاء إدخال الاسم الأول';
-        if (value.trim().length < 2) return 'الاسم الأول يجب أن يكون حرفين على الأقل';
-        if (!/^[\u0600-\u06FFa-zA-Z\s]+$/.test(value.trim())) return 'الاسم الأول يجب أن يحتوي على حروف فقط';
-        return '';
-
-      case 'lastName':
-        if (!value.trim()) return 'الرجاء إدخال اسم العائلة';
-        if (value.trim().length < 2) return 'اسم العائلة يجب أن يكون حرفين على الأقل';
-        if (!/^[\u0600-\u06FFa-zA-Z\s]+$/.test(value.trim())) return 'اسم العائلة يجب أن يحتوي على حروف فقط';
+      case 'fullName':
+        if (!value.trim()) return 'الرجاء إدخال الاسم الكامل';
+        if (value.trim().length < 2) return 'الاسم الكامل يجب أن يكون حرفين على الأقل';
+        if (!/^[\u0600-\u06FFa-zA-Z\s]+$/.test(value.trim())) return 'الاسم الكامل يجب أن يحتوي على حروف فقط';
         return '';
 
       case 'email':
@@ -177,8 +245,7 @@ export default function RegisterScreen() {
   const handleFieldChange = (field: string, value: string) => {
     // تحديث القيمة
     switch (field) {
-      case 'firstName': setFirstName(value); break;
-      case 'lastName': setLastName(value); break;
+      case 'fullName': setFullName(value); break;
       case 'email': setEmail(value); break;
       case 'phone': setPhoneNumber(value); break;
       case 'password': 
@@ -204,8 +271,7 @@ export default function RegisterScreen() {
 
   const getFieldValue = (field: string): string => {
     switch (field) {
-      case 'firstName': return firstName;
-      case 'lastName': return lastName;
+      case 'fullName': return fullName;
       case 'email': return email;
       case 'phone': return phoneNumber;
       case 'password': return password;
@@ -233,7 +299,12 @@ export default function RegisterScreen() {
 
   // ✅ التحقق النهائي من النموذج
   const validateForm = (): boolean => {
-    const fieldsToValidate = ['firstName', 'lastName', 'password', 'confirmPassword'];
+    if (!agreedToTerms) {
+      Alert.alert('خطأ', 'الرجاء الموافقة على الشروط والأحكام');
+      return false;
+    }
+
+    const fieldsToValidate = ['fullName', 'password', 'confirmPassword'];
     if (authMethod === 'email') fieldsToValidate.push('email');
     if (authMethod === 'phone') fieldsToValidate.push('phone');
 
@@ -257,20 +328,24 @@ export default function RegisterScreen() {
   // ✅ دالة التسجيل الرئيسية
   const handleRegister = async () => {
     if (!validateForm()) {
-      Alert.alert('خطأ', 'الرجاء تصحيح الأخطاء في النموذج');
       return;
     }
 
     setLoading(true);
 
     try {
+      // تقسيم الاسم الكامل إلى اسم أول واسم عائلة
+      const nameParts = fullName.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
       const credentials = {
         password: password,
         options: {
           data: {
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            full_name: `${firstName.trim()} ${lastName.trim()}`,
+            first_name: firstName,
+            last_name: lastName,
+            full_name: fullName.trim(),
           },
         },
       };
@@ -303,16 +378,15 @@ export default function RegisterScreen() {
         .from('profiles')
         .insert({
           id: data.user.id,
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          full_name: `${firstName.trim()} ${lastName.trim()}`,
+          first_name: firstName,
+          last_name: lastName,
+          full_name: fullName.trim(),
           phone: authMethod === 'phone' ? internationalPhone : null,
           email: authMethod === 'email' ? email.trim() : null,
         });
 
       if (profileError) {
         console.error('Error creating profile:', profileError);
-        // لا نوقف العملية إذا فشل إنشاء البروفايل، نكتفي بتسجيل الخطأ
       }
 
         if (authMethod === 'phone') {
@@ -322,8 +396,7 @@ export default function RegisterScreen() {
             [{ text: 'حسناً', onPress: () => {
               router.push({ 
                 pathname: '/(auth)/verify-otp', 
-                params: { phone: internationalPhone,
-                   type: 'signup' } 
+                params: { phone: internationalPhone, type: 'signup' } 
               });
             }}]
           );
@@ -364,41 +437,9 @@ export default function RegisterScreen() {
     }
   };
 
-  // ✅ مكون مبدل طرق التسجيل
-  const AuthMethodSwitcher = () => (
-    <View style={styles.switcherContainer}>
-      <TouchableOpacity
-        style={[styles.switcherButton, authMethod === 'phone' && styles.switcherActiveButton]}
-        onPress={() => switchAuthMethod('phone')}
-      >
-        <Ionicons 
-          name="call-outline" 
-          size={20} 
-          color={authMethod === 'phone' ? COLORS.primary : COLORS.gray} 
-        />
-        <Text style={[styles.switcherText, authMethod === 'phone' && styles.switcherActiveText]}>
-          رقم الهاتف
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.switcherButton, authMethod === 'email' && styles.switcherActiveButton]}
-        onPress={() => switchAuthMethod('email')}
-      >
-        <Ionicons 
-          name="mail-outline" 
-          size={20} 
-          color={authMethod === 'email' ? COLORS.primary : COLORS.gray} 
-        />
-        <Text style={[styles.switcherText, authMethod === 'email' && styles.switcherActiveText]}>
-          البريد الإلكتروني
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingContainer}
@@ -409,195 +450,205 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* الهيدر */}
           <View style={styles.header}>
-            <Image source={require('@/assets/images/icon.png')} style={styles.logo} />
+            <View style={styles.logoContainer}>
+              <Ionicons name="sparkles" size={32} color={COLORS.white} />
+            </View>
+            <Text style={styles.title}>أنشئ حسابك</Text>
+            <Text style={styles.subtitle}>انضم إلينا واستمتع بوجبات لذيذة</Text>
           </View>
 
-          <Text style={styles.title}>أنشئ حسابك الآن</Text>
-          <Text style={styles.subtitle}>أهلاً بك في عائلة الملكي!</Text>
+          {/* التبويبات */}
+          <AuthTabs activeTab={authMethod} onTabChange={switchAuthMethod} />
 
-          <AuthMethodSwitcher />
-
-          {/* ✅ حقول الاسم */}
-          <View style={styles.nameContainer}>
-            <View style={styles.nameInputWrapper}>
-              <TextInput
-                ref={lastNameRef}
-                style={[
-                  styles.nameInput,
-                  formErrors.lastName && styles.inputError
-                ]}
-                placeholder="اسم العائلة"
-                value={lastName}
-                onChangeText={(value) => handleFieldChange('lastName', value)}
-                onBlur={() => handleFieldBlur('lastName')}
-                placeholderTextColor={COLORS.gray}
-                onFocus={() => handleFocus(lastNameRef)}
-                returnKeyType="next"
-                onSubmitEditing={() => firstNameRef.current?.focus()}
-              />
-              <ErrorMessage message={formErrors.lastName} />
-            </View>
-
-            <View style={styles.nameInputWrapper}>
-              <TextInput
-                ref={firstNameRef}
-                style={[
-                  styles.nameInput,
-                  formErrors.firstName && styles.inputError
-                ]}
-                placeholder="الاسم الأول"
-                value={firstName}
-                onChangeText={(value) => handleFieldChange('firstName', value)}
-                onBlur={() => handleFieldBlur('firstName')}
-                placeholderTextColor={COLORS.gray}
-                onFocus={() => handleFocus(firstNameRef)}
-                returnKeyType="next"
-                onSubmitEditing={() => authMethod === 'phone' ? phoneRef.current?.focus() : emailRef.current?.focus()}
-              />
-              <ErrorMessage message={formErrors.firstName} />
-            </View>
-          </View>
-
-          {/* ✅ حقل الهاتف أو البريد */}
-          {authMethod === 'phone' ? (
+          {/* النموذج */}
+          <View style={styles.formContainer}>
+            {/* حقل الاسم الكامل */}
             <View style={styles.inputWrapper}>
               <View style={[
                 styles.inputContainer,
-                formErrors.phone && styles.inputContainerError
+                formErrors.fullName && styles.inputContainerError
               ]}>
-                <Ionicons name="call-outline" size={22} color={formErrors.phone ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                <Ionicons name="person-outline" size={22} color={formErrors.fullName ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
                 <TextInput
-                  ref={phoneRef}
+                  ref={fullNameRef}
                   style={styles.inputField}
-                  placeholder="رقم الهاتف (05)"
-                  value={phoneNumber}
-                  onChangeText={(value) => handleFieldChange('phone', value)}
-                  onBlur={() => handleFieldBlur('phone')}
-                  keyboardType="phone-pad"
-                  autoCapitalize="none"
+                  placeholder="الاسم الكامل"
+                  value={fullName}
+                  onChangeText={(value) => handleFieldChange('fullName', value)}
+                  onBlur={() => handleFieldBlur('fullName')}
                   placeholderTextColor={COLORS.gray}
-                  onFocus={() => handleFocus(phoneRef)}
+                  onFocus={() => handleFocus(fullNameRef)}
                   returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                  maxLength={10} 
+                  onSubmitEditing={() => authMethod === 'phone' ? phoneRef.current?.focus() : emailRef.current?.focus()}
                 />
               </View>
-              <ErrorMessage message={formErrors.phone} />
+              <ErrorMessage message={formErrors.fullName} />
             </View>
-          ) : (
-            <View style={styles.inputWrapper}>
-              <View style={[
-                styles.inputContainer,
-                formErrors.email && styles.inputContainerError
-              ]}>
-                <Ionicons name="mail-outline" size={22} color={formErrors.email ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
-                <TextInput
-                  ref={emailRef}
-                  style={styles.inputField}
-                  placeholder="البريد الإلكتروني"
-                  value={email}
-                  onChangeText={(value) => handleFieldChange('email', value)}
-                  onBlur={() => handleFieldBlur('email')}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  placeholderTextColor={COLORS.gray}
-                  onFocus={() => handleFocus(emailRef)}
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                />
-              </View>
-              <ErrorMessage message={formErrors.email} />
-            </View>
-          )}
 
-          {/* ✅ حقل كلمة المرور */}
-          <View style={styles.inputWrapper}>
-            <View style={[
-              styles.inputContainer,
-              formErrors.password && styles.inputContainerError
-            ]}>
-              <Ionicons name="lock-closed-outline" size={22} color={formErrors.password ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
-              <TextInput
-                ref={passwordRef}
-                style={styles.inputField}
-                placeholder="كلمة المرور"
-                value={password}
-                onChangeText={(value) => handleFieldChange('password', value)}
-                onBlur={() => handleFieldBlur('password')}
-                secureTextEntry={!isPasswordVisible}
-                placeholderTextColor={COLORS.gray}
-                onFocus={() => handleFocus(passwordRef)}
-                returnKeyType="next"
-                onSubmitEditing={() => confirmPasswordRef.current?.focus()}
-              />
-              <TouchableOpacity 
-                onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-                style={styles.visibilityButton}
-              >
-                <Ionicons 
-                  name={isPasswordVisible ? "eye-off-outline" : "eye-outline"} 
-                  size={24} 
-                  color={COLORS.gray} 
-                />
-              </TouchableOpacity>
-            </View>
-            <ErrorMessage message={formErrors.password} />
-            
-            {password.length > 0 && (
-              <PasswordStrengthIndicator validationState={passwordValidation} />
+            {/* حقل الهاتف أو البريد */}
+            {authMethod === 'phone' ? (
+              <View style={styles.inputWrapper}>
+                <View style={[
+                  styles.inputContainer,
+                  formErrors.phone && styles.inputContainerError
+                ]}>
+                  <Ionicons name="call-outline" size={22} color={formErrors.phone ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                  <TextInput
+                    ref={phoneRef}
+                    style={styles.inputField}
+                    placeholder="رقم الهاتف (05)"
+                    value={phoneNumber}
+                    onChangeText={(value) => handleFieldChange('phone', value)}
+                    onBlur={() => handleFieldBlur('phone')}
+                    keyboardType="phone-pad"
+                    autoCapitalize="none"
+                    placeholderTextColor={COLORS.gray}
+                    onFocus={() => handleFocus(phoneRef)}
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                    maxLength={10} 
+                  />
+                </View>
+                <ErrorMessage message={formErrors.phone} />
+              </View>
+            ) : (
+              <View style={styles.inputWrapper}>
+                <View style={[
+                  styles.inputContainer,
+                  formErrors.email && styles.inputContainerError
+                ]}>
+                  <Ionicons name="mail-outline" size={22} color={formErrors.email ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                  <TextInput
+                    ref={emailRef}
+                    style={styles.inputField}
+                    placeholder="البريد الإلكتروني"
+                    value={email}
+                    onChangeText={(value) => handleFieldChange('email', value)}
+                    onBlur={() => handleFieldBlur('email')}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    placeholderTextColor={COLORS.gray}
+                    onFocus={() => handleFocus(emailRef)}
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                  />
+                </View>
+                <ErrorMessage message={formErrors.email} />
+              </View>
             )}
-          </View>
 
-          {/* ✅ حقل تأكيد كلمة المرور */}
-          <View style={styles.inputWrapper}>
-            <View style={[
-              styles.inputContainer,
-              formErrors.confirmPassword && styles.inputContainerError
-            ]}>
-              <Ionicons name="lock-closed-outline" size={22} color={formErrors.confirmPassword ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
-              <TextInput
-                ref={confirmPasswordRef}
-                style={styles.inputField}
-                placeholder="تأكيد كلمة المرور"
-                value={confirmPassword}
-                onChangeText={(value) => handleFieldChange('confirmPassword', value)}
-                onBlur={() => handleFieldBlur('confirmPassword')}
-                secureTextEntry={!isConfirmPasswordVisible}
-                placeholderTextColor={COLORS.gray}
-                onFocus={() => handleFocus(confirmPasswordRef)}
-                returnKeyType="done"
-                onSubmitEditing={handleRegister}
-              />
-              <TouchableOpacity 
-                onPress={() => setIsConfirmPasswordVisible(!isConfirmPasswordVisible)}
-                style={styles.visibilityButton}
-              >
-                <Ionicons 
-                  name={isConfirmPasswordVisible ? "eye-off-outline" : "eye-outline"} 
-                  size={24} 
-                  color={COLORS.gray} 
+            {/* حقل كلمة المرور */}
+            <View style={styles.inputWrapper}>
+              <View style={[
+                styles.inputContainer,
+                formErrors.password && styles.inputContainerError
+              ]}>
+                <Ionicons name="lock-closed-outline" size={22} color={formErrors.password ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                <TextInput
+                  ref={passwordRef}
+                  style={styles.inputField}
+                  placeholder="كلمة المرور"
+                  value={password}
+                  onChangeText={(value) => handleFieldChange('password', value)}
+                  onBlur={() => handleFieldBlur('password')}
+                  secureTextEntry={!isPasswordVisible}
+                  placeholderTextColor={COLORS.gray}
+                  onFocus={() => handleFocus(passwordRef)}
+                  returnKeyType="next"
+                  onSubmitEditing={() => confirmPasswordRef.current?.focus()}
                 />
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                  style={styles.visibilityButton}
+                >
+                  <Ionicons 
+                    name={isPasswordVisible ? "eye-off-outline" : "eye-outline"} 
+                    size={24} 
+                    color={COLORS.gray} 
+                  />
+                </TouchableOpacity>
+              </View>
+              <ErrorMessage message={formErrors.password} />
+              
+              {password.length > 0 && (
+                <PasswordStrengthIndicator validationState={passwordValidation} />
+              )}
             </View>
-            <ErrorMessage message={formErrors.confirmPassword} />
+
+            {/* حقل تأكيد كلمة المرور */}
+            <View style={styles.inputWrapper}>
+              <View style={[
+                styles.inputContainer,
+                formErrors.confirmPassword && styles.inputContainerError
+              ]}>
+                <Ionicons name="lock-closed-outline" size={22} color={formErrors.confirmPassword ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                <TextInput
+                  ref={confirmPasswordRef}
+                  style={styles.inputField}
+                  placeholder="تأكيد كلمة المرور"
+                  value={confirmPassword}
+                  onChangeText={(value) => handleFieldChange('confirmPassword', value)}
+                  onBlur={() => handleFieldBlur('confirmPassword')}
+                  secureTextEntry={!isConfirmPasswordVisible}
+                  placeholderTextColor={COLORS.gray}
+                  onFocus={() => handleFocus(confirmPasswordRef)}
+                  returnKeyType="done"
+                  onSubmitEditing={handleRegister}
+                />
+                <TouchableOpacity 
+                  onPress={() => setIsConfirmPasswordVisible(!isConfirmPasswordVisible)}
+                  style={styles.visibilityButton}
+                >
+                  <Ionicons 
+                    name={isConfirmPasswordVisible ? "eye-off-outline" : "eye-outline"} 
+                    size={24} 
+                    color={COLORS.gray} 
+                  />
+                </TouchableOpacity>
+              </View>
+              <ErrorMessage message={formErrors.confirmPassword} />
+            </View>
+
+            {/* شروط الاستخدام */}
+            <TouchableOpacity 
+              style={styles.termsContainer}
+              onPress={() => setAgreedToTerms(!agreedToTerms)}
+            >
+              <View style={[
+                styles.checkbox,
+                agreedToTerms && styles.checkboxChecked
+              ]}>
+                {agreedToTerms && (
+                  <Ionicons name="checkmark" size={16} color={COLORS.white} />
+                )}
+              </View>
+              <Text style={styles.termsText}>
+                أوافق على{' '}
+                <Text style={styles.termsLink}>الشروط والأحكام</Text>
+                {' '}و{' '}
+                <Text style={styles.termsLink}>سياسة الخصوصية</Text>
+              </Text>
+            </TouchableOpacity>
+
+            {/* زر التسجيل */}
+            <TouchableOpacity 
+              style={[
+                styles.button, 
+                loading && styles.buttonDisabled
+              ]} 
+              onPress={handleRegister} 
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? 'جاري الإنشاء...' : 'إنشاء حساب'}
+              </Text>
+              <Ionicons name="arrow-forward" size={20} color={COLORS.white} style={styles.buttonIcon} />
+            </TouchableOpacity>
           </View>
 
-          {/* ✅ زر التسجيل */}
-          <TouchableOpacity 
-            style={[
-              styles.button, 
-              loading && styles.buttonDisabled
-            ]} 
-            onPress={handleRegister} 
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? 'جاري الإنشاء...' : 'إنشاء حساب'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* ✅ رابط تسجيل الدخول */}
+          {/* رابط تسجيل الدخول */}
           <TouchableOpacity 
             onPress={() => router.replace('/(auth)/login')}
             style={styles.loginLink}
@@ -606,112 +657,123 @@ export default function RegisterScreen() {
               لديك حساب بالفعل؟ <Text style={styles.signInLink}>سجل الدخول</Text>
             </Text>
           </TouchableOpacity>
+
+          {/* قسم الفوائد */}
+          <BenefitsSection />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-// ✅ التنسيقات
+// ✅ التنسيقات الجديدة
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.white },
-  keyboardAvoidingContainer: { flex: 1 },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.background 
+  },
+  keyboardAvoidingContainer: { 
+    flex: 1 
+  },
   scrollContainer: { 
     flexGrow: 1, 
-    justifyContent: 'center', 
     paddingHorizontal: 25, 
     paddingVertical: 20 
   },
-  header: { alignItems: 'center', marginBottom: 30 },
-  logo: { width: 180, height: 180, resizeMode: 'contain' },
+  
+  // الهيدر
+  header: { 
+    alignItems: 'center', 
+    marginBottom: 30 
+  },
+  logoContainer: {
+    width: 64,
+    height: 64,
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
   title: { 
-    fontSize: 26, 
+    fontSize: 28, 
     fontWeight: 'bold', 
     color: COLORS.darkGray, 
-    textAlign: 'left', 
     marginBottom: 8 
   },
   subtitle: { 
     fontSize: 16, 
     color: COLORS.gray, 
-    textAlign: 'left', 
-    marginBottom: 20 
+    textAlign: 'center' 
   },
 
-  // مبدل طرق التسجيل
-  switcherContainer: {
+  // التبويبات
+  tabsContainer: {
     flexDirection: 'row',
     backgroundColor: COLORS.lightGray,
-    borderRadius: 30,
+    borderRadius: 16,
     padding: 4,
     marginBottom: 25,
   },
-  switcherButton: {
+  tabButton: {
     flex: 1,
     flexDirection: 'row',
     paddingVertical: 12,
-    borderRadius: 26,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  switcherActiveButton: {
-    backgroundColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+  tabButtonActive: {
+    backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  switcherText: {
+  tabText: {
     fontSize: 15,
     fontWeight: '600',
     color: COLORS.gray,
   },
-  switcherActiveText: {
-    color: COLORS.primary,
+  tabTextActive: {
+    color: COLORS.white,
   },
 
-  // حقول الإدخال
-  nameContainer: { 
-    flexDirection: 'row-reverse', 
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-  nameInputWrapper: {
-    width: '48%',
-  },
-  nameInput: { 
-    width: '100%', 
-    backgroundColor: COLORS.lightGray, 
-    borderRadius: 10, 
-    paddingHorizontal: 15, 
-    height: 55, 
-    fontSize: 16, 
-    textAlign: 'right', 
-    marginBottom: 5, 
-    color: COLORS.darkGray 
+  // النموذج
+  formContainer: {
+    marginBottom: 20,
   },
   inputWrapper: {
-    marginBottom: 15,
+    marginBottom: 16,
   },
   inputContainer: { 
     flexDirection: 'row-reverse', 
     alignItems: 'center', 
-    backgroundColor: COLORS.lightGray, 
-    borderRadius: 10, 
-    paddingHorizontal: 15, 
-    height: 55 
+    backgroundColor: COLORS.white, 
+    borderRadius: 12, 
+    paddingHorizontal: 16, 
+    height: 56,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   inputContainerError: {
-    borderWidth: 1,
     borderColor: COLORS.error,
   },
-  inputError: {
-    borderWidth: 1,
-    borderColor: COLORS.error,
+  inputIcon: { 
+    marginLeft: 12 
   },
-  inputIcon: { marginLeft: 10 },
   inputField: { 
     flex: 1, 
     fontSize: 16, 
@@ -719,58 +781,56 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray 
   },
   visibilityButton: {
-    padding: 5,
+    padding: 4,
   },
 
-  // مؤشر قوة كلمة المرور
-  validationContainer: {
-    paddingHorizontal: 10,
-    marginTop: 10,
-    backgroundColor: 'rgba(245, 245, 245, 0.8)',
-    borderRadius: 8,
-    paddingVertical: 8,
-  },
-  validationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 2,
-  },
-  validationText: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginLeft: 8,
-  },
-  validationTextValid: {
-    color: COLORS.success,
-  },
-
-  // رسائل الخطأ
-  errorContainer: {
+  // شروط الاستخدام
+  termsContainer: {
     flexDirection: 'row-reverse',
-    alignItems: 'center',
-    marginTop: 5,
-    paddingHorizontal: 5,
-    gap: 4,
+    alignItems: 'flex-start',
+    marginBottom: 24,
+    paddingHorizontal: 4,
   },
-  errorText: {
-    fontSize: 12,
-    color: COLORS.error,
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: COLORS.gray,
+    marginLeft: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  termsText: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.gray,
+    lineHeight: 20,
     textAlign: 'right',
   },
+  termsLink: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
 
-  // الأزرار والروابط
+  // زر التسجيل
   button: { 
+    flexDirection: 'row-reverse',
     backgroundColor: COLORS.primary, 
-    paddingVertical: 15, 
-    borderRadius: 10, 
+    paddingVertical: 16, 
+    borderRadius: 16, 
     alignItems: 'center', 
-    marginTop: 10, 
+    justifyContent: 'center',
     marginBottom: 20, 
     shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8 
+    shadowRadius: 16,
+    elevation: 8,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -780,8 +840,14 @@ const styles = StyleSheet.create({
     fontSize: 18, 
     fontWeight: 'bold' 
   },
+  buttonIcon: {
+    marginRight: 8,
+  },
+
+  // رابط تسجيل الدخول
   loginLink: {
     alignItems: 'center',
+    marginBottom: 30,
   },
   linkText: { 
     color: COLORS.gray, 
@@ -791,5 +857,85 @@ const styles = StyleSheet.create({
   signInLink: { 
     color: COLORS.primary, 
     fontWeight: 'bold' 
+  },
+
+  // قسم الفوائد
+  benefitsContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+  },
+  benefitsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.darkGray,
+    marginBottom: 16,
+    textAlign: 'right',
+  },
+  benefitsList: {
+    gap: 12,
+  },
+  benefitItem: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+  },
+  benefitIcon: {
+    width: 24,
+    height: 24,
+    backgroundColor: COLORS.secondary,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  benefitText: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.darkGray,
+    textAlign: 'right',
+  },
+
+  // مؤشر قوة كلمة المرور
+  validationContainer: {
+    paddingHorizontal: 12,
+    marginTop: 10,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 8,
+    paddingVertical: 8,
+  },
+  validationItem: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginVertical: 2,
+  },
+  validationText: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginRight: 8,
+  },
+  validationTextValid: {
+    color: COLORS.success,
+  },
+
+  // رسائل الخطأ
+  errorContainer: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingHorizontal: 4,
+    gap: 4,
+  },
+  errorText: {
+    fontSize: 12,
+    color: COLORS.error,
+    textAlign: 'right',
   },
 });
