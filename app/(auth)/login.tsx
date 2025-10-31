@@ -42,9 +42,17 @@ import {
   LogIn,
   Sparkles,
   Star,
-  ChevronRight
+  ChevronRight,
+  Hamburger,
+  Pizza,
+  Ham,
+  Drumstick,
+  Donut,
+  CupSoda,
 } from 'lucide-react-native';
-import Svg, { Circle, Rect } from 'react-native-svg';
+
+// استيراد ionicons
+import { Ionicons } from '@expo/vector-icons';
 
 // الألوان المستوحاة من التصميم الجديد
 const COLORS = {
@@ -64,133 +72,237 @@ const COLORS = {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// ✅ تعريف أنواع الأيقونات المختلطة
+const FOOD_ICONS = [
+  // أيقونات Lucide
+  { type: 'lucide', component: Hamburger, name: 'hamburger' },
+  { type: 'lucide', component: Pizza, name: 'pizza' },
+  { type: 'lucide', component: Ham, name: 'ham' },
+  { type: 'lucide', component: Drumstick, name: 'drumstick' },
+  { type: 'lucide', component: Donut, name: 'donut' },
+  { type: 'lucide', component: CupSoda, name: 'cup-soda' },
+  
+  // أيقونات Ionicons
+  { type: 'ionicon', component: 'fast-food', name: 'fast-food' },
+  { type: 'ionicon', component: 'ice-cream', name: 'ice-cream' },
+  { type: 'ionicon', component: 'cafe', name: 'cafe' },
+  { type: 'ionicon', component: 'wine', name: 'wine' },
+  { type: 'ionicon', component: 'fish', name: 'fish' },
+  { type: 'ionicon', component: 'nutrition', name: 'nutrition' },
+  { type: 'ionicon', component: 'restaurant', name: 'restaurant' },
+  { type: 'ionicon', component: 'pizza', name: 'pizza-ionicon' },
+  { type: 'ionicon', component: 'beer', name: 'beer' },
+  { type: 'ionicon', component: 'water', name: 'water' },
+];
+
 // ✅ تعريف أنواع البيانات
 type AuthMethod = 'phone' | 'email';
 
-// ✅ مكون الخلفية المتحركة
-const AnimatedBackground = () => {
-  const scale1 = useSharedValue(1);
-  const scale2 = useSharedValue(1);
-  const scale3 = useSharedValue(1);
-  const opacity1 = useSharedValue(0.1);
-  const opacity2 = useSharedValue(0.1);
-  const opacity3 = useSharedValue(0.05);
-
-  const floatAnimation = useSharedValue(0);
+// ✅ مكون أيقونة الطعام العائمة المحسنة
+const FloatingFoodIcon = ({ 
+  icon, 
+  size, 
+  delay, 
+  duration, 
+  startX 
+}: { 
+  icon: any;
+  size: number;
+  delay: number;
+  duration: number;
+  startX: number;
+}) => {
+  const translateY = useSharedValue(-size); // تبدأ من فوق الشاشة بحسب حجم الأيقونة
+  const opacity = useSharedValue(0);
+  const rotate = useSharedValue(Math.random() * 360);
+  const scale = useSharedValue(0.8 + Math.random() * 0.4);
+  const translateX = useSharedValue(startX);
 
   React.useEffect(() => {
-    // تحريك الدوائر الخلفية
-    scale1.value = withRepeat(
-      withSequence(
-        withTiming(1.2, { duration: 4000 }),
-        withTiming(1, { duration: 4000 })
-      ),
-      -1,
-      true
-    );
+    const startAnimation = () => {
+      // 1. حركة نزول سلسة ومستمرة بدون توقف
+      translateY.value = withDelay(
+        delay,
+        withRepeat(
+          withTiming(SCREEN_HEIGHT + size, { 
+            duration: duration,
+            easing: Easing.linear 
+          }),
+          -1,
+          false
+        )
+      );
 
-    scale2.value = withRepeat(
-      withSequence(
-        withDelay(1000, withTiming(1.3, { duration: 5000 })),
-        withTiming(1, { duration: 5000 })
-      ),
-      -1,
-      true
-    );
+      // 2. ظهور واختفاء سلس مع الحركة
+      opacity.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            // ظهور سريع عند البدء
+            withTiming(0.7, { duration: 800 }),
+            // بقاء مرئي خلال معظم المسار
+            withTiming(0.7, { duration: duration - 2000 }),
+            // اختفاء سريع قبل النهاية
+            withTiming(0, { duration: 1200 })
+          ),
+          -1,
+          false
+        )
+      );
 
-    scale3.value = withRepeat(
-      withSequence(
-        withDelay(2000, withTiming(1.1, { duration: 3500 })),
-        withTiming(1, { duration: 3500 })
-      ),
-      -1,
-      true
-    );
+      // 3. دوران مستمر وسلس
+      rotate.value = withDelay(
+        delay,
+        withRepeat(
+          withTiming(rotate.value + 720, { // دورة كاملة 720 درجة للحركة المستمرة
+            duration: duration * 0.8, 
+            easing: Easing.linear 
+          }),
+          -1,
+          false
+        )
+      );
 
-    opacity1.value = withRepeat(
-      withSequence(
-        withTiming(0.15, { duration: 4000 }),
-        withTiming(0.1, { duration: 4000 })
-      ),
-      -1,
-      true
-    );
+      // 4. تأثير تمايل خفيف أثناء النزول
+      const swingDuration = duration / 4;
+      translateX.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            withTiming(startX + 15, { duration: swingDuration, easing: Easing.inOut(Easing.sin) }),
+            withTiming(startX - 10, { duration: swingDuration * 2, easing: Easing.inOut(Easing.sin) }),
+            withTiming(startX + 5, { duration: swingDuration, easing: Easing.inOut(Easing.sin) })
+          ),
+          -1,
+          true
+        )
+      );
 
-    opacity2.value = withRepeat(
-      withSequence(
-        withDelay(1000, withTiming(0.15, { duration: 5000 })),
-        withTiming(0.1, { duration: 5000 })
-      ),
-      -1,
-      true
-    );
+      // 5. تأثير نبض خفيف في الحجم
+      scale.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            withTiming(scale.value * 1.15, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
+            withTiming(scale.value, { duration: 2000, easing: Easing.inOut(Easing.sin) })
+          ),
+          -1,
+          true
+        )
+      );
+    };
 
-    opacity3.value = withRepeat(
-      withSequence(
-        withDelay(2000, withTiming(0.1, { duration: 3500 })),
-        withTiming(0.05, { duration: 3500 })
-      ),
-      -1,
-      true
-    );
-
-    // تحريك الأشكال العائمة
-    floatAnimation.value = withRepeat(
-      withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
-    );
+    startAnimation();
   }, []);
 
-  const circle1Style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale1.value }],
-    opacity: opacity1.value,
-  }));
-
-  const circle2Style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale2.value }],
-    opacity: opacity2.value,
-  }));
-
-  const circle3Style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale3.value }],
-    opacity: opacity3.value,
-  }));
-
-  const floatingShape1Style = useAnimatedStyle(() => ({
+  const animatedStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: interpolate(floatAnimation.value, [0, 1], [0, -20]) },
-      { rotate: interpolate(floatAnimation.value, [0, 1], [0, 5]) + 'deg' }
+      { translateY: translateY.value },
+      { translateX: translateX.value },
+      { rotate: rotate.value + 'deg' },
+      { scale: scale.value }
     ],
+    opacity: opacity.value,
   }));
 
-  const floatingShape2Style = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: interpolate(floatAnimation.value, [0, 1], [0, -20]) },
-    ],
-  }));
+  // ألوان عشوائية للأيقونات مع شفافية
+  const iconColors = [
+    COLORS.emailPrimary,
+    COLORS.phonePrimary,
+    COLORS.yellow,
+    '#4CAF50', // أخضر
+    '#FF9800', // برتقالي
+    '#9C27B0', // بنفسجي
+    '#795548', // بني
+    '#607D8B', // أزرق رمادي
+    '#E91E63', // وردي
+    '#00BCD4', // سماوي
+  ];
+  
+  const randomColor = iconColors[Math.floor(Math.random() * iconColors.length)];
 
-  const floatingShape3Style = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: interpolate(floatAnimation.value, [0, 1], [0, -20]) },
-    ],
-  }));
+  return (
+    <Animated.View style={[styles.floatingFoodIcon, animatedStyle]}>
+      {icon.type === 'lucide' ? (
+        <icon.component 
+          size={size} 
+          color={randomColor} 
+          fill={randomColor}
+          opacity={0.6}
+        />
+      ) : (
+        <Ionicons 
+          name={icon.name}
+          size={size}
+          color={randomColor}
+          style={{ opacity: 0.6 }}
+        />
+      )}
+    </Animated.View>
+  );
+};
+
+// ✅ مكون الخلفية المتحركة المحسنة
+const AnimatedBackground = () => {
+  const [foodIcons, setFoodIcons] = useState<React.ReactNode[]>([]);
+
+  React.useEffect(() => {
+    // إنشاء مصفوفة من الأيقونات مع توزيع أفضل
+    const createIcons = () => {
+      const icons = [];
+      const totalIcons = 20; // قلل العدد قليلاً لتجنب الاكتظاظ
+      
+      // تقسيم الشاشة إلى أعمدة لتوزيع أفضل
+      const columns = 6;
+      const columnWidth = SCREEN_WIDTH / columns;
+      
+      for (let i = 0; i < totalIcons; i++) {
+        const randomIcon = FOOD_ICONS[Math.floor(Math.random() * FOOD_ICONS.length)];
+        const size = Math.random() * 18 + 22; // أحجام بين 22 و 40
+        
+        // توزيع أفضل على الأعمدة
+        const column = i % columns;
+        const baseX = column * columnWidth;
+        const startX = baseX + Math.random() * (columnWidth - size);
+        
+        // تأخير وتوقيت أكثر تنوعاً
+        const delay = Math.random() * 15000; // تأخير أطول بين 0-15 ثانية
+        const duration = Math.random() * 10000 + 20000; // مدة بين 20-30 ثانية
+        
+        icons.push(
+          <FloatingFoodIcon
+            key={i}
+            icon={randomIcon}
+            size={size}
+            delay={delay}
+            duration={duration}
+            startX={startX}
+          />
+        );
+      }
+      
+      return icons;
+    };
+    
+    setFoodIcons(createIcons());
+
+    // إعادة إنشاء الأيقونات كل دقيقة لمنع التكدس
+    const interval = setInterval(() => {
+      setFoodIcons(createIcons());
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <View style={styles.backgroundContainer}>
-      {/* Red Circle - Top Right */}
-      <Animated.View style={[styles.circle, styles.circleRed, circle1Style]} />
-      
-      {/* Blue Circle - Bottom Left */}
-      <Animated.View style={[styles.circle, styles.circleBlue, circle2Style]} />
-      
-      {/* Yellow Circle - Middle */}
-      <Animated.View style={[styles.circle, styles.circleYellow, circle3Style]} />
+      {/* الدوائر الخلفية */}
+      <Animated.View style={[styles.circle, styles.circleRed]} />
+      <Animated.View style={[styles.circle, styles.circleBlue]} />
+      <Animated.View style={[styles.circle, styles.circleYellow]} />
 
-      {/* Floating Shapes */}
-      <Animated.View style={[styles.floatingShape, styles.floatingShape1, floatingShape1Style]} />
-      <Animated.View style={[styles.floatingShape, styles.floatingShape2, floatingShape2Style]} />
-      <Animated.View style={[styles.floatingShape, styles.floatingShape3, floatingShape3Style]} />
+      {/* أيقونات الطعام العائمة */}
+      {foodIcons}
     </View>
   );
 };
@@ -796,6 +908,10 @@ const styles = StyleSheet.create({
     top: 160,
     left: 80,
     transform: [{ rotate: '45deg' }],
+  },
+  floatingFoodIcon: {
+    position: 'absolute',
+    top: 0,
   },
 
   // الهيدر
