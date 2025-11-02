@@ -861,10 +861,7 @@ export default function RegisterScreen() {
     );
   };
 
-  // ✅ دالة المتابعة كضيف
-  const handleContinueAsGuest = () => {
-    router.replace('/(tabs)');
-  };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1139,19 +1136,7 @@ export default function RegisterScreen() {
                 </Text>
               </AnimatedButton>
 
-              {/* زر المتابعة كضيف */}
-              <TouchableOpacity 
-                style={[
-                  styles.guestButton,
-                  { borderColor: colors.primary }
-                ]}
-                onPress={handleContinueAsGuest}
-              >
-                <Text style={[styles.guestButtonText, { color: colors.primary }]}>
-                  المتابعة كضيف
-                </Text>
-                <ChevronRight size={18} color={colors.primary} />
-              </TouchableOpacity>
+              
             </View>
 
             <View style={styles.separatorContainer}>
