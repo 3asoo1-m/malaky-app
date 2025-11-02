@@ -19,6 +19,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   CartItem, 
   OrderType, 
@@ -33,7 +34,6 @@ import {
 } from '@/lib/types';
 import CustomBottomNav from '@/components/CustomBottomNav';
 
-// --- المكونات الفرعية (تبقى كما هي) ---
 const AddressItem = React.memo(({ address, isSelected, onSelect }: AddressItemProps) => (
   <TouchableOpacity
     style={[styles.locationOption, isSelected && styles.locationOptionSelected]}
@@ -224,17 +224,18 @@ const BranchSection = React.memo(({
   );
 });
 
-
-// --- المكون الرئيسي (CartScreen) ---
+// --- المكون الرئيسي (CartScreen) مع التحديثات ---
 export default function CartScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const params = useLocalSearchParams();
 
   const {
     items, updateQuantity, removeFromCart, subtotal,
     orderType, setOrderType, selectedAddress, setSelectedAddress,
     selectedBranch, setSelectedBranch, clearCart,
+    showLoginPrompt, // ✅ إضافة الدالة الجديدة من useCart
+    getTotalItems // ✅ إضافة الدالة الجديدة
   } = useCart();
 
   const deliveryPrice = orderType === 'delivery' && selectedAddress?.delivery_zones 
@@ -250,6 +251,7 @@ export default function CartScreen() {
   const [isPlacingOrder, setPlacingOrder] = useState(false);
   const [isCheckoutModalVisible, setCheckoutModalVisible] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState(1);
+  
 
   useFocusEffect(
     useCallback(() => {
@@ -265,26 +267,69 @@ export default function CartScreen() {
   );
 
   const fetchAddresses = useCallback(async () => {
-    if (!user) return;
-    setLoadingAddresses(true);
+  if (!user) return;
+  setLoadingAddresses(true);
+  
+  try {
     const { data: rawData, error } = await supabase
       .from('user_addresses')
-      .select(`id, street_address, notes, created_at, delivery_zones (city, area_name, delivery_price)`)
+      .select(`
+        id, 
+        street_address, 
+        notes, 
+        created_at,
+        is_default,
+        address_name,
+        delivery_zones (city, area_name, delivery_price)
+      `)
       .eq('user_id', user.id)
       .is('deleted_at', null) 
+      .order('is_default', { ascending: false })
       .order('created_at', { ascending: false });
     
     if (error) { 
       console.error('Error fetching addresses:', error.message); 
-    } else if (rawData) {
-      const formattedData: Address[] = rawData.map(addr => ({ 
-        ...addr, 
-        delivery_zones: Array.isArray(addr.delivery_zones) ? addr.delivery_zones[0] || null : addr.delivery_zones 
-      }));
+      return;
+    } 
+    
+    if (rawData) {
+      const formattedData: Address[] = rawData.map(addr => {
+        // ✅ التعامل مع delivery_zones
+        let deliveryZones = null;
+        if (addr.delivery_zones) {
+          if (Array.isArray(addr.delivery_zones)) {
+            deliveryZones = addr.delivery_zones[0] || null;
+          } else {
+            deliveryZones = addr.delivery_zones;
+          }
+        }
+        
+        // ✅ إنشاء اسم افتراضي إذا لم يكن موجوداً
+        let addressName = addr.address_name;
+        if (!addressName) {
+          const areaName = deliveryZones?.area_name || 'غير محدد';
+          addressName = `عنوان ${areaName}`;
+        }
+        
+        return {
+          id: addr.id,
+          street_address: addr.street_address,
+          notes: addr.notes,
+          created_at: addr.created_at,
+          is_default: addr.is_default || false,
+          address_name: addressName,
+          delivery_zones: deliveryZones
+        };
+      });
+      
       setAvailableAddresses(formattedData);
     }
+  } catch (error) {
+    console.error('Unexpected error fetching addresses:', error);
+  } finally {
     setLoadingAddresses(false);
-  }, [user]);
+  }
+}, [user]);
 
   const fetchBranches = useCallback(async () => {
     setLoadingBranches(true);
@@ -342,78 +387,156 @@ export default function CartScreen() {
     removeFromCart(itemId);
   }, [removeFromCart]);
 
-  const handleCheckout = useCallback(async () => {
-    if (isPlacingOrder) return;
+ // ✅ تحديث دالة handleCheckout - استبدلها بالكامل:
+const handleCheckout = useCallback(async () => {
+  if (isPlacingOrder) return;
+  
+  // ✅ تحقق بسيط - إذا ما في مستخدم ولا ضيف
+  if (!user && !isGuest) {
+    Alert.alert('خطأ', 'يجب عليك تسجيل الدخول أولاً لإتمام الطلب.');
+    return;
+  }
+
+  // ✅ إذا كان ضيف، امنعه من الطلب واعرض له خيار التسجيل
+  if (isGuest) {
+    Alert.alert(
+      'تسجيل الدخول مطلوب',
+      'لا يمكن إنشاء طلبات كضيف. يرجى إنشاء حساب للمتابعة.',
+      [
+        {
+          text: 'إنشاء حساب',
+          onPress: () => {
+            setCheckoutModalVisible(false);
+            router.push('/(auth)/register');
+          }
+        },
+        {
+          text: 'إلغاء',
+          style: 'cancel'
+        }
+      ]
+    );
+    return;
+  }
+
+  // ✅ تحقق إضافي - تأكد من وجود user (هذا يحل المشكلة)
+  if (!user) {
+    Alert.alert('خطأ', 'يجب عليك تسجيل الدخول أولاً لإتمام الطلب.');
+    return;
+  }
+  
+  // ... باقي التحققيات والكود الحالي
+  if (items.length === 0) {
+    Alert.alert('خطأ', 'سلتك فارغة!');
+    return;
+  }
+
+  if (orderType === 'delivery' && !selectedAddress) {
+    Alert.alert('خطأ', 'يجب اختيار عنوان التوصيل أولاً.');
+    return;
+  }
+
+  if (orderType === 'pickup' && !selectedBranch) {
+    Alert.alert('خطأ', 'يجب اختيار فرع الاستلام أولاً.');
+    return;
+  }
+
+  setPlacingOrder(true);
+
+  try {
+    // ✅ استخدام user.id فقط (لا نسمح بالضيوف)
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        user_id: user.id, // ✅ فقط المستخدمين المسجلين
+        total_price: totalPrice,
+        subtotal: subtotal,
+        delivery_price: deliveryPrice,
+        order_type: orderType,
+        user_address_id: orderType === 'delivery' ? selectedAddress?.id : null,
+        branch_id: orderType === 'pickup' ? selectedBranch?.id : null,
+        is_guest_order: false, // ✅ دائماً false لأننا نمنع الضيوف
+      })
+      .select('id')
+      .single();
+
+    if (orderError) throw orderError;
+
+    const orderId = orderData.id;
+
+    const orderItems = items.map(cartItem => ({
+      order_id: orderId,
+      menu_item_id: cartItem.product.id,
+      quantity: cartItem.quantity,
+      unit_price: cartItem.product.price,
+      options: cartItem.options,
+      notes: cartItem.notes,
+      additional_pieces: cartItem.additionalPieces && cartItem.additionalPieces.length > 0 
+        ? cartItem.additionalPieces 
+        : null,
+    }));
+
+    const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+
+    if (itemsError) throw itemsError;
+
+    setCheckoutModalVisible(false);
     
-    if (!user) {
-      Alert.alert('خطأ', 'يجب عليك تسجيل الدخول أولاً لإتمام الطلب.');
-      return;
-    }
-    
-    if (items.length === 0) {
-      Alert.alert('خطأ', 'سلتك فارغة!');
-      return;
-    }
+    Alert.alert('نجاح!', 'تم استلام طلبك بنجاح.', [
+      {
+        text: 'حسناً',
+        onPress: () => {
+          clearCart();
+          router.push('/');
+        }
+      }
+    ]);
 
-    if (orderType === 'delivery' && !selectedAddress) {
-      Alert.alert('خطأ', 'يجب اختيار عنوان التوصيل أولاً.');
-      return;
-    }
+  } catch (error: any) {
+    console.error('Error placing order:', error);
+    Alert.alert('خطأ فادح', 'حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى.');
+  } finally {
+    setPlacingOrder(false);
+  }
+}, [
+  isPlacingOrder, 
+  isGuest, // ✅ تغيير isGuestUser إلى isGuest
+  user,
+  items, 
+  totalPrice, 
+  subtotal, 
+  deliveryPrice, 
+  orderType, 
+  selectedAddress, 
+  selectedBranch, 
+  clearCart, 
+  router
+]);
 
-    if (orderType === 'pickup' && !selectedBranch) {
-      Alert.alert('خطأ', 'يجب اختيار فرع الاستلام أولاً.');
-      return;
-    }
-
-    setPlacingOrder(true);
-
-    try {
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          user_id: user.id,
-          total_price: totalPrice,
-          subtotal: subtotal,
-          delivery_price: deliveryPrice,
-          order_type: orderType,
-          user_address_id: orderType === 'delivery' ? selectedAddress?.id : null,
-          branch_id: orderType === 'pickup' ? selectedBranch?.id : null,
-        })
-        .select('id')
-        .single();
-
-      if (orderError) throw orderError;
-
-      const orderId = orderData.id;
-
-      const orderItems = items.map(cartItem => ({
-        order_id: orderId,
-        menu_item_id: cartItem.product.id,
-        quantity: cartItem.quantity,
-        unit_price: cartItem.product.price,
-        options: cartItem.options,
-        notes: cartItem.notes,
-        additional_pieces: cartItem.additionalPieces && cartItem.additionalPieces.length > 0 
-          ? cartItem.additionalPieces 
-          : null,
-      }));
-
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      setCheckoutModalVisible(false);
-      Alert.alert('نجاح!', 'تم استلام طلبك بنجاح.');
-      clearCart();
-      router.push('/');
-
-    } catch (error: any) {
-      console.error('Error placing order:', error);
-      Alert.alert('خطأ فادح', 'حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى.');
-    } finally {
-      setPlacingOrder(false);
-    }
-  }, [isPlacingOrder, user, items, totalPrice, subtotal, deliveryPrice, orderType, selectedAddress, selectedBranch, clearCart, router]);
+// ✅ تحديث دالة فتح الـ modal - استبدلها:
+const handleOpenCheckoutModal = useCallback(async () => {
+  // ✅ إذا كان ضيف، امنعه من فتح المودال واعرض له خيار التسجيل
+  if (isGuest) {
+    Alert.alert(
+      'تسجيل الدخول مطلوب',
+      'لإكمال عملية الطلب، يرجى إنشاء حساب أولاً.',
+      [
+        {
+          text: 'إنشاء حساب',
+          onPress: () => router.push('/(auth)/register')
+        },
+        {
+          text: 'لاحقاً',
+          style: 'cancel'
+        }
+      ]
+    );
+    return;
+  }
+  
+  setCheckoutModalVisible(true);
+  setCheckoutStep(1);
+}, [isGuest, router]); // ✅ إزالة showLoginPrompt
 
   const renderItem = useCallback(({ item }: { item: CartItem }) => (
     <CartItemComponent
@@ -441,8 +564,33 @@ export default function CartScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.header}>
             <Text style={styles.headerTitle}>سلتي</Text>
-            {items.length > 0 && <Text style={styles.itemsCount}>{items.length} منتجات</Text>}
+            {items.length > 0 && (
+              <View style={styles.headerInfo}>
+                <Text style={styles.itemsCount}>{getTotalItems()} منتجات</Text>
+                {isGuest && (
+                  <Text style={styles.guestBadge}>ضيف</Text>
+                )}
+              </View>
+            )}
         </View>
+
+{isGuest && items.length > 0 && (
+  <View style={styles.guestBlockWarning}>
+    <Ionicons name="alert-circle" size={24} color="#D32F2F" />
+    <View style={styles.guestBlockTextContainer}>
+      <Text style={styles.guestBlockTitle}>تسجيل الدخول مطلوب</Text>
+      <Text style={styles.guestBlockDescription}>
+        لا يمكن إنشاء طلبات كضيف. يرجى إنشاء حساب أو تسجيل الدخول للمتابعة.
+      </Text>
+    </View>
+    <TouchableOpacity 
+      style={styles.loginButton}
+      onPress={() => router.push('/(auth)/register')}
+    >
+      <Text style={styles.loginButtonText}>إنشاء حساب</Text>
+    </TouchableOpacity>
+  </View>
+)}
 
 {isCheckoutModalVisible && (
   <Modal
@@ -468,7 +616,16 @@ export default function CartScreen() {
           <View style={{ width: 24 }} />
         </View>
         
-        {/* المحتوى قابل للتمرير */}
+        {/* ✅ إضافة تنبيه للضيف في الـ modal */}
+        {isGuest && (
+          <View style={styles.modalGuestWarning}>
+            <Ionicons name="person-outline" size={16} color="#F9A825" />
+            <Text style={styles.modalGuestWarningText}>
+              أنت تستخدم التطبيق كضيف
+            </Text>
+          </View>
+        )}
+        
         <FlatList
           data={[]}
           renderItem={null}
@@ -581,10 +738,7 @@ export default function CartScreen() {
             </View>
             <TouchableOpacity
               style={styles.checkoutButton}
-              onPress={() => {
-                setCheckoutModalVisible(true);
-                setCheckoutStep(1);
-              }}
+              onPress={handleOpenCheckoutModal} // ✅ استخدام الدالة المحدثة
             >
               <Text style={styles.checkoutButtonText}>إتمام الطلب</Text>
             </TouchableOpacity>
@@ -595,6 +749,7 @@ export default function CartScreen() {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   fullScreen: {
@@ -612,10 +767,61 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 10,
   },
+  headerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   headerTitle: {
     fontSize: 28,
     fontFamily: 'Cairo-Bold',
     color: '#1A1A1A',
+  },
+  guestBadge: {
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    color: '#F9A825',
+    backgroundColor: '#FFF8E1',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F9A825',
+  },
+  guestWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F9A825',
+  },
+  guestWarningText: {
+    color: '#F9A825',
+    fontSize: 14,
+    marginLeft: 8,
+    flex: 1,
+    textAlign: 'right',
+  },
+  modalGuestWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF8E1',
+    padding: 8,
+    marginHorizontal: 20,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F9A825',
+  },
+  modalGuestWarningText: {
+    color: '#F9A825',
+    fontSize: 12,
+    marginLeft: 4,
+    fontWeight: '500',
   },
   itemsCount: {
     fontSize: 14,
@@ -783,5 +989,43 @@ wizardContent: {
     fontWeight: '500',
     marginLeft: 8,
     fontSize: 14,
+  },
+  guestBlockWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBEE',
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D32F2F',
+  },
+  guestBlockTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  guestBlockTitle: {
+    color: '#D32F2F',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  guestBlockDescription: {
+    color: '#D32F2F',
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  loginButton: {
+    backgroundColor: '#D32F2F',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginLeft: 12,
+  },
+  loginButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

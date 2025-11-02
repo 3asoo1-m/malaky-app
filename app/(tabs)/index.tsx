@@ -27,16 +27,8 @@ import {
 } from '@/lib/types';
 
 // ✅ استيراد نظام التحليلات المحسن
-import { 
-  trackEvent, 
-  AnalyticsEvents, 
-  flushBackupEvents, 
-  cleanupOldBackupEvents,
-  initializeAnalytics,
-  cleanupAnalytics,
-  forceFlush
-} from '@/lib/analytics';
-
+import { trackEvent, AnalyticsEvents } from '@/lib/analytics';
+import { useGuestAnalytics } from '@/hooks/useGuestAnalytics';
 const { width: screenWidth } = Dimensions.get('window');
 
 // =================================================================
@@ -253,6 +245,11 @@ export default function HomeScreen() {
   const [isDataCached, setDataCached] = useState({ menu: false, promotions: false, categories: false });
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
+  useGuestAnalytics('home', { 
+    screen_type: 'main',
+    has_promotions: promotions.length > 0 
+  });
+
   // ✅ استخدام useRef للـ timeout
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -303,106 +300,103 @@ export default function HomeScreen() {
     return null;
   }, [sections]);
 
-  // ✅ دالة محسنة لاختيار الفئة مع معالجة الأقسام الفارغة
-  const handleCategorySelect = useCallback((categoryId: ActiveCategory) => {
-    console.log(`🎯 محاولة اختيار الفئة: ${categoryId}`);
+ // ✅ تحسين الدالة لتجنب التكرار
+const handleCategorySelect = useCallback((categoryId: ActiveCategory) => {
+  console.log(`🎯 محاولة اختيار الفئة: ${categoryId}`);
+  
+  if (categoryId === 'all') {
+    setSearchQuery('');
+    setActiveCategory('all');
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    trackEvent(AnalyticsEvents.CATEGORY_CHANGED, { new_category: 'all', source: 'chips' });
+    return;
+  }
+
+  const selectedSection = sections.find(section => section.id === categoryId);
+  
+  // ✅ تحقق إذا كان القسم موجوداً وأليس فارغاً
+  if (selectedSection && selectedSection.menu_items && selectedSection.menu_items.length > 0) {
+    setSearchQuery('');
+    setActiveCategory(categoryId);
+    trackEvent(AnalyticsEvents.CATEGORY_CHANGED, { 
+      new_category: categoryId, 
+      source: 'chips' 
+    });
+  } else {
+    // ✅ إذا كان القسم غير موجود أو فارغ
+    console.log(`⚠️ القسم '${selectedSection?.name}' غير متاح. البحث عن بديل...`);
     
-    if (categoryId === 'all') {
+    trackEvent('empty_category_selected', {
+      category_id: categoryId,
+      category_name: selectedSection?.name
+    });
+
+    // ابحث عن أقرب قسم غير فارغ
+    const alternativeCategory = findNearestNonEmptySectionId(categoryId);
+    
+    if (alternativeCategory) {
       setSearchQuery('');
-      setActiveCategory('all');
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
-      trackEvent(AnalyticsEvents.CATEGORY_CHANGED, { new_category: 'all', source: 'chips' });
-      return;
-    }
-
-    const selectedSection = sections.find(section => section.id === categoryId);
-    const isEmptySection = !selectedSection?.menu_items || selectedSection.menu_items.length === 0;
-
-    let targetCategoryId: ActiveCategory | null = categoryId;
-
-    // ✅ إذا كان القسم المختار فارغاً
-    if (isEmptySection) {
-      console.log(`⚠️ القسم '${selectedSection?.name}' فارغ. البحث عن بديل...`);
-      
-      // تتبع محاولة اختيار قسم فارغ
-      trackEvent('empty_category_selected', {
-        category_id: categoryId,
-        category_name: selectedSection?.name
+      setActiveCategory(alternativeCategory);
+      trackEvent(AnalyticsEvents.CATEGORY_CHANGED, {
+        original_selection: categoryId,
+        final_category: alternativeCategory,
+        was_redirected: true,
+        source: 'chips'
       });
+    } else {
+      // ✅ العودة للكل إذا لم يوجد بديل
+      setActiveCategory('all');
+      trackEvent(AnalyticsEvents.CATEGORY_CHANGED, {
+        original_selection: categoryId,
+        final_category: 'all',
+        was_redirected: true,
+        reason: 'no_alternative_found'
+      });
+    }
+  }
+}, [sections, findNearestNonEmptySectionId]);
+const handleSearchChange = useCallback((text: string) => {
+  setSearchQuery(text);
 
-      // ابحث عن أقرب قسم غير فارغ
-      targetCategoryId = findNearestNonEmptySectionId(categoryId);
+  if (searchTimeoutRef.current) {
+    clearTimeout(searchTimeoutRef.current);
+  }
+
+  if (text.length === 0) {
+    if (searchQuery.length > 0) {
+      // ✅ حساب النتائج من sections مباشرة
+      const hadResults = sections.some(section => 
+        section.menu_items && section.menu_items.length > 0
+      );
       
-      // ✅ إذا لم يتم العثور على بديل، استخدم "الكل"
-      if (!targetCategoryId) {
-        console.log("❌ لم يتم العثور على قسم بديل، العودة إلى 'الكل'");
-        setActiveCategory('all');
-        trackEvent(AnalyticsEvents.CATEGORY_CHANGED, {
-          original_selection: categoryId,
-          final_category: 'all',
-          was_redirected: true,
-          reason: 'no_non_empty_sections_found'
-        });
-        return;
-      }
+      trackEvent(AnalyticsEvents.SEARCH_CLEARED, {
+        previous_query_length: searchQuery.length,
+        had_results: hadResults
+      });
     }
+    return;
+  }
 
-    // ✅ إذا وجدنا قسماً (سواء الأصلي أو البديل)
-    if (targetCategoryId) {
-      setSearchQuery('');
-      setActiveCategory(targetCategoryId);
+  if (text.length > 2) {
+    searchTimeoutRef.current = setTimeout(() => {
+      const searchTerm = text.toLowerCase().trim();
+      
+      const resultsCount = sections.reduce((total, section) => 
+        total + (section.menu_items?.filter(item =>
+          item.name.toLowerCase().includes(searchTerm) ||
+          (item.description && item.description.toLowerCase().includes(searchTerm))
+        ).length || 0), 0
+      );
 
-      // تتبع تغيير الفئة
-      if (targetCategoryId !== activeCategory) {
-        trackEvent(AnalyticsEvents.CATEGORY_CHANGED, {
-          original_selection: categoryId,
-          final_category: targetCategoryId,
-          was_redirected: categoryId !== targetCategoryId,
-          source: 'chips'
-        });
-      }
-    }
-  }, [activeCategory, sections, findNearestNonEmptySectionId]);
-
-  // ✅ تحسين البحث مع تقليل التتبع
-  const handleSearchChange = useCallback((text: string) => {
-    setSearchQuery(text);
-
-    // تنظيف الـ timeout السابق
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (text.length === 0) {
-      if (searchQuery.length > 0) {
-        trackEvent(AnalyticsEvents.SEARCH_CLEARED, {
-          previous_query_length: searchQuery.length
-        });
-      }
-      return;
-    }
-
-    // ✅ بحث بعد توقف الكتابة مع تقليل الأحداث
-    if (text.length > 2) {
-      searchTimeoutRef.current = setTimeout(() => {
-        const searchTerm = text.toLowerCase().trim();
-        
-        // ✅ تتبع فقط إذا كانت النتائج مختلفة
-        const hasResults = sections.some(section =>
-          section.menu_items?.some(item =>
-            item.name.toLowerCase().includes(searchTerm) ||
-            (item.description && item.description.toLowerCase().includes(searchTerm))
-          )
-        );
-
-        trackEvent(AnalyticsEvents.SEARCH_PERFORMED, {
-          query_length: text.length,
-          has_results: hasResults,
-        });
-
-      }, 600); // ✅ زيادة وقت الانتظار
-    }
-  }, [sections, searchQuery]);
+      trackEvent(AnalyticsEvents.SEARCH_PERFORMED, {
+        query_length: text.length,
+        has_results: resultsCount > 0,
+        results_count: resultsCount,
+        is_cached: !!searchCache[searchTerm]
+      });
+    }, 600);
+  }
+}, [sections, searchQuery, searchCache]);
 
   const handleClearSearch = useCallback(() => {
     if (searchQuery.length > 0) {
@@ -413,19 +407,28 @@ export default function HomeScreen() {
     setSearchQuery('');
   }, [searchQuery]);
 
-  const handleScroll = useCallback((event: any) => {
-    const scrollY = event.nativeEvent.contentOffset.y;
-    const PROMO_HEIGHT = promotions.length > 0 ? 240 : 0;
-    const HEADER_HEIGHT = (Platform.OS === 'ios' ? 260 : 280) + PROMO_HEIGHT;
-    setIsChipsSticky(scrollY > HEADER_HEIGHT);
+  // ✅ في handleScroll (إضافة عمق تمرير إضافي)
+const handleScroll = useCallback((event: any) => {
+  const scrollY = event.nativeEvent.contentOffset.y;
+  const PROMO_HEIGHT = promotions.length > 0 ? 240 : 0;
+  const HEADER_HEIGHT = (Platform.OS === 'ios' ? 260 : 280) + PROMO_HEIGHT;
+  setIsChipsSticky(scrollY > HEADER_HEIGHT);
 
-    // ✅ تتبع التمرير فقط مرة واحدة عند الوصول للعمق
-    if (scrollY > 500 && scrollY < 600) {
-      trackEvent(AnalyticsEvents.SCROLL_DEPTH, {
-        scroll_depth: 'deep'
-      });
-    }
-  }, [promotions.length]);
+  // ✅ تتبع التمرير بمراحل متعددة
+  if (scrollY > 300 && scrollY < 400) {
+    trackEvent(AnalyticsEvents.SCROLL_DEPTH, {
+      scroll_depth: 'medium'
+    });
+  } else if (scrollY > 600 && scrollY < 700) {
+    trackEvent(AnalyticsEvents.SCROLL_DEPTH, {
+      scroll_depth: 'deep'
+    });
+  } else if (scrollY > 900) {
+    trackEvent(AnalyticsEvents.SCROLL_DEPTH, {
+      scroll_depth: 'very_deep'
+    });
+  }
+}, [promotions.length]);
 
   const handleNotificationPress = useCallback(() => {
     trackEvent(AnalyticsEvents.NOTIFICATIONS_ACCESSED, {
@@ -582,12 +585,14 @@ export default function HomeScreen() {
   }, [fetchFreshData, checkNotifications, handleCacheFallback]);
 
   const handleRefreshData = useCallback(async () => {
-    trackEvent(AnalyticsEvents.MANUAL_REFRESH, {
-      current_data_age: Date.now() - lastSyncTime
-    });
+  trackEvent(AnalyticsEvents.MANUAL_REFRESH, {
+    current_data_age: Date.now() - lastSyncTime,
+    has_cached_data: isDataCached.menu
+  });
 
-    await loadData(true);
-  }, [loadData, lastSyncTime]);
+  await loadData(true);
+}, [loadData, lastSyncTime, isDataCached.menu]);
+
 
   // ✅ تحسين البحث مع caching
   const filteredSections = useMemo(() => {
@@ -648,60 +653,68 @@ export default function HomeScreen() {
     ...displaySections.map(section => ({ ...section, type: 'section' as const })),
   ], [displaySections, promotions]);
 
-  // ✅ معالج محسن لفشل التمرير
-  const handleScrollToIndexFailed = useCallback((info: any) => {
-    console.warn('❌ فشل في التمرير للعنصر:', info);
-    
-    trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
-      error_type: 'scroll_to_index_failed',
-      index: info.index,
-      highestMeasuredFrameIndex: info.highestMeasuredFrameIndex,
-      averageItemLength: info.averageItemLength
-    });
+// ✅ تحسين معالج فشل التمرير
+const handleScrollToIndexFailed = useCallback((info: any) => {
+  console.warn('❌ فشل في التمرير للعنصر:', info);
+  
+  trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
+    error_type: 'scroll_to_index_failed',
+    index: info.index,
+    highestMeasuredFrameIndex: info.highestMeasuredFrameIndex,
+    averageItemLength: info.averageItemLength
+  });
 
-    // ✅ محاولة بديلة: استخدام scrollToOffset للتمرير التقريبي
-    const approximateOffset = info.averageItemLength * Math.max(0, info.index - 1);
-    
-    setTimeout(() => {
+  // ✅ محاولات بديلة متعددة
+  const alternativeOffsets = [
+    info.averageItemLength * Math.max(0, info.index - 1),
+    info.averageItemLength * Math.max(0, info.index - 2),
+    0 // العودة للبداية
+  ];
+
+  let currentAttempt = 0;
+  
+  const tryAlternativeScroll = () => {
+    if (currentAttempt < alternativeOffsets.length) {
       listRef.current?.scrollToOffset({
         animated: true,
-        offset: approximateOffset,
+        offset: alternativeOffsets[currentAttempt],
       });
-    }, 100);
-  }, []);
+      currentAttempt++;
+      
+      // ✅ محاولة أخرى بعد تأخير
+      if (currentAttempt < alternativeOffsets.length) {
+        setTimeout(tryAlternativeScroll, 150);
+      }
+    }
+  };
 
-  // ✅ تحسين scroll to category - العودة للفكرة الأصلية
-  useEffect(() => {
-    if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
+  setTimeout(tryAlternativeScroll, 100);
+}, []);
 
+// ✅ الحل الموصى به
+useEffect(() => {
+  let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+  
+  if (activeCategory === 'all' || !listRef.current || sections.length === 0) return;
+
+  const performScroll = () => {
     const promoSectionExists = promotions.length > 0;
     const categoriesIndex = 1 + (promoSectionExists ? 1 : 0);
     
-    // ✅ البحث في sections الأصلية (جميع الأقسام)
     const sectionIndex = sections.findIndex(section => section.id === activeCategory);
-
-    console.log(`🎯 محاولة التمرير إلى القسم: ${activeCategory}, موجود في الفهرس: ${sectionIndex}, إجمالي الأقسام: ${sections.length}`);
 
     if (sectionIndex !== -1) {
       const targetSection = sections[sectionIndex];
       
-      // ✅ التحقق إذا كان القسم فارغاً
       const isEmptySection = !targetSection.menu_items || targetSection.menu_items.length === 0;
       
       if (isEmptySection) {
         console.log(`⚠️ القسم ${targetSection.name} فارغ - إلغاء التمرير`);
-        trackEvent('scroll_to_empty_section_attempt', {
-          category_id: activeCategory,
-          category_name: targetSection.name
-        });
         return;
       }
 
       const targetIndex = categoriesIndex + sectionIndex + 1;
       
-      console.log(`🎯 الفهرس المستهدف: ${targetIndex}, عدد العناصر في القائمة: ${listData.length}`);
-      
-      // ✅ التحقق من صحة الفهرس قبل التمرير
       if (targetIndex >= 0 && targetIndex < listData.length) {
         requestAnimationFrame(() => {
           listRef.current?.scrollToIndex({
@@ -710,41 +723,42 @@ export default function HomeScreen() {
             viewOffset: chipsHeight
           });
         });
-      } else {
-        console.warn(`❌ الفهرس ${targetIndex} خارج النطاق (0-${listData.length - 1})`);
-        trackEvent(AnalyticsEvents.ERROR_OCCURRED, {
-          error_type: 'invalid_scroll_index',
-          target_index: targetIndex,
-          list_length: listData.length,
-          category_id: activeCategory
-        });
       }
-    } else {
-      console.warn(`❌ القسم ${activeCategory} غير موجود في الأقسام`);
     }
-  }, [activeCategory, chipsHeight, sections, promotions, listData.length]);
+  };
 
-  // ✅ تأثير التحميل الأولي والمزامنة المحسن
-  useEffect(() => {
-    // ✅ تهيئة التحليلات أولاً
-    initializeAnalytics();
+  scrollTimeout = setTimeout(performScroll, 50);
 
+  return () => {
+    if (scrollTimeout) clearTimeout(scrollTimeout);
+  };
+}, [activeCategory, chipsHeight, sections, promotions, listData.length]);
+// ✅ تحسين تأثير التحميل الأولي
+useEffect(() => {
+  let mounted = true;
+
+  const initializeApp = async () => {
     // ✅ تتبع فتح التطبيق
-    trackEvent(AnalyticsEvents.APP_OPENED, {
-      source: 'cold_start',
+    await trackEvent(AnalyticsEvents.APP_OPENED, {
+      source: 'home_screen',
       platform: Platform.OS,
     });
 
-    loadData();
+    if (mounted) {
+      await loadData();
+    }
+  };
 
-    // ✅ تنظيف الموارد
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-      cleanupAnalytics();
-    };
-  }, []);
+  initializeApp();
+
+  // ✅ تنظيف الموارد
+  return () => {
+    mounted = false;
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+  };
+}, []);
 
   // ✅ مزامنة تلقائية مخففة
   useEffect(() => {

@@ -1,7 +1,13 @@
 // مسار الملف: lib/useCart.tsx
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { randomUUID } from 'expo-crypto';
+import { Alert } from 'react-native';
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ✅ استيراد نظام التحليلات
+import { trackEvent, trackGuestEvent } from '@/lib/analytics';
 
 // ✅ استيراد الأنواع المحدثة
 import { MenuItem, OrderType, CartItem, Address, Branch, CartAdditionalPiece } from './types';
@@ -14,7 +20,7 @@ interface CartContextType {
     quantity: number, 
     options: Record<string, any>, 
     notes?: string,
-    additionalPieces?: CartAdditionalPiece[] // ✅ أضف هذا المعامل
+    additionalPieces?: CartAdditionalPiece[]
   ) => void;
   updateQuantity: (cartItemId: string, amount: -1 | 1) => void;
   removeFromCart: (cartItemId: string) => void;
@@ -29,6 +35,10 @@ interface CartContextType {
   selectedBranch: Branch | null;
   setSelectedBranch: (branch: Branch | null) => void;
   clearCart: () => void;
+  // ✅ إضافة الدوال الجديدة
+  requiresLogin: boolean;
+  showLoginPrompt: () => Promise<boolean>;
+  getTotalItems: () => number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -39,25 +49,53 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [deliveryPrice, setDeliveryPriceState] = useState(0);
   const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null);
   const [selectedBranch, setSelectedBranchState] = useState<Branch | null>(null);
+  const [requiresLogin, setRequiresLogin] = useState(false);
+  
+  const router = useRouter();
 
-  // ✅ تحديث دالة addToCart مع دعم القطع الإضافية
+  // ✅ تحميل السلة من التخزين المحلي
+  useEffect(() => {
+  loadCartFromStorage();
+}, []);
+
+  const loadCartFromStorage = async () => {
+    try {
+      const savedCart = await AsyncStorage.getItem('user_cart');
+      if (savedCart) {
+        setItems(JSON.parse(savedCart));
+      }
+    } catch (error) {
+      console.error('Failed to load cart:', error);
+    }
+  };
+
+  const saveCartToStorage = async (cartItems: CartItem[]) => {
+    try {
+      await AsyncStorage.setItem('user_cart', JSON.stringify(cartItems));
+    } catch (error) {
+      console.error('Failed to save cart:', error);
+    }
+  };
+
+  // ✅ تحديث دالة addToCart مع دعم القطع الإضافية والتتبع
   const addToCart = (
     product: MenuItem, 
     quantity: number, 
     options: Record<string, any>, 
     notes?: string,
-    additionalPieces: CartAdditionalPiece[] = [] // ✅ معامل جديد
+    additionalPieces: CartAdditionalPiece[] = []
   ) => {
     setItems(currentItems => {
-      // ✅ تحديث شرط المقارنة ليشمل القطع الإضافية
       const existingItem = currentItems.find(item => 
         item.product.id === product.id && 
         JSON.stringify(item.options) === JSON.stringify(options) &&
         JSON.stringify(item.additionalPieces) === JSON.stringify(additionalPieces)
       );
       
+      let newItems;
+
       if (existingItem) {
-        return currentItems.map(item =>
+        newItems = currentItems.map(item =>
           item.id === existingItem.id
             ? { 
                 ...item, 
@@ -76,14 +114,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
           quantity, 
           options, 
           notes, 
-          additionalPieces, // ✅ إضافة القطع الإضافية
-          totalPrice: 0 // سيتم حسابه في السطر التالي
+          additionalPieces,
+          totalPrice: 0
         };
         
-        // ✅ حساب السعر الإجمالي
         newCartItem.totalPrice = calculateItemTotal(newCartItem);
-        return [...currentItems, newCartItem];
+        newItems = [...currentItems, newCartItem];
       }
+
+      // ✅ حفظ في التخزين المحلي
+      saveCartToStorage(newItems);
+      
+      // ✅ تتبع إضافة عنصر للسلة
+      trackEvent('cart_item_added', {
+        item_id: product.id,
+        item_name: product.name,
+        price: product.price,
+        quantity: quantity,
+        cart_total_items: newItems.reduce((sum, i) => sum + i.quantity, 0)
+      });
+
+      return newItems;
     });
   };
 
@@ -112,13 +163,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const updateQuantity = (cartItemId: string, amount: -1 | 1) => {
-    setItems(currentItems =>
-      currentItems.map(item => {
+    setItems(currentItems => {
+      const newItems = currentItems.map(item => {
         if (item.id === cartItemId) {
           if (item.quantity === 1 && amount === -1) { return item; }
           const newQuantity = item.quantity + amount;
           
-          // ✅ استخدام دالة الحساب الجديدة
           const newTotalPrice = calculateItemTotal({
             ...item,
             quantity: newQuantity
@@ -127,12 +177,36 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return { ...item, quantity: newQuantity, totalPrice: newTotalPrice };
         }
         return item;
-      })
-    );
+      }).filter(item => item.quantity > 0); // إزالة العناصر بكمية صفر
+
+      // ✅ حفظ في التخزين المحلي
+      saveCartToStorage(newItems);
+      
+      // ✅ تتبع تحديث الكمية
+      if (newItems.length !== currentItems.length) {
+        trackEvent('cart_item_removed', {
+          cart_total_items: newItems.reduce((sum, i) => sum + i.quantity, 0)
+        });
+      }
+
+      return newItems;
+    });
   };
 
   const removeFromCart = (cartItemId: string) => {
-    setItems(currentItems => currentItems.filter(item => item.id !== cartItemId));
+    setItems(currentItems => {
+      const newItems = currentItems.filter(item => item.id !== cartItemId);
+      
+      // ✅ حفظ في التخزين المحلي
+      saveCartToStorage(newItems);
+      
+      // ✅ تتبع إزالة عنصر
+      trackEvent('cart_item_removed', {
+        cart_total_items: newItems.reduce((sum, i) => sum + i.quantity, 0)
+      });
+
+      return newItems;
+    });
   };
 
   const setDeliveryPrice = (price: number) => {
@@ -163,6 +237,86 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setSelectedAddressState(null);
     setSelectedBranchState(null);
     setOrderTypeState('pickup');
+    
+    // ✅ مسح التخزين المحلي
+    AsyncStorage.removeItem('user_cart');
+    trackEvent('cart_cleared');
+  };
+
+  // ✅ دالة جديدة: الحصول على إجمالي عدد العناصر
+  const getTotalItems = () => {
+    return items.reduce((total, item) => total + item.quantity, 0);
+  };
+
+  // ✅ دالة جديدة: التحقق وإظهار prompt التسجيل
+  const showLoginPrompt = async (): Promise<boolean> => {
+    // ✅ التحقق إذا كان المستخدم ضيف
+    const isGuest = await AsyncStorage.getItem('isGuest');
+    
+    if (isGuest === 'true') {
+      setRequiresLogin(true);
+      
+      // ✅ تتبع محاولة طلب كضيف
+      await trackGuestEvent('guest_checkout_attempt', {
+        cart_items_count: getTotalItems(),
+        cart_total_price: totalPrice,
+        order_type: orderType,
+        items_in_cart: items.map(item => ({
+          id: item.product.id,
+          name: item.product.name,
+          quantity: item.quantity,
+          price: item.totalPrice
+        }))
+      });
+
+      return new Promise((resolve) => {
+        Alert.alert(
+          'تسجيل الدخول مطلوب',
+          'لإكمال عملية الطلب، يرجى إنشاء حساب أو تسجيل الدخول. هذا سيسمح لك بحفظ عنوانك وتتبع طلباتك.',
+          [
+            {
+              text: 'البقاء كضيف',
+              style: 'cancel',
+              onPress: () => {
+                setRequiresLogin(false);
+                trackGuestEvent('guest_checkout_declined');
+                resolve(false); // لا يحتاج تسجيل دخول
+              }
+            },
+            {
+              text: 'تسجيل الدخول',
+              style: 'default',
+              onPress: () => {
+                setRequiresLogin(false);
+                trackGuestEvent('guest_checkout_accepted');
+                // ✅ حفظ السلة الحالية قبل التوجيه
+                saveCartBeforeLogin();
+                router.push('/(auth)/login');
+                resolve(true); // يحتاج تسجيل دخول
+              }
+            }
+          ]
+        );
+      });
+    }
+    
+    return false; // لا يحتاج تسجيل دخول
+  };
+
+  // ✅ دالة جديدة: حفظ السلة قبل التوجيه للتسجيل
+  const saveCartBeforeLogin = async () => {
+    try {
+      await AsyncStorage.setItem('pending_cart_after_login', JSON.stringify({
+        items,
+        orderType,
+        selectedAddress,
+        selectedBranch,
+        deliveryPrice,
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.error('Failed to save pending cart:', error);
+    }
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -184,6 +338,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     selectedBranch,
     setSelectedBranch,
     clearCart,
+    // ✅ إضافة الدوال الجديدة
+    requiresLogin,
+    showLoginPrompt,
+    getTotalItems,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

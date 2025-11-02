@@ -58,9 +58,11 @@ import {
   LogOut,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // استيراد ionicons
 import { Ionicons } from '@expo/vector-icons';
+import { startGuestSession, trackEvent, fallbackAnalytics } from '@/lib/analytics';
 
 // الألوان المستوحاة من التصميم الجديد
 const COLORS = {
@@ -861,10 +863,131 @@ export default function RegisterScreen() {
     );
   };
 
-  // ✅ دالة المتابعة كضيف
-  const handleContinueAsGuest = () => {
-    router.replace('/(tabs)');
-  };
+const handleContinueAsGuest = async () => {
+  setLoading(true);
+  
+  try {
+    // 1. محاولة التسجيل المجهول في Supabase
+    const { data, error } = await supabase.auth.signInAnonymously();
+
+    if (error) {
+      console.error('Anonymous auth error:', error);
+      throw new Error('فشل في إنشاء جلسة الضيف');
+    }
+
+    if (data.user) {
+      console.log('✅ Anonymous user created:', data.user.id);
+      
+      // 2. محاولة إنشاء البروفايل (مع التعامل مع الأخطاء)
+      try {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            first_name: 'ضيف',
+            last_name: 'ملكي',
+            full_name: 'ضيف ملكي',
+            phone: null,
+            email: null,
+            points: 0,
+            loyalty_level: 'bronze',
+            is_guest: true, // ✅ إضافة علامة للضيف
+            guest_join_date: new Date().toISOString()
+          });
+
+        if (profileError) {
+          console.warn('⚠️ Guest profile creation warning:', profileError);
+          // لا نرمي خطأ هنا لأن المستخدم مجهول أنشئ بنجاح
+        }
+      } catch (profileError) {
+        console.warn('⚠️ Guest profile creation failed:', profileError);
+      }
+
+      // 3. استخدام نظام التحليلات (مع fallback)
+      try {
+        let guestSessionId;
+        if (typeof startGuestSession === 'function') {
+          guestSessionId = await startGuestSession(data.user.id);
+        } else {
+          guestSessionId = await fallbackAnalytics.startGuestSession(data.user.id);
+        }
+        
+        console.log('✅ Guest session started:', guestSessionId);
+      } catch (analyticsError) {
+        console.warn('⚠️ Analytics setup failed:', analyticsError);
+      }
+
+      // 4. حفظ بيانات الضيف محلياً
+      await AsyncStorage.multiSet([
+        ['isGuest', 'true'],
+        ['guestUserId', data.user.id],
+        ['guestSessionStart', new Date().toISOString()],
+        ['guestName', 'ضيف ملكي']
+      ]);
+
+      // 5. تسجيل الحدث
+      try {
+        if (typeof trackEvent === 'function') {
+          await trackEvent('guest_session_started', {
+            user_id: data.user.id,
+            timestamp: new Date().toISOString()
+          });
+        } else {
+          await fallbackAnalytics.trackEvent('guest_session_started', {
+            user_id: data.user.id,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (trackingError) {
+        console.warn('⚠️ Event tracking failed:', trackingError);
+      }
+
+      // 6. التوجيه للرئيسية
+      router.replace('/(tabs)');
+    }
+    
+  } catch (error: any) { // ✅ إضافة النوع any للخطأ
+    console.error('❌ Anonymous login failed:', error);
+    
+    // ✅ Fallback محسن
+    Alert.alert(
+      'المتابعة كضيف',
+      'يمكنك التصفح كضيف. بعض الميزات قد لا تكون متاحة بالكامل.',
+      [{ 
+        text: 'متابعة كضيف', 
+        onPress: async () => {
+          const fallbackSessionId = `local_guest_${Date.now()}`;
+          
+          // حفظ شامل للحالة المحلية
+          await AsyncStorage.multiSet([
+            ['isGuest', 'true'],
+            ['guestSessionId', fallbackSessionId],
+            ['guestLoginTime', new Date().toISOString()],
+            ['guestFallback', 'true'], // إشارة أن هذا fallback
+            ['guestName', 'ضيف ملكي']
+          ]);
+
+          // تسجيل الحدث
+          try {
+            if (typeof trackEvent === 'function') {
+              await trackEvent('guest_fallback_session', {
+                session_id: fallbackSessionId,
+                reason: 'anonymous_auth_failed',
+                error: error?.message || 'Unknown error' // ✅ معالجة الخطأ بشكل آمن
+              });
+            }
+          } catch (e: any) { // ✅ إضافة النوع any للخطأ هنا أيضاً
+            console.warn('Failed to track fallback event:', e);
+          }
+          
+          router.replace('/(tabs)');
+        }
+      }]
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1140,18 +1263,21 @@ export default function RegisterScreen() {
               </AnimatedButton>
 
               {/* زر المتابعة كضيف */}
-              <TouchableOpacity 
-                style={[
-                  styles.guestButton,
-                  { borderColor: colors.primary }
-                ]}
-                onPress={handleContinueAsGuest}
-              >
-                <Text style={[styles.guestButtonText, { color: colors.primary }]}>
-                  المتابعة كضيف
-                </Text>
-                <ChevronRight size={18} color={colors.primary} />
-              </TouchableOpacity>
+              {/* زر المتابعة كضيف */}
+<TouchableOpacity 
+  style={[
+    styles.guestButton,
+    { borderColor: colors.primary },
+    loading && styles.guestButtonDisabled
+  ]}
+  onPress={handleContinueAsGuest}
+  disabled={loading}
+>
+  <Text style={[styles.guestButtonText, { color: colors.primary }]}>
+    {loading ? 'جاري التحميل...' : 'المتابعة كضيف'}
+  </Text>
+  <ChevronRight size={18} color={colors.primary} />
+</TouchableOpacity>
             </View>
 
             <View style={styles.separatorContainer}>
@@ -1532,6 +1658,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  guestButtonDisabled: {
+  opacity: 0.6,
+},
 
   separatorContainer: {
     flexDirection: 'row',

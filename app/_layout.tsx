@@ -24,6 +24,9 @@ import { AppState } from 'react-native';
 // ✅ استيراد نظام OTA للتحديثات التلقائية
 import * as Updates from 'expo-updates';
 
+// ✅ استيراد نظام التحليلات
+import { initializeAnalytics, cleanupAnalytics } from '@/lib/analytics';
+
 // --- كود RTL يبقى كما هو ---
 try {
   I18nManager.forceRTL(true);
@@ -102,7 +105,7 @@ const AuthGuard = () => {
     }
   }, [user, initialLoading, configLoading, showMaintenance, showForceUpdate]);
 
-  // ✅ عرض شاشات الصيانة والتحديث إذا لزم الأمر
+  // ✅ عرض شاشات التحميل
   if (configLoading || initialLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
@@ -115,33 +118,36 @@ const AuthGuard = () => {
   }
 
   // ✅ عرض شاشة الصيانة
- // ✅ عرض شاشة الصيانة
-// ✅ عرض شاشة الصيانة
-if (showMaintenance) {
-  return <MaintenanceScreen />;
-}
+  if (showMaintenance) {
+    return <MaintenanceScreen />;
+  }
 
-// ✅ عرض شاشة التحديث الإجباري
-if (showForceUpdate) {
-  return <ForceUpdateScreen />;
-}
+  // ✅ عرض شاشة التحديث الإجباري
+  if (showForceUpdate) {
+    return <ForceUpdateScreen />;
+  }
 
   return <Slot />;
 };
 
 export default function RootLayout() {
   
-  // ✅ إعداد معالجات الإشعارات والتطبيق
+  // ✅ إعداد أنظمة التطبيق
   useEffect(() => {
-    // إعداد معالجات النقر على الإشعارات
+    // تهيئة نظام التحليلات
+    initializeAnalytics().then(() => {
+      console.log('✅ Analytics system initialized');
+    }).catch(error => {
+      console.error('❌ Analytics initialization failed:', error);
+    });
+    
+    // إعداد معالجات الإشعارات
     const { removeReceivedListener, removeResponseListener } = setupNotificationHandlers();
 
-    // التعامل مع حالة التطبيق (عندما يعود المستخدم للتطبيق)
+    // التعامل مع حالة التطبيق
     const subscription = AppState.addEventListener('change', (nextAppState) => {
-      // إذا عاد المستخدم إلى التطبيق وهو في المقدمة
       if (nextAppState === 'active') {
         console.log('App has come to the foreground, clearing badge count.');
-        // مسح عداد الإشعارات على أيقونة التطبيق
         clearBadgeCount();
       }
     });
@@ -151,6 +157,8 @@ export default function RootLayout() {
       removeReceivedListener();
       removeResponseListener();
       subscription.remove();
+      cleanupAnalytics(); // ✅ تنظيف نظام التحليلات
+      console.log('🧹 Analytics system cleaned up');
     };
   }, []);
 

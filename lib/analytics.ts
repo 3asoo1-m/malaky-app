@@ -5,13 +5,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ✅ تعريف نوع الحدث
 interface AnalyticsEvent {
-  user_id: string | null;
+  user_id?: string | null;
   event_name: string;
-  event_properties: any;
-  device_info: string;
-  session_id: string;
-  timestamp: string;
-  backup_timestamp?: number;
+  event_properties?: any;
+  device_info?: string;
+  session_id?: string;
+  timestamp?: string;
+  guest_user_id?: string;
 }
 
 // ✅ إعدادات الأداء المحسنة
@@ -28,16 +28,16 @@ const CRITICAL_EVENTS = [
   'order_placed',
   'payment_success',
   'user_signed_in',
-  'error_occurred'
+  'error_occurred',
+  'guest_signup',
+  'guest_conversion'
 ];
 
 // ✅ متغيرات عالمية
 let eventQueue: AnalyticsEvent[] = [];
-let flushTimer: ReturnType<typeof setInterval> | null = null; // ✅ استخدام ReturnType
+let flushTimer: ReturnType<typeof setInterval> | null = null;
 let isFlushing = false;
 let retryCount = 0;
-
-// ✅ حفظ subscription لإزالتها لاحقاً
 let appStateSubscription: { remove: () => void } | null = null;
 
 // ✅ توليد معرف جلسة فريد
@@ -57,6 +57,94 @@ const getSessionId = async (): Promise<string> => {
   } catch (error) {
     return generateSessionId();
   }
+};
+
+// ✅ الحصول على حالة الضيف
+export const getGuestStatus = async (): Promise<{
+  isGuest: boolean;
+  guestSessionId: string | null;
+  guestUserId: string | null;
+}> => {
+  try {
+    const isGuest = await AsyncStorage.getItem('isGuest');
+    const guestSessionId = await AsyncStorage.getItem('guestSessionId');
+    const guestUserId = await AsyncStorage.getItem('guestUserId');
+    
+    return {
+      isGuest: isGuest === 'true',
+      guestSessionId,
+      guestUserId
+    };
+  } catch (error) {
+    console.error('Error getting guest status:', error);
+    return { isGuest: false, guestSessionId: null, guestUserId: null };
+  }
+};
+
+// ✅ الحصول على معلومات المستخدم الحالي - متوافقة مع النظام الهجين
+const getCurrentUserInfo = async (): Promise<{
+  user_id: string | null;
+  is_guest: boolean;
+  guest_user_id: string | null;
+  guest_session_id: string | null;
+}> => {
+  try {
+    // 1. التحقق من المستخدم المسجل أولاً
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (user) {
+      return {
+        user_id: user.id,
+        is_guest: false,
+        guest_user_id: null,
+        guest_session_id: null
+      };
+    }
+    
+    // 2. إذا مافي مستخدم، نجيب بيانات الضيف من النظام الهجين
+    const guestData = await AsyncStorage.getItem('guest_user');
+    
+    if (guestData) {
+      const guest = JSON.parse(guestData);
+      return {
+        user_id: null,
+        is_guest: true,
+        guest_user_id: guest.id, // ✅ آيدي الضيف من النظام الهجين
+        guest_session_id: guest.session_id
+      };
+    }
+    
+    // 3. إذا مافي ضيف ولا مستخدم
+    return {
+      user_id: null,
+      is_guest: false,
+      guest_user_id: null,
+      guest_session_id: null
+    };
+    
+  } catch (error) {
+    console.error('Error getting user info:', error);
+    return { 
+      user_id: null, 
+      is_guest: false, 
+      guest_user_id: null,
+      guest_session_id: null
+    };
+  }
+};
+
+// ✅ الحصول على معلومات الجهاز
+const getDeviceInfo = (): any => {
+  return {
+    platform: Platform.OS,
+    version: Platform.Version,
+  };
+};
+
+// ✅ دالة مساعدة لتحويل device_info إلى نص
+const getDeviceInfoAsString = (): string => {
+  const deviceInfo = getDeviceInfo();
+  return JSON.stringify(deviceInfo);
 };
 
 // ✅ الأحداث الرئيسية
@@ -86,6 +174,21 @@ export const AnalyticsEvents = {
   NOTIFICATIONS_ACCESSED: 'notifications_accessed'
 };
 
+// ✅ أحداث خاصة بالضيوف في النظام الهجين
+export const GuestAnalyticsEvents = {
+  // الأحداث الأساسية
+  GUEST_SESSION_START: 'guest_session_start',
+  GUEST_SESSION_END: 'guest_session_end',
+  GUEST_CONVERSION: 'guest_conversion',
+  
+  // ✅ أحداث جديدة خاصة بالنظام الهجين
+  GUEST_CART_CREATED: 'guest_cart_created',
+  GUEST_ORDER_ATTEMPT: 'guest_order_attempt',
+  GUEST_UPGRADE_PROMPT: 'guest_upgrade_prompt',
+  GUEST_DATA_MIGRATED: 'guest_data_migrated',
+  GUEST_UPGRADE_DELAYED: 'guest_upgrade_delayed'
+};
+
 // ✅ التعامل مع تغيير حالة التطبيق
 const handleAppStateChange = (nextAppState: AppStateStatus) => {
   if (nextAppState === 'background' && eventQueue.length > 0) {
@@ -94,13 +197,12 @@ const handleAppStateChange = (nextAppState: AppStateStatus) => {
   }
 };
 
-// ✅ بدء timer الإرسال الدوري - الإصدار المصحح
+// ✅ بدء timer الإرسال الدوري
 const startFlushTimer = () => {
   if (flushTimer) {
     clearInterval(flushTimer);
   }
   
-  // ✅ استخدام ReturnType<typeof setInterval> بدون تحويل نوع
   flushTimer = setInterval(() => {
     if (eventQueue.length > 0 && !isFlushing) {
       flushEvents();
@@ -108,65 +210,34 @@ const startFlushTimer = () => {
   }, ANALYTICS_CONFIG.FLUSH_INTERVAL);
 };
 
-// ✅ تهيئة نظام التحليلات - الإصدار المصحح
-export const initializeAnalytics = async () => {
+// ✅ تنظيف جلسات الضيوف القديمة
+export const cleanupOldGuestSessions = async (maxAge: number = 1000 * 60 * 60 * 24): Promise<void> => {
   try {
-    // تحميل الأحداث المحفوظة مسبقاً
-    const savedQueue = await AsyncStorage.getItem('analytics_event_queue');
-    if (savedQueue) {
-      eventQueue = JSON.parse(savedQueue);
-      console.log(`📊 Loaded ${eventQueue.length} events from storage`);
+    const guestLoginTime = await AsyncStorage.getItem('guestLoginTime');
+    
+    if (guestLoginTime) {
+      const sessionAge = Date.now() - new Date(guestLoginTime).getTime();
+      
+      if (sessionAge > maxAge) {
+        console.log('🧹 Cleaning up old guest session');
+        await endGuestSession();
+      }
     }
-
-    // بدء timer للإرسال الدوري
-    startFlushTimer();
-
-    // ✅ استخدام الطريقة الصحيحة لـ AppState في React Native
-    appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
-
-    await flushBackupEvents();
   } catch (error) {
-    console.error('❌ Analytics initialization error:', error);
+    console.error('❌ Guest session cleanup error:', error);
   }
 };
 
-// ✅ الدالة الرئيسية المحسنة لتسجيل الأحداث
-export const trackEvent = async (eventName: string, properties: any = {}) => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    const sessionId = await getSessionId();
-
-    const eventData: AnalyticsEvent = {
-      user_id: user?.id || null,
-      event_name: eventName,
-      event_properties: {
-        ...properties,
-        platform: Platform.OS,
-        timestamp: new Date().toISOString()
-      },
-      device_info: Platform.OS,
-      session_id: sessionId,
-      timestamp: new Date().toISOString()
-    };
-
-    // ✅ تحديد إذا كان الحدث مهم ويستحق الإرسال الفوري
-    if (CRITICAL_EVENTS.includes(eventName)) {
-      await addToQueueAndFlush(eventData);
-    } else {
-      addToQueue(eventData);
-    }
-
-    console.log(`📊 Queued: ${eventName}`);
-
-  } catch (error) {
-    console.error('❌ Analytics tracking error:', error);
+// ✅ تعريف وتصدير fallbackAnalytics
+export const fallbackAnalytics = {
+  startGuestSession: async (userId: string) => {
+    const sessionId = `guest_${userId}_${Date.now()}`;
+    await AsyncStorage.setItem('guestSessionId', sessionId);
+    return sessionId;
+  },
+  trackEvent: async (eventName: string, properties: any) => {
+    console.log(`[Fallback Analytics] ${eventName}:`, properties);
   }
-};
-
-// ✅ إضافة للطابور مع إرسال فوري للأحداث المهمة
-const addToQueueAndFlush = async (eventData: AnalyticsEvent) => {
-  addToQueue(eventData);
-  await forceFlush();
 };
 
 // ✅ إضافة الحدث للطابور
@@ -288,15 +359,152 @@ export const flushBackupEvents = async (): Promise<void> => {
   }
 };
 
-// ✅ تنظيف الموارد - الإصدار المصحح
+// ✅ الدالة الرئيسية المحسنة للنظام الهجين
+export const trackEvent = async (eventName: string, properties: any = {}) => {
+  try {
+    const userInfo = await getCurrentUserInfo();
+    const sessionId = await getSessionId();
+    
+    const event: AnalyticsEvent = {
+      event_name: eventName,
+      event_properties: properties,
+      session_id: sessionId,
+      device_info: getDeviceInfoAsString(),
+      timestamp: new Date().toISOString(),
+    };
+
+    // ✅ إضافة user_id للمستخدمين المسجلين
+    if (userInfo.user_id) {
+      event.user_id = userInfo.user_id;
+    }
+
+    // ✅ إضافة بيانات الضيف للنظام الهجين
+    if (userInfo.is_guest && userInfo.guest_user_id) {
+      event.guest_user_id = userInfo.guest_user_id;
+      event.event_properties = {
+        ...properties,
+        guest_session_id: userInfo.guest_session_id,
+        is_guest: true,
+        guest_system: 'hybrid' // ✅ تمييز أن الضيف من النظام الهجين
+      };
+    }
+
+    addToQueue(event);
+
+    // ✅ الإرسال الفوري للأحداث المهمة
+    if (CRITICAL_EVENTS.includes(eventName)) {
+      await forceFlush();
+    }
+
+  } catch (error) {
+    console.error('❌ Track event error:', error);
+  }
+};
+
+// ✅ دالة خاصة بتسجيل أحداث الضيوف
+export const trackGuestEvent = async (eventName: string, properties: any = {}) => {
+  const guestData = await AsyncStorage.getItem('guest_user');
+  
+  if (!guestData) {
+    console.log('⚠️ No guest session found');
+    return trackEvent(eventName, properties);
+  }
+
+  const guest = JSON.parse(guestData);
+  
+  return trackEvent(eventName, {
+    ...properties,
+    guest_specific: true,
+    guest_user_id: guest.id,
+    guest_session_id: guest.session_id,
+    guest_system: 'hybrid'
+  });
+};
+
+// ✅ دالة خاصة بتسجيل بدء جلسة الضيف
+export const trackGuestSessionStart = async (guestData: any) => {
+  await trackEvent(GuestAnalyticsEvents.GUEST_SESSION_START, {
+    guest_user_id: guestData.id,
+    guest_session_id: guestData.session_id,
+    system_type: 'hybrid',
+    device_info: guestData.device_info,
+    session_start_time: guestData.created_at
+  });
+};
+
+// ✅ دالة خاصة بتسجيل تحويل الضيف (تعريف واحد فقط)
+export const trackGuestConversion = async (guestId: string, newUserId: string, migrationData: any = {}) => {
+  await trackEvent(GuestAnalyticsEvents.GUEST_CONVERSION, {
+    old_guest_user_id: guestId,
+    new_user_id: newUserId,
+    migration_success: true,
+    migrated_data: migrationData,
+    conversion_timestamp: new Date().toISOString()
+  });
+
+  console.log('🎯 Guest conversion tracked:', newUserId);
+};
+
+// ✅ دالة لبدء جلسة ضيف في النظام الهجين
+export const startGuestSession = async (guestData: any) => {
+  // حفظ بيانات الجلسة
+  await AsyncStorage.setItem('guest_user', JSON.stringify(guestData));
+  
+  // تسجيل بدء الجلسة في التحليلات
+  await trackGuestSessionStart(guestData);
+
+  console.log('🎯 Guest session started (Hybrid):', guestData.id);
+  return guestData.id;
+};
+
+// ✅ دالة لإنهاء جلسة ضيف
+export const endGuestSession = async () => {
+  const guestData = await AsyncStorage.getItem('guest_user');
+  
+  if (guestData) {
+    const guest = JSON.parse(guestData);
+    await trackGuestEvent(GuestAnalyticsEvents.GUEST_SESSION_END, {
+      session_duration: Date.now() - new Date(guest.created_at).getTime()
+    });
+
+    // تنظيف بيانات الضيف
+    await AsyncStorage.removeItem('guest_user');
+    console.log('🎯 Guest session ended');
+  }
+};
+
+// ✅ تهيئة نظام التحليلات
+export const initializeAnalytics = async () => {
+  try {
+    // تحميل الأحداث المحفوظة مسبقاً
+    const savedQueue = await AsyncStorage.getItem('analytics_event_queue');
+    if (savedQueue) {
+      eventQueue = JSON.parse(savedQueue);
+      console.log(`📊 Loaded ${eventQueue.length} events from storage`);
+    }
+
+    // تنظيف الجلسات القديمة
+    await cleanupOldGuestSessions();
+
+    // بدء timer للإرسال الدوري
+    startFlushTimer();
+
+    // إعداد listener لحالة التطبيق
+    appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+
+    await flushBackupEvents();
+  } catch (error) {
+    console.error('❌ Analytics initialization error:', error);
+  }
+};
+
+// ✅ تنظيف الموارد
 export const cleanupAnalytics = () => {
-  // ✅ تنظيف الـ timer
   if (flushTimer) {
     clearInterval(flushTimer);
     flushTimer = null;
   }
   
-  // ✅ إزالة subscription باستخدام الطريقة الصحيحة
   if (appStateSubscription) {
     appStateSubscription.remove();
     appStateSubscription = null;
@@ -308,7 +516,7 @@ export const cleanupOldBackupEvents = async (maxAge: number = 1000 * 60 * 60 * 2
   try {
     const backupEvents = await AsyncStorage.getItem('analytics_backup_events');
     if (backupEvents) {
-      const events: (AnalyticsEvent & { backup_timestamp: number })[] = JSON.parse(backupEvents);
+      const events: (AnalyticsEvent & { backup_timestamp?: number })[] = JSON.parse(backupEvents);
       const now = Date.now();
       const freshEvents = events.filter(event => 
         now - (event.backup_timestamp || now) < maxAge
