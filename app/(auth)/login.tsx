@@ -52,6 +52,8 @@ import {
   LogOut,
   ChevronLeft,
 } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+
 
 // استيراد ionicons
 import { Ionicons } from '@expo/vector-icons';
@@ -114,7 +116,7 @@ const FloatingFoodIcon = ({
   duration: number;
   startX: number;
 }) => {
-  const translateY = useSharedValue(-size); // تبدأ من فوق الشاشة بحسب حجم الأيقونة
+  const translateY = useSharedValue(-size);
   const opacity = useSharedValue(0);
   const rotate = useSharedValue(Math.random() * 360);
   const scale = useSharedValue(0.8 + Math.random() * 0.4);
@@ -122,7 +124,6 @@ const FloatingFoodIcon = ({
 
   React.useEffect(() => {
     const startAnimation = () => {
-      // 1. حركة نزول سلسة ومستمرة بدون توقف
       translateY.value = withDelay(
         delay,
         withRepeat(
@@ -135,16 +136,12 @@ const FloatingFoodIcon = ({
         )
       );
 
-      // 2. ظهور واختفاء سلس مع الحركة
       opacity.value = withDelay(
         delay,
         withRepeat(
           withSequence(
-            // ظهور سريع عند البدء
             withTiming(0.7, { duration: 800 }),
-            // بقاء مرئي خلال معظم المسار
             withTiming(0.7, { duration: duration - 2000 }),
-            // اختفاء سريع قبل النهاية
             withTiming(0, { duration: 1200 })
           ),
           -1,
@@ -152,11 +149,10 @@ const FloatingFoodIcon = ({
         )
       );
 
-      // 3. دوران مستمر وسلس
       rotate.value = withDelay(
         delay,
         withRepeat(
-          withTiming(rotate.value + 720, { // دورة كاملة 720 درجة للحركة المستمرة
+          withTiming(rotate.value + 720, {
             duration: duration * 0.8, 
             easing: Easing.linear 
           }),
@@ -165,7 +161,6 @@ const FloatingFoodIcon = ({
         )
       );
 
-      // 4. تأثير تمايل خفيف أثناء النزول
       const swingDuration = duration / 4;
       translateX.value = withDelay(
         delay,
@@ -180,7 +175,6 @@ const FloatingFoodIcon = ({
         )
       );
 
-      // 5. تأثير نبض خفيف في الحجم
       scale.value = withDelay(
         delay,
         withRepeat(
@@ -207,18 +201,17 @@ const FloatingFoodIcon = ({
     opacity: opacity.value,
   }));
 
-  // ألوان عشوائية للأيقونات مع شفافية
   const iconColors = [
     COLORS.emailPrimary,
     COLORS.phonePrimary,
     COLORS.yellow,
-    '#4CAF50', // أخضر
-    '#FF9800', // برتقالي
-    '#9C27B0', // بنفسجي
-    '#795548', // بني
-    '#607D8B', // أزرق رمادي
-    '#E91E63', // وردي
-    '#00BCD4', // سماوي
+    '#4CAF50',
+    '#FF9800',
+    '#9C27B0',
+    '#795548',
+    '#607D8B',
+    '#E91E63',
+    '#00BCD4',
   ];
   
   const randomColor = iconColors[Math.floor(Math.random() * iconColors.length)];
@@ -249,27 +242,23 @@ const AnimatedBackground = () => {
   const [foodIcons, setFoodIcons] = useState<React.ReactNode[]>([]);
 
   React.useEffect(() => {
-    // إنشاء مصفوفة من الأيقونات مع توزيع أفضل
     const createIcons = () => {
       const icons = [];
-      const totalIcons = 20; // قلل العدد قليلاً لتجنب الاكتظاظ
+      const totalIcons = 20;
       
-      // تقسيم الشاشة إلى أعمدة لتوزيع أفضل
       const columns = 6;
       const columnWidth = SCREEN_WIDTH / columns;
       
       for (let i = 0; i < totalIcons; i++) {
         const randomIcon = FOOD_ICONS[Math.floor(Math.random() * FOOD_ICONS.length)];
-        const size = Math.random() * 18 + 22; // أحجام بين 22 و 40
+        const size = Math.random() * 18 + 22;
         
-        // توزيع أفضل على الأعمدة
         const column = i % columns;
         const baseX = column * columnWidth;
         const startX = baseX + Math.random() * (columnWidth - size);
         
-        // تأخير وتوقيت أكثر تنوعاً
-        const delay = Math.random() * 15000; // تأخير أطول بين 0-15 ثانية
-        const duration = Math.random() * 10000 + 20000; // مدة بين 20-30 ثانية
+        const delay = Math.random() * 15000;
+        const duration = Math.random() * 10000 + 20000;
         
         icons.push(
           <FloatingFoodIcon
@@ -288,7 +277,6 @@ const AnimatedBackground = () => {
     
     setFoodIcons(createIcons());
 
-    // إعادة إنشاء الأيقونات كل دقيقة لمنع التكدس
     const interval = setInterval(() => {
       setFoodIcons(createIcons());
     }, 60000);
@@ -298,12 +286,9 @@ const AnimatedBackground = () => {
 
   return (
     <View style={styles.backgroundContainer}>
-      {/* الدوائر الخلفية */}
       <Animated.View style={[styles.circle, styles.circleRed]} />
       <Animated.View style={[styles.circle, styles.circleBlue]} />
       <Animated.View style={[styles.circle, styles.circleYellow]} />
-
-      {/* أيقونات الطعام العائمة */}
       {foodIcons}
     </View>
   );
@@ -372,12 +357,10 @@ const AnimatedLogo = () => {
         style={styles.logoImage} 
       />
       
-      {/* Sparkle decoration */}
       <Animated.View style={[styles.sparkleDecoration, styles.sparkleTopRight, sparkleStyle]}>
         <Sparkles size={24} color={COLORS.yellow} fill={COLORS.yellow} />
       </Animated.View>
       
-      {/* Star decoration */}
       <Animated.View style={[styles.sparkleDecoration, styles.starBottomLeft, starStyle]}>
         <Star size={20} color={COLORS.emailPrimary} fill={COLORS.emailPrimary} />
       </Animated.View>
@@ -385,7 +368,7 @@ const AnimatedLogo = () => {
   );
 };
 
-// ✅ مكون الزر المتحرك
+// ✅ مكون الزر المتحرك مع تأثير اللمعان الخفيف
 const AnimatedButton = ({ 
   children, 
   onPress, 
@@ -398,22 +381,41 @@ const AnimatedButton = ({
   disabled?: boolean;
 }) => {
   const scale = useSharedValue(1);
-  const pressProgress = useSharedValue(0);
+  const shimmerTranslate = useSharedValue(-500);
+
+  React.useEffect(() => {
+    // لمعان خفيف جداً يظهر كل 4 ثواني
+    shimmerTranslate.value = withRepeat(
+      withSequence(
+        withTiming(-500, { duration: 0 }),
+        withDelay(4000, withTiming(-500, { duration: 0 })),
+        withTiming(500, {
+          duration: 4000,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        })
+      ),
+      -1,
+      false
+    );
+  }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
   const shimmerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(pressProgress.value, [0, 1], [-200, 200]) }],
+    transform: [
+      { translateX: shimmerTranslate.value },
+      { skewX: '-20deg' }
+    ],
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.98);
+    scale.value = withSpring(0.96, { damping: 15 });
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1);
+    scale.value = withSpring(1, { damping: 15 });
   };
 
   return (
@@ -424,24 +426,39 @@ const AnimatedButton = ({
       disabled={disabled}
       activeOpacity={0.8}
     >
-      <Animated.View style={[styles.animatedButton, { backgroundColor: colors.primary }, animatedStyle]}>
-        <Animated.View 
-          style={[
-            styles.buttonShimmer, 
-            { backgroundColor: 'rgba(255,255,255,0.2)' },
-            shimmerStyle
-          ]} 
-        />
+      <Animated.View
+        style={[
+          styles.animatedButton,
+          { backgroundColor: colors.primary },
+          animatedStyle,
+        ]}
+      >
+        {/* طبقة اللمعان الخفيف جداً */}
+        <Animated.View style={[styles.buttonShimmer, shimmerStyle]}>
+          <LinearGradient
+            colors={[
+              'transparent',
+              'rgba(255,255,255,0.15)',
+              'rgba(255,255,255,0.3)',
+              'rgba(255,255,255,0.15)',
+              'transparent'
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.shimmerGradient}
+          />
+        </Animated.View>
+
         {children}
       </Animated.View>
     </TouchableOpacity>
   );
 };
 
+
 export default function LoginScreen() {
   const router = useRouter();
   
-  // ✅ حالات التطبيق
   const [authMethod, setAuthMethod] = useState<AuthMethod>('phone');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('05');
@@ -451,13 +468,11 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  // ✅ المراجع
   const scrollViewRef = useRef<ScrollView>(null);
   const phoneRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
-  // ✅ الحصول على الألوان الحالية بناءً على طريقة المصادقة
   const getCurrentColors = () => {
     return authMethod === 'email' 
       ? { primary: COLORS.emailPrimary, secondary: COLORS.emailSecondary }
@@ -466,7 +481,6 @@ export default function LoginScreen() {
 
   const colors = getCurrentColors();
 
-  // ✅ دالة تسجيل الدخول
   const handleLogin = async () => {
     setErrorText(null);
 
@@ -506,7 +520,6 @@ export default function LoginScreen() {
     }
   };
 
-  // ✅ دوال إخفاء الخطأ عند الكتابة
   const handleEmailChange = (text: string) => {
     if (errorText) setErrorText(null);
     setEmail(text);
@@ -522,7 +535,6 @@ export default function LoginScreen() {
     setPassword(text);
   };
 
-  // ✅ دالة التركيز والتمرير
   const handleFocus = (ref: React.RefObject<TextInput | null>) => {
     if (ref.current && scrollViewRef.current) {
       const node = findNodeHandle(ref.current);
@@ -535,7 +547,6 @@ export default function LoginScreen() {
     }
   };
 
-  // ✅ مكون التبويبات
   const AuthTabs = () => {
     return (
       <View style={styles.tabsContainer}>
@@ -574,7 +585,6 @@ export default function LoginScreen() {
     );
   };
 
-  // ✅ مكون الشارات المتحركة
   const AnimatedBadge = ({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) => {
     const opacity = useSharedValue(0);
     const scale = useSharedValue(0.8);
@@ -600,7 +610,6 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent />
       
-      {/* الخلفية المتحركة */}
       <AnimatedBackground />
 
       <KeyboardAvoidingView
@@ -613,7 +622,6 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* الهيدر */}
           <View style={styles.header}>
             <AnimatedLogo />
             
@@ -622,7 +630,6 @@ export default function LoginScreen() {
               <Text style={styles.subtitle}>سجل دخولك للاستمتاع بالذ الوجبات الملكية !</Text>
             </View>
 
-            {/* الشارات الإحصائية */}
             <View style={styles.badgesContainer}>
               <AnimatedBadge delay={200}>
                 <Star size={12} color={COLORS.yellow} fill={COLORS.yellow} />
@@ -632,18 +639,13 @@ export default function LoginScreen() {
                 <Crown size={12} color={COLORS.emailPrimary} />
                 <Text style={styles.badgeText}>جودة ملكية</Text>
               </AnimatedBadge>
-              
             </View>
           </View>
 
-          {/* بطاقة تسجيل الدخول */}
           <Animated.View style={styles.loginCard}>
-            {/* التبويبات */}
             <AuthTabs />
 
-            {/* النموذج */}
             <View style={styles.formContainer}>
-              {/* حقل البريد الإلكتروني أو الهاتف */}
               {authMethod === 'phone' ? (
                 <View style={styles.inputWrapper}>
                   <View style={[
@@ -687,7 +689,6 @@ export default function LoginScreen() {
                 </View>
               )}
 
-              {/* حقل كلمة المرور */}
               <View style={styles.inputWrapper}>
                 <View style={[
                   styles.inputContainer,
@@ -718,14 +719,12 @@ export default function LoginScreen() {
                 </View>
               </View>
 
-              {/* رسالة الخطأ */}
               {errorText && (
                 <View style={styles.errorContainer}>
                   <Text style={[styles.errorText, { color: colors.primary }]}>{errorText}</Text>
                 </View>
               )}
 
-              {/* تذكرني ونسيت كلمة المرور */}
               <View style={styles.optionsContainer}>
                 <TouchableOpacity>
                   <View style={styles.forgotPasswordContainer}>
@@ -749,10 +748,8 @@ export default function LoginScreen() {
                   </View>
                   <Text style={styles.rememberMeText}>تذكرني</Text>
                 </TouchableOpacity>
-
               </View>
 
-              {/* زر تسجيل الدخول */}
               <AnimatedButton 
                 onPress={handleLogin} 
                 colors={colors}
@@ -765,17 +762,14 @@ export default function LoginScreen() {
               </AnimatedButton>
             </View>
 
-            {/* الفاصل */}
             <View style={styles.separatorContainer}>
               <View style={styles.separatorLine} />
               <Text style={styles.separatorText}>أو تسجيل الدخول عبر</Text>
               <View style={styles.separatorLine} />
             </View>
 
-            {/* تسجيل الدخول الاجتماعي */}
             <View style={styles.socialContainer}>
               <TouchableOpacity style={styles.socialButton}>
-                {/* أيقونة Google */}
                 <View style={styles.googleIcon}>
                   <Text style={styles.googleIconText}>G</Text>
                 </View>
@@ -783,7 +777,6 @@ export default function LoginScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.socialButton}>
-                {/* أيقونة Facebook */}
                 <View style={styles.facebookIcon}>
                   <Text style={styles.facebookIconText}>f</Text>
                 </View>
@@ -791,7 +784,6 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* رابط إنشاء حساب */}
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>
                 ليس لديك حساب؟{' '}
@@ -807,7 +799,6 @@ export default function LoginScreen() {
             </View>
           </Animated.View>
 
-          {/* التذييل */}
           <View style={styles.footer}>
             <View style={styles.footerRow}>
               <Crown size={16} color={COLORS.emailPrimary} />
@@ -829,7 +820,6 @@ export default function LoginScreen() {
   );
 }
 
-// ✅ التنسيقات
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
@@ -845,7 +835,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   
-  // الخلفية المتحركة
   backgroundContainer: {
     position: 'absolute',
     top: 0,
@@ -882,41 +871,11 @@ const styles = StyleSheet.create({
     marginLeft: -192,
     marginTop: -192,
   },
-  floatingShape: {
-    position: 'absolute',
-  },
-  floatingShape1: {
-    width: 64,
-    height: 64,
-    borderWidth: 4,
-    borderColor: 'rgba(227, 30, 36, 0.2)',
-    borderRadius: 16,
-    top: 80,
-    right: 160,
-  },
-  floatingShape2: {
-    width: 48,
-    height: 48,
-    backgroundColor: 'rgba(45, 74, 158, 0.1)',
-    borderRadius: 24,
-    bottom: 128,
-    left: 128,
-  },
-  floatingShape3: {
-    width: 32,
-    height: 32,
-    backgroundColor: 'rgba(253, 185, 19, 0.2)',
-    borderRadius: 8,
-    top: 160,
-    left: 80,
-    transform: [{ rotate: '45deg' }],
-  },
   floatingFoodIcon: {
     position: 'absolute',
     top: 0,
   },
 
-  // الهيدر
   header: { 
     alignItems: 'center', 
     marginBottom: 30 
@@ -979,7 +938,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // بطاقة تسجيل الدخول
   loginCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     borderRadius: 24,
@@ -995,7 +953,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // التبويبات
   tabsContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(243, 244, 246, 0.8)',
@@ -1028,7 +985,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
 
-  // النموذج
   formContainer: {
     marginBottom: 20,
   },
@@ -1067,7 +1023,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  // رسائل الخطأ
   errorContainer: {
     marginBottom: 16,
     paddingHorizontal: 4,
@@ -1078,7 +1033,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // الخيارات
   optionsContainer: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
@@ -1121,7 +1075,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // زر تسجيل الدخول
   animatedButton: {
     flexDirection: 'row',
     paddingVertical: 16, 
@@ -1144,13 +1097,16 @@ const styles = StyleSheet.create({
   },
   buttonShimmer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: -50,
+    left: -50,
+    right: -50,
+    bottom: -50,
+  },
+  shimmerGradient: {
+    flex: 1,
+    width: 150,
   },
 
-  // الفاصل
   separatorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1169,7 +1125,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
 
-  // التسجيل الاجتماعي
   socialContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -1219,7 +1174,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // رابط إنشاء حساب
   signupContainer: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -1243,7 +1197,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // التذييل
   footer: {
     alignItems: 'center',
   },
