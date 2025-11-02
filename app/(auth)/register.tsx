@@ -45,7 +45,8 @@ import {
   User,
   Check,
   Gift,
-  Utensils
+  Utensils,
+  ChevronLeft
 } from 'lucide-react-native';
 
 // الألوان المستوحاة من التصميم الجديد
@@ -696,7 +697,7 @@ export default function RegisterScreen() {
                     <Phone size={20} color={formErrors.phone ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
                     <TextInput
                       ref={phoneRef}
-                      style={styles.inputField}
+                      style={styles.emailphoneinputField}
                       placeholder="05X XXX XXXX"
                       value={phoneNumber}
                       onChangeText={(value) => handleFieldChange('phone', value)}
@@ -723,7 +724,7 @@ export default function RegisterScreen() {
                     <Mail size={20} color={formErrors.email ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
                     <TextInput
                       ref={emailRef}
-                      style={styles.inputField}
+                      style={styles.emailphoneinputField}
                       placeholder="example@email.com"
                       value={email}
                       onChangeText={(value) => handleFieldChange('email', value)}
@@ -927,7 +928,7 @@ export default function RegisterScreen() {
                   <Text style={[styles.loginLinkText, { color: colors.primary }]}>
                     تسجيل الدخول
                   </Text>
-                  <ChevronRight size={12} color={colors.primary} />
+                  <ChevronLeft size={12} color={colors.primary} />
                 </View>
               </TouchableOpacity>
             </View>
@@ -946,7 +947,7 @@ export default function RegisterScreen() {
             </View>
             
             <Text style={styles.footerCopyright}>
-              © 2025 ملكي بروست تشكن. جميع الحقوق محفوظة
+              © 2025 الدجاج الملكي بروست. جميع الحقوق محفوظة
             </Text>
           </View>
         </ScrollView>
@@ -1050,7 +1051,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   badgesContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap: 8,
     flexWrap: 'wrap',
     justifyContent: 'center',
@@ -1158,6 +1159,12 @@ const styles = StyleSheet.create({
     textAlign: 'right', 
     color: COLORS.darkGray 
   },
+  emailphoneinputField:{
+    flex: 1, 
+    fontSize: 16, 
+    textAlign: 'left', 
+    color: COLORS.darkGray
+  },
   visibilityButton: {
     padding: 4,
   },
@@ -1241,7 +1248,7 @@ const styles = StyleSheet.create({
 
   // زر إنشاء الحساب
   button: { 
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     paddingVertical: 16, 
     borderRadius: 16, 
     alignItems: 'center', 
@@ -1309,7 +1316,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#4285F4',
+    backgroundColor: '#ff2020ff',
     justifyContent: 'center',
     alignItems: 'center',
   },

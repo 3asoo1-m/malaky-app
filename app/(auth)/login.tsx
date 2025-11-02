@@ -49,6 +49,8 @@ import {
   Drumstick,
   Donut,
   CupSoda,
+  LogOut,
+  ChevronLeft,
 } from 'lucide-react-native';
 
 // استيراد ionicons
@@ -651,7 +653,7 @@ export default function LoginScreen() {
                     <Phone size={20} color={errorText ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                     <TextInput
                       ref={phoneRef}
-                      style={styles.inputField}
+                      style={styles.emailphoneinputField}
                       placeholder="05X XXX XXXX"
                       value={phone}
                       onChangeText={handlePhoneChange}
@@ -672,7 +674,7 @@ export default function LoginScreen() {
                     <Mail size={20} color={errorText ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                     <TextInput
                       ref={emailRef}
-                      style={styles.inputField}
+                      style={styles.emailphoneinputField}
                       placeholder="example@email.com"
                       value={email}
                       onChangeText={handleEmailChange}
@@ -725,6 +727,14 @@ export default function LoginScreen() {
 
               {/* تذكرني ونسيت كلمة المرور */}
               <View style={styles.optionsContainer}>
+                <TouchableOpacity>
+                  <View style={styles.forgotPasswordContainer}>
+                    <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+                      نسيت كلمة المرور؟
+                    </Text>
+                    <ChevronLeft size={12} color={colors.primary} />
+                  </View>
+                </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.rememberMeContainer}
                   onPress={() => setRememberMe(!rememberMe)}
@@ -740,14 +750,6 @@ export default function LoginScreen() {
                   <Text style={styles.rememberMeText}>تذكرني</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity>
-                  <View style={styles.forgotPasswordContainer}>
-                    <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
-                      نسيت كلمة المرور؟
-                    </Text>
-                    <ChevronRight size={12} color={colors.primary} />
-                  </View>
-                </TouchableOpacity>
               </View>
 
               {/* زر تسجيل الدخول */}
@@ -799,7 +801,7 @@ export default function LoginScreen() {
                   <Text style={[styles.signupLink, { color: colors.primary }]}>
                     إنشاء حساب جديد
                   </Text>
-                  <ChevronRight size={12} color={colors.primary} />
+                  <ChevronLeft size={12} color={colors.primary} />
                 </View>
               </TouchableOpacity>
             </View>
@@ -1055,6 +1057,12 @@ const styles = StyleSheet.create({
     textAlign: 'right', 
     color: COLORS.darkGray 
   },
+  emailphoneinputField:{
+    flex: 1, 
+    fontSize: 16, 
+    textAlign: 'left', 
+    color: COLORS.darkGray 
+  },
   visibilityButton: {
     padding: 4,
   },
@@ -1115,7 +1123,7 @@ const styles = StyleSheet.create({
 
   // زر تسجيل الدخول
   animatedButton: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     paddingVertical: 16, 
     borderRadius: 16, 
     alignItems: 'center', 
@@ -1188,7 +1196,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#4285F4',
+    backgroundColor: '#ff3030ff',
     justifyContent: 'center',
     alignItems: 'center',
   },
