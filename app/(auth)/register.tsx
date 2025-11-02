@@ -29,7 +29,9 @@ import Animated, {
   withDelay,
   Easing,
   interpolate,
-  withSpring
+  useAnimatedProps,
+  withSpring,
+  runOnJS
 } from 'react-native-reanimated';
 import { 
   Mail, 
@@ -46,8 +48,19 @@ import {
   Check,
   Gift,
   Utensils,
-  ChevronLeft
+  ChevronLeft,
+  Hamburger,
+  Pizza,
+  Ham,
+  Drumstick,
+  Donut,
+  CupSoda,
+  LogOut,
 } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+
+// استيراد ionicons
+import { Ionicons } from '@expo/vector-icons';
 
 // الألوان المستوحاة من التصميم الجديد
 const COLORS = {
@@ -60,13 +73,37 @@ const COLORS = {
   lightGray: '#F5F5F5',
   gray: '#6B7280',
   darkGray: '#374151',
-  background: '#F8FAFC',
+  background: '#FFF5F5',
   border: '#E5E7EB',
+  blueBackground: '#F0F4FF',
   success: '#22C55E',
   error: '#EF4444',
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ✅ تعريف أنواع الأيقونات المختلطة
+const FOOD_ICONS = [
+  // أيقونات Lucide
+  { type: 'lucide', component: Hamburger, name: 'hamburger' },
+  { type: 'lucide', component: Pizza, name: 'pizza' },
+  { type: 'lucide', component: Ham, name: 'ham' },
+  { type: 'lucide', component: Drumstick, name: 'drumstick' },
+  { type: 'lucide', component: Donut, name: 'donut' },
+  { type: 'lucide', component: CupSoda, name: 'cup-soda' },
+  
+  // أيقونات Ionicons
+  { type: 'ionicon', component: 'fast-food', name: 'fast-food' },
+  { type: 'ionicon', component: 'ice-cream', name: 'ice-cream' },
+  { type: 'ionicon', component: 'cafe', name: 'cafe' },
+  { type: 'ionicon', component: 'wine', name: 'wine' },
+  { type: 'ionicon', component: 'fish', name: 'fish' },
+  { type: 'ionicon', component: 'nutrition', name: 'nutrition' },
+  { type: 'ionicon', component: 'restaurant', name: 'restaurant' },
+  { type: 'ionicon', component: 'pizza', name: 'pizza-ionicon' },
+  { type: 'ionicon', component: 'beer', name: 'beer' },
+  { type: 'ionicon', component: 'water', name: 'water' },
+];
 
 // ✅ تعريف أنواع البيانات
 type AuthMethod = 'phone' | 'email';
@@ -87,61 +124,194 @@ interface FormErrors {
   confirmPassword?: string;
 }
 
-// ✅ مكون الخلفية المتحركة
-const AnimatedBackground = () => {
-  const scale1 = useSharedValue(1);
-  const scale2 = useSharedValue(1);
-  const scale3 = useSharedValue(1);
+// ✅ مكون أيقونة الطعام العائمة المحسنة
+const FloatingFoodIcon = ({ 
+  icon, 
+  size, 
+  delay, 
+  duration, 
+  startX 
+}: { 
+  icon: any;
+  size: number;
+  delay: number;
+  duration: number;
+  startX: number;
+}) => {
+  const translateY = useSharedValue(-size);
+  const opacity = useSharedValue(0);
+  const rotate = useSharedValue(Math.random() * 360);
+  const scale = useSharedValue(0.8 + Math.random() * 0.4);
+  const translateX = useSharedValue(startX);
 
   React.useEffect(() => {
-    scale1.value = withRepeat(
-      withSequence(
-        withTiming(1.1, { duration: 4000 }),
-        withTiming(1, { duration: 4000 })
-      ),
-      -1,
-      true
-    );
+    const startAnimation = () => {
+      translateY.value = withDelay(
+        delay,
+        withRepeat(
+          withTiming(SCREEN_HEIGHT + size, { 
+            duration: duration,
+            easing: Easing.linear 
+          }),
+          -1,
+          false
+        )
+      );
 
-    scale2.value = withRepeat(
-      withSequence(
-        withDelay(1000, withTiming(1.2, { duration: 5000 })),
-        withTiming(1, { duration: 5000 })
-      ),
-      -1,
-      true
-    );
+      opacity.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            withTiming(0.7, { duration: 800 }),
+            withTiming(0.7, { duration: duration - 2000 }),
+            withTiming(0, { duration: 1200 })
+          ),
+          -1,
+          false
+        )
+      );
 
-    scale3.value = withRepeat(
-      withSequence(
-        withDelay(2000, withTiming(1.05, { duration: 3500 })),
-        withTiming(1, { duration: 3500 })
-      ),
-      -1,
-      true
-    );
+      rotate.value = withDelay(
+        delay,
+        withRepeat(
+          withTiming(rotate.value + 720, {
+            duration: duration * 0.8, 
+            easing: Easing.linear 
+          }),
+          -1,
+          false
+        )
+      );
+
+      const swingDuration = duration / 4;
+      translateX.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            withTiming(startX + 15, { duration: swingDuration, easing: Easing.inOut(Easing.sin) }),
+            withTiming(startX - 10, { duration: swingDuration * 2, easing: Easing.inOut(Easing.sin) }),
+            withTiming(startX + 5, { duration: swingDuration, easing: Easing.inOut(Easing.sin) })
+          ),
+          -1,
+          true
+        )
+      );
+
+      scale.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            withTiming(scale.value * 1.15, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
+            withTiming(scale.value, { duration: 2000, easing: Easing.inOut(Easing.sin) })
+          ),
+          -1,
+          true
+        )
+      );
+    };
+
+    startAnimation();
   }, []);
 
-  const circle1Style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale1.value }],
-    opacity: 0.03,
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: translateY.value },
+      { translateX: translateX.value },
+      { rotate: rotate.value + 'deg' },
+      { scale: scale.value }
+    ],
+    opacity: opacity.value,
   }));
 
-  const circle2Style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale2.value }],
-    opacity: 0.03,
-  }));
+  const iconColors = [
+    COLORS.emailPrimary,
+    COLORS.phonePrimary,
+    COLORS.yellow,
+    '#4CAF50',
+    '#FF9800',
+    '#9C27B0',
+    '#795548',
+    '#607D8B',
+    '#E91E63',
+    '#00BCD4',
+  ];
+  
+  const randomColor = iconColors[Math.floor(Math.random() * iconColors.length)];
 
-  const circle3Style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale3.value }],
-    opacity: 0.02,
-  }));
+  return (
+    <Animated.View style={[styles.floatingFoodIcon, animatedStyle]}>
+      {icon.type === 'lucide' ? (
+        <icon.component 
+          size={size} 
+          color={randomColor} 
+          fill={randomColor}
+          opacity={0.6}
+        />
+      ) : (
+        <Ionicons 
+          name={icon.name}
+          size={size}
+          color={randomColor}
+          style={{ opacity: 0.6 }}
+        />
+      )}
+    </Animated.View>
+  );
+};
+
+// ✅ مكون الخلفية المتحركة المحسنة
+const AnimatedBackground = () => {
+  const [foodIcons, setFoodIcons] = useState<React.ReactNode[]>([]);
+
+  React.useEffect(() => {
+    const createIcons = () => {
+      const icons = [];
+      const totalIcons = 20;
+      
+      const columns = 6;
+      const columnWidth = SCREEN_WIDTH / columns;
+      
+      for (let i = 0; i < totalIcons; i++) {
+        const randomIcon = FOOD_ICONS[Math.floor(Math.random() * FOOD_ICONS.length)];
+        const size = Math.random() * 18 + 22;
+        
+        const column = i % columns;
+        const baseX = column * columnWidth;
+        const startX = baseX + Math.random() * (columnWidth - size);
+        
+        const delay = Math.random() * 15000;
+        const duration = Math.random() * 10000 + 20000;
+        
+        icons.push(
+          <FloatingFoodIcon
+            key={i}
+            icon={randomIcon}
+            size={size}
+            delay={delay}
+            duration={duration}
+            startX={startX}
+          />
+        );
+      }
+      
+      return icons;
+    };
+    
+    setFoodIcons(createIcons());
+
+    const interval = setInterval(() => {
+      setFoodIcons(createIcons());
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <View style={styles.backgroundContainer}>
-      <Animated.View style={[styles.circle, styles.circleRed, circle1Style]} />
-      <Animated.View style={[styles.circle, styles.circleBlue, circle2Style]} />
-      <Animated.View style={[styles.circle, styles.circleYellow, circle3Style]} />
+      <Animated.View style={[styles.circle, styles.circleRed]} />
+      <Animated.View style={[styles.circle, styles.circleBlue]} />
+      <Animated.View style={[styles.circle, styles.circleYellow]} />
+      {foodIcons}
     </View>
   );
 };
@@ -152,6 +322,8 @@ const AnimatedLogo = () => {
   const rotate = useSharedValue(-180);
   const sparkleRotate = useSharedValue(0);
   const starRotate = useSharedValue(0);
+  const sparkleScale = useSharedValue(1);
+  const starScale = useSharedValue(1);
 
   React.useEffect(() => {
     scale.value = withSpring(1, { damping: 15, stiffness: 120 });
@@ -168,6 +340,24 @@ const AnimatedLogo = () => {
       -1,
       false
     );
+
+    sparkleScale.value = withRepeat(
+      withSequence(
+        withTiming(1.2, { duration: 2000 }),
+        withTiming(1, { duration: 2000 })
+      ),
+      -1,
+      true
+    );
+
+    starScale.value = withRepeat(
+      withSequence(
+        withDelay(500, withTiming(1.2, { duration: 2500 })),
+        withTiming(1, { duration: 2500 })
+      ),
+      -1,
+      true
+    );
   }, []);
 
   const logoStyle = useAnimatedStyle(() => ({
@@ -175,11 +365,11 @@ const AnimatedLogo = () => {
   }));
 
   const sparkleStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: sparkleRotate.value + 'deg' }],
+    transform: [{ rotate: sparkleRotate.value + 'deg' }, { scale: sparkleScale.value }],
   }));
 
   const starStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: starRotate.value + 'deg' }],
+    transform: [{ rotate: starRotate.value + 'deg' }, { scale: starScale.value }],
   }));
 
   return (
@@ -197,6 +387,93 @@ const AnimatedLogo = () => {
         <Star size={20} color={COLORS.emailPrimary} fill={COLORS.emailPrimary} />
       </Animated.View>
     </Animated.View>
+  );
+};
+
+// ✅ مكون الزر المتحرك مع تأثير اللمعان الخفيف
+const AnimatedButton = ({ 
+  children, 
+  onPress, 
+  colors, 
+  disabled = false 
+}: { 
+  children: React.ReactNode; 
+  onPress: () => void; 
+  colors: { primary: string; secondary: string };
+  disabled?: boolean;
+}) => {
+  const scale = useSharedValue(1);
+  const shimmerTranslate = useSharedValue(-500);
+
+  React.useEffect(() => {
+    // لمعان خفيف جداً يظهر كل 4 ثواني
+    shimmerTranslate.value = withRepeat(
+      withSequence(
+        withTiming(-500, { duration: 0 }),
+        withDelay(4000, withTiming(-500, { duration: 0 })),
+        withTiming(500, {
+          duration: 4000,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        })
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: shimmerTranslate.value },
+      { skewX: '-20deg' }
+    ],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.96, { damping: 15 });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 15 });
+  };
+
+  return (
+    <TouchableOpacity
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.8}
+    >
+      <Animated.View
+        style={[
+          styles.animatedButton,
+          { backgroundColor: colors.primary },
+          animatedStyle,
+        ]}
+      >
+        {/* طبقة اللمعان الخفيف جداً */}
+        <Animated.View style={[styles.buttonShimmer, shimmerStyle]}>
+          <LinearGradient
+            colors={[
+              'transparent',
+              'rgba(255,255,255,0.15)',
+              'rgba(255,255,255,0.3)',
+              'rgba(255,255,255,0.15)',
+              'transparent'
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.shimmerGradient}
+          />
+        </Animated.View>
+
+        {children}
+      </Animated.View>
+    </TouchableOpacity>
   );
 };
 
@@ -584,11 +861,15 @@ export default function RegisterScreen() {
     );
   };
 
+  // ✅ دالة المتابعة كضيف
+  const handleContinueAsGuest = () => {
+    router.replace('/(tabs)');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent />
       
-      {/* الخلفية المتحركة */}
       <AnimatedBackground />
 
       <KeyboardAvoidingView
@@ -601,7 +882,6 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* الهيدر */}
           <View style={styles.header}>
             <AnimatedLogo />
             
@@ -610,31 +890,21 @@ export default function RegisterScreen() {
               <Text style={styles.subtitle}>سجل الآن واستمتع بعروض حصرية وخدمة ملكية</Text>
             </View>
 
-            {/* شارات الفوائد */}
             <View style={styles.badgesContainer}>
-              <AnimatedBadge>
-                <Gift size={12} color={COLORS.emailPrimary} />
-                <Text style={styles.badgeText}>خصم الانضمام</Text>
-              </AnimatedBadge>
-              
               <AnimatedBadge delay={200}>
-                <Utensils size={12} color={COLORS.phonePrimary} />
-                <Text style={styles.badgeText}>توصيل مجاني</Text>
-              </AnimatedBadge>
-              
-              <AnimatedBadge delay={400}>
                 <Star size={12} color={COLORS.yellow} fill={COLORS.yellow} />
-                <Text style={styles.badgeText}>نقاط ولاء</Text>
+                <Text style={styles.badgeText}>نكهة أبدية</Text>
+              </AnimatedBadge>
+              <AnimatedBadge>
+                <Crown size={12} color={COLORS.emailPrimary} />
+                <Text style={styles.badgeText}>جودة ملكية</Text>
               </AnimatedBadge>
             </View>
           </View>
 
-          {/* بطاقة التسجيل */}
           <Animated.View style={styles.registerCard}>
-            {/* التبويبات */}
             <AuthTabs activeTab={authMethod} onTabChange={switchAuthMethod} />
 
-            {/* النموذج */}
             <View style={styles.formContainer}>
               {/* حقل الاسم الأول واسم العائلة */}
               <View style={styles.nameContainer}>
@@ -643,7 +913,7 @@ export default function RegisterScreen() {
                     styles.inputContainer,
                     formErrors.firstName && styles.inputContainerError
                   ]}>
-                    <User size={20} color={formErrors.firstName ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                    <User size={20} color={formErrors.firstName ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                     <TextInput
                       ref={firstNameRef}
                       style={styles.inputField}
@@ -658,7 +928,7 @@ export default function RegisterScreen() {
                     />
                   </View>
                   {formErrors.firstName && (
-                    <Text style={styles.errorText}>{formErrors.firstName}</Text>
+                    <Text style={[styles.errorText, { color: colors.primary }]}>{formErrors.firstName}</Text>
                   )}
                 </View>
 
@@ -667,7 +937,7 @@ export default function RegisterScreen() {
                     styles.inputContainer,
                     formErrors.lastName && styles.inputContainerError
                   ]}>
-                    <User size={20} color={formErrors.lastName ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                    <User size={20} color={formErrors.lastName ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                     <TextInput
                       ref={lastNameRef}
                       style={styles.inputField}
@@ -682,7 +952,7 @@ export default function RegisterScreen() {
                     />
                   </View>
                   {formErrors.lastName && (
-                    <Text style={styles.errorText}>{formErrors.lastName}</Text>
+                    <Text style={[styles.errorText, { color: colors.primary }]}>{formErrors.lastName}</Text>
                   )}
                 </View>
               </View>
@@ -694,7 +964,7 @@ export default function RegisterScreen() {
                     styles.inputContainer,
                     formErrors.phone && styles.inputContainerError
                   ]}>
-                    <Phone size={20} color={formErrors.phone ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                    <Phone size={20} color={formErrors.phone ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                     <TextInput
                       ref={phoneRef}
                       style={styles.emailphoneinputField}
@@ -712,7 +982,7 @@ export default function RegisterScreen() {
                     />
                   </View>
                   {formErrors.phone && (
-                    <Text style={styles.errorText}>{formErrors.phone}</Text>
+                    <Text style={[styles.errorText, { color: colors.primary }]}>{formErrors.phone}</Text>
                   )}
                 </View>
               ) : (
@@ -721,7 +991,7 @@ export default function RegisterScreen() {
                     styles.inputContainer,
                     formErrors.email && styles.inputContainerError
                   ]}>
-                    <Mail size={20} color={formErrors.email ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                    <Mail size={20} color={formErrors.email ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                     <TextInput
                       ref={emailRef}
                       style={styles.emailphoneinputField}
@@ -738,7 +1008,7 @@ export default function RegisterScreen() {
                     />
                   </View>
                   {formErrors.email && (
-                    <Text style={styles.errorText}>{formErrors.email}</Text>
+                    <Text style={[styles.errorText, { color: colors.primary }]}>{formErrors.email}</Text>
                   )}
                 </View>
               )}
@@ -749,7 +1019,7 @@ export default function RegisterScreen() {
                   styles.inputContainer,
                   formErrors.password && styles.inputContainerError
                 ]}>
-                  <Lock size={20} color={formErrors.password ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                  <Lock size={20} color={formErrors.password ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                   <TextInput
                     ref={passwordRef}
                     style={styles.inputField}
@@ -774,7 +1044,7 @@ export default function RegisterScreen() {
                   </TouchableOpacity>
                 </View>
                 {formErrors.password && (
-                  <Text style={styles.errorText}>{formErrors.password}</Text>
+                  <Text style={[styles.errorText, { color: colors.primary }]}>{formErrors.password}</Text>
                 )}
                 
                 {password.length > 0 && (
@@ -788,7 +1058,7 @@ export default function RegisterScreen() {
                   styles.inputContainer,
                   formErrors.confirmPassword && styles.inputContainerError
                 ]}>
-                  <Lock size={20} color={formErrors.confirmPassword ? COLORS.error : COLORS.gray} style={styles.inputIcon} />
+                  <Lock size={20} color={formErrors.confirmPassword ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                   <TextInput
                     ref={confirmPasswordRef}
                     style={styles.inputField}
@@ -813,25 +1083,7 @@ export default function RegisterScreen() {
                   </TouchableOpacity>
                 </View>
                 {formErrors.confirmPassword && (
-                  <Text style={styles.errorText}>{formErrors.confirmPassword}</Text>
-                )}
-                
-                {/* مؤشر تطابق كلمة المرور */}
-                {confirmPassword.length > 0 && password.length > 0 && (
-                  <View style={styles.passwordMatchContainer}>
-                    {password === confirmPassword ? (
-                      <View style={styles.passwordMatch}>
-                        <Check size={16} color={COLORS.success} />
-                        <Text style={[styles.passwordMatchText, { color: COLORS.success }]}>
-                          كلمات المرور متطابقة
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text style={[styles.passwordMatchText, { color: COLORS.error }]}>
-                        كلمات المرور غير متطابقة
-                      </Text>
-                    )}
-                  </View>
+                  <Text style={[styles.errorText, { color: colors.primary }]}>{formErrors.confirmPassword}</Text>
                 )}
               </View>
 
@@ -870,39 +1122,46 @@ export default function RegisterScreen() {
                     )}
                   </View>
                   <Text style={styles.termsText}>
-                    أرغب في استلام العروض الحصرية والأخبار عبر البريد الإلكتروني
+                    أرغب في استلام العروض الحصرية والأخبار
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {/* زر إنشاء الحساب */}
-              <TouchableOpacity 
-                style={[
-                  styles.button, 
-                  { backgroundColor: colors.primary },
-                  loading && styles.buttonDisabled
-                ]} 
+              <AnimatedButton 
                 onPress={handleRegister} 
-                disabled={loading}
+                colors={colors}
+                disabled={loading || !agreeToTerms}
               >
                 <UserPlus size={20} color={COLORS.white} />
                 <Text style={styles.buttonText}>
                   {loading ? 'جاري الإنشاء...' : 'إنشاء حساب جديد'}
                 </Text>
+              </AnimatedButton>
+
+              {/* زر المتابعة كضيف */}
+              <TouchableOpacity 
+                style={[
+                  styles.guestButton,
+                  { borderColor: colors.primary }
+                ]}
+                onPress={handleContinueAsGuest}
+              >
+                <Text style={[styles.guestButtonText, { color: colors.primary }]}>
+                  المتابعة كضيف
+                </Text>
+                <ChevronRight size={18} color={colors.primary} />
               </TouchableOpacity>
             </View>
 
-            {/* الفاصل */}
             <View style={styles.separatorContainer}>
               <View style={styles.separatorLine} />
               <Text style={styles.separatorText}>أو التسجيل عبر</Text>
               <View style={styles.separatorLine} />
             </View>
 
-            {/* التسجيل الاجتماعي */}
             <View style={styles.socialContainer}>
               <TouchableOpacity style={styles.socialButton}>
-                {/* أيقونة Google */}
                 <View style={styles.googleIcon}>
                   <Text style={styles.googleIconText}>G</Text>
                 </View>
@@ -910,7 +1169,6 @@ export default function RegisterScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.socialButton}>
-                {/* أيقونة Facebook */}
                 <View style={styles.facebookIcon}>
                   <Text style={styles.facebookIconText}>f</Text>
                 </View>
@@ -918,7 +1176,6 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* رابط تسجيل الدخول */}
             <View style={styles.loginLinkContainer}>
               <Text style={styles.loginText}>
                 لديك حساب بالفعل؟{' '}
@@ -934,7 +1191,6 @@ export default function RegisterScreen() {
             </View>
           </Animated.View>
 
-          {/* التذييل */}
           <View style={styles.footer}>
             <View style={styles.footerRow}>
               <Crown size={16} color={COLORS.emailPrimary} />
@@ -956,7 +1212,6 @@ export default function RegisterScreen() {
   );
 }
 
-// ✅ التنسيقات
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
@@ -969,9 +1224,9 @@ const styles = StyleSheet.create({
     flexGrow: 1, 
     paddingHorizontal: 20, 
     paddingVertical: 20,
+    justifyContent: 'center',
   },
   
-  // الخلفية المتحركة
   backgroundContainer: {
     position: 'absolute',
     top: 0,
@@ -983,35 +1238,39 @@ const styles = StyleSheet.create({
   circle: {
     position: 'absolute',
     borderRadius: 500,
+    opacity: 0.1,
   },
   circleRed: {
-    width: 300,
-    height: 300,
+    width: 384,
+    height: 384,
     backgroundColor: COLORS.emailPrimary,
-    top: '10%',
-    right: '-10%',
+    top: -80,
+    right: -80,
   },
   circleBlue: {
-    width: 400,
-    height: 400,
+    width: 384,
+    height: 384,
     backgroundColor: COLORS.phonePrimary,
-    bottom: '-20%',
-    left: '-20%',
+    bottom: -128,
+    left: -128,
   },
   circleYellow: {
-    width: 200,
-    height: 200,
+    width: 384,
+    height: 384,
     backgroundColor: COLORS.yellow,
     top: '50%',
     left: '50%',
-    marginLeft: -100,
-    marginTop: -100,
+    marginLeft: -192,
+    marginTop: -192,
+  },
+  floatingFoodIcon: {
+    position: 'absolute',
+    top: 0,
   },
 
-  // الهيدر
   header: { 
     alignItems: 'center', 
-    marginBottom: 24 
+    marginBottom: 30 
   },
   logoContainer: {
     marginBottom: 16,
@@ -1051,10 +1310,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   badgesContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     gap: 8,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
   },
   badge: {
     flexDirection: 'row',
@@ -1073,7 +1330,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // بطاقة التسجيل
   registerCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     borderRadius: 24,
@@ -1086,9 +1342,9 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
+    overflow: 'hidden',
   },
 
-  // التبويبات
   tabsContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(243, 244, 246, 0.8)',
@@ -1121,7 +1377,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
 
-  // النموذج
   formContainer: {
     marginBottom: 20,
   },
@@ -1148,7 +1403,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   inputContainerError: {
-    borderColor: COLORS.error,
+    borderColor: COLORS.emailPrimary,
   },
   inputIcon: { 
     marginLeft: 12 
@@ -1163,20 +1418,20 @@ const styles = StyleSheet.create({
     flex: 1, 
     fontSize: 16, 
     textAlign: 'left', 
-    color: COLORS.darkGray
+    color: COLORS.darkGray 
   },
   visibilityButton: {
     padding: 4,
   },
+
   errorText: {
     fontSize: 12,
-    color: COLORS.error,
     textAlign: 'right',
     marginTop: 4,
     marginRight: 4,
+    fontWeight: '500',
   },
 
-  // مؤشر قوة كلمة المرور
   passwordStrengthContainer: {
     marginTop: 8,
     paddingHorizontal: 4,
@@ -1197,22 +1452,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // مؤشر تطابق كلمة المرور
-  passwordMatchContainer: {
-    marginTop: 8,
-    paddingHorizontal: 4,
-  },
-  passwordMatch: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-  },
-  passwordMatchText: {
-    fontSize: 12,
-    textAlign: 'right',
-  },
-
-  // الشروط والأحكام
   termsContainer: {
     marginBottom: 24,
     gap: 12,
@@ -1246,31 +1485,54 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // زر إنشاء الحساب
-  button: { 
+  animatedButton: {
     flexDirection: 'row',
     paddingVertical: 16, 
     borderRadius: 16, 
     alignItems: 'center', 
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
+    overflow: 'hidden',
     gap: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
   },
   buttonText: { 
     color: COLORS.white, 
     fontSize: 18, 
     fontWeight: 'bold',
   },
+  buttonShimmer: {
+    position: 'absolute',
+    top: -50,
+    left: -50,
+    right: -50,
+    bottom: -50,
+  },
+  shimmerGradient: {
+    flex: 1,
+    width: 150,
+  },
 
-  // الفاصل
+  guestButton: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 16,
+    gap: 8,
+  },
+  guestButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
   separatorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1289,7 +1551,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
 
-  // التسجيل الاجتماعي
   socialContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -1316,7 +1577,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#ff2020ff',
+    backgroundColor: '#ff3030ff',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1339,7 +1600,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // رابط تسجيل الدخول
   loginLinkContainer: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -1363,7 +1623,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // التذييل
   footer: {
     alignItems: 'center',
   },
