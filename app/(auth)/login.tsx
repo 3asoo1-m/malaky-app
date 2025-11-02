@@ -99,7 +99,7 @@ const FOOD_ICONS = [
   { type: 'ionicon', component: 'water', name: 'water' },
 ];
 
-// ✅ تعريف أنواع البيانات
+// ✅ تعريف أنواع البيانات------
 type AuthMethod = 'phone' | 'email';
 
 // ✅ مكون أيقونة الطعام العائمة المحسنة
