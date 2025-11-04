@@ -24,13 +24,57 @@ import { AppState } from 'react-native';
 // ✅ استيراد نظام OTA للتحديثات التلقائية
 import * as Updates from 'expo-updates';
 
-// --- كود RTL يبقى كما هو ---
-try {
-  I18nManager.forceRTL(true);
-  I18nManager.allowRTL(true);
-} catch (e) {
-  console.error('Failed to force RTL:', e);
-}
+// ✅ استيراد مكتبات إضافية للغة
+import * as Localization from 'expo-localization';
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import ar from '@/locales/ar.json';
+
+// --- تهيئة اللغة العربية وإجبار RTL ---
+const initializeArabicRTL = () => {
+  try {
+    // إجبار تنسيق RTL
+    I18nManager.forceRTL(true);
+    I18nManager.allowRTL(true);
+    
+    // منع تغيير الاتجاه تلقائياً
+    if (I18nManager.swapLeftAndRightInRTL) {
+      I18nManager.swapLeftAndRightInRTL(false);
+    }
+    
+    console.log('✅ تم تفعيل اللغة العربية وتنسيق RTL بنجاح');
+  } catch (error) {
+    console.error('❌ فشل في تفعيل RTL:', error);
+  }
+};
+
+// --- تهيئة نظام الترجمة ---
+const initializeI18n = async () => {
+  try {
+    await i18n
+      .use(initReactI18next)
+      .init({
+        resources: {
+          ar: {
+            translation: ar
+          }
+        },
+        lng: 'ar', // إجبار اللغة العربية
+        fallbackLng: 'ar',
+        interpolation: {
+          escapeValue: false
+        }
+      });
+    
+    console.log('✅ تم تهيئة نظام الترجمة باللغة العربية');
+  } catch (error) {
+    console.error('❌ فشل في تهيئة نظام الترجمة:', error);
+  }
+};
+
+// --- استدعاء التهيئة فوراً ---
+initializeArabicRTL();
+initializeI18n();
 
 const AuthGuard = () => {
   const { user, initialLoading } = useAuth();
@@ -45,6 +89,11 @@ const AuthGuard = () => {
     appConfig, 
     handleUpdate 
   } = useAppConfig();
+
+  // ✅ التأكد من تطبيق إعدادات RTL عند كل تحميل
+  useEffect(() => {
+    initializeArabicRTL();
+  }, []);
 
   // ✅ كود التحديث التلقائي OTA
   useEffect(() => {
@@ -71,7 +120,6 @@ const AuthGuard = () => {
       }
     };
 
-    // تحقق من التحديثات عند فتح التطبيق
     checkForOTAUpdates();
   }, []);
 
@@ -105,9 +153,22 @@ const AuthGuard = () => {
   // ✅ عرض شاشات الصيانة والتحديث إذا لزم الأمر
   if (configLoading || initialLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        backgroundColor: '#fff',
+        direction: 'rtl' // إضافة دعم RTL للشاشة
+      }}>
         <ActivityIndicator size="large" color="#1D3557" />
-        <Text style={{ marginTop: 10, fontSize: 16, fontFamily: 'Cairo-Regular', color: '#1D3557' }}>
+        <Text style={{ 
+          marginTop: 10, 
+          fontSize: 16, 
+          fontFamily: 'Cairo-Regular', 
+          color: '#1D3557',
+          textAlign: 'right', // محاذاة النص لليمين
+          writingDirection: 'rtl' // اتجاه الكتابة
+        }}>
           {configLoading ? 'جاري التحقق من التحديثات...' : 'جاري التحميل...'}
         </Text>
       </View>
@@ -115,16 +176,14 @@ const AuthGuard = () => {
   }
 
   // ✅ عرض شاشة الصيانة
- // ✅ عرض شاشة الصيانة
-// ✅ عرض شاشة الصيانة
-if (showMaintenance) {
-  return <MaintenanceScreen />;
-}
+  if (showMaintenance) {
+    return <MaintenanceScreen />;
+  }
 
-// ✅ عرض شاشة التحديث الإجباري
-if (showForceUpdate) {
-  return <ForceUpdateScreen />;
-}
+  // ✅ عرض شاشة التحديث الإجباري
+  if (showForceUpdate) {
+    return <ForceUpdateScreen />;
+  }
 
   return <Slot />;
 };
@@ -159,7 +218,10 @@ export default function RootLayout() {
       <AuthProvider>
         <FavoritesProvider>
           <CartProvider>
-            <AuthGuard />
+            {/* ✅ إضافة إعدادات RTL إضافية */}
+            <View style={{ flex: 1, direction: 'rtl' }}>
+              <AuthGuard />
+            </View>
           </CartProvider>
         </FavoritesProvider>
       </AuthProvider>

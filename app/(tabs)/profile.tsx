@@ -53,7 +53,7 @@ const Badge = ({ text, style }: { text: string; style?: any }) => (
   </View>
 );
 
-// مكون مساعد لإنشاء أزرار القائمة
+//  مكون مساعد لإنشاء أزرار القائمة - غير مستعمل حاليا !!
 const ProfileListItem = ({ 
   icon, text, onPress, color = '#333', badge, iconBgColor = '#f8f9fa'
 }: { 
@@ -220,7 +220,7 @@ const ProfileListItem = ({
       ) : (
         <>
           {badge && <Badge text={badge} style={styles.listItemBadge} />}
-          <Ionicons name="chevron-forward-outline" size={scale(18)} color="#A0A0A0" />
+          <Ionicons name="chevron-back-outline" size={scale(18)} color="#A0A0A0" />
         </>
       )}
     </View>
@@ -509,6 +509,7 @@ const styles = StyleSheet.create({
   },
   profileDetails: {
     flex: 1,
+    alignItems: 'flex-start', // ✅ يضبط المحاذاة للنصوص لليمين
   },
   nameContainer: {
     flexDirection: 'row',
@@ -525,9 +526,11 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     color: '#6B7280',
     marginBottom: scale(2),
+    marginRight:scale(12),
   },
   userEmail: {
     fontSize: fontScale(12),
+    marginRight:scale(12),
     color: '#9CA3AF',
   },
 
@@ -552,6 +555,8 @@ const styles = StyleSheet.create({
   },
   loyaltyInfo: {
     flex: 1,
+    alignItems: 'flex-start', // ✅ يضبط المحاذاة للنصوص لليمين
+
   },
   loyaltyTitle: {
     flexDirection: 'row',
@@ -563,9 +568,12 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     fontWeight: '600',
     color: '#991B1B',
+    marginRight: scale(12),
+
   },
   loyaltySubtext: {
     fontSize: fontScale(12),
+    marginRight: scale(12),
     color: '#DC2626',
   },
   progressContainer: {
@@ -650,16 +658,18 @@ const styles = StyleSheet.create({
   },
   promoBadge: {
     backgroundColor: '#DC2626',
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
     marginBottom: scale(8),
   },
   promoTitle: {
     fontSize: fontScale(18),
+    alignSelf: 'flex-start',
     fontWeight: 'bold',
     color: 'white',
     marginBottom: scale(4),
   },
   promoSubtitle: {
+    alignSelf: 'flex-start',
     fontSize: fontScale(14),
     color: 'rgba(255, 255, 255, 0.9)',
   },
