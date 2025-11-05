@@ -12,6 +12,7 @@ import { CartProvider } from '@/lib/useCart';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import MaintenanceScreen from './maintenance';
 import ForceUpdateScreen from './force-update';
+import * as NavigationBar from 'expo-navigation-bar';
 
 // ✅ استيراد نظام الإشعارات
 import { 
@@ -75,6 +76,8 @@ const initializeI18n = async () => {
 // --- استدعاء التهيئة فوراً ---
 initializeArabicRTL();
 initializeI18n();
+
+
 
 const AuthGuard = () => {
   const { user, initialLoading } = useAuth();
@@ -189,6 +192,23 @@ const AuthGuard = () => {
 };
 
 export default function RootLayout() {
+  
+  useEffect(() => {
+  const hideNavigationBar = async () => {
+    try {
+      await NavigationBar.setVisibilityAsync('hidden'); // إخفاء الشريط
+      await NavigationBar.setBehaviorAsync('overlay-swipe'); // يسمح بالسحب لإظهاره مؤقتًا
+      await NavigationBar.setBackgroundColorAsync('transparent'); // يجعل الخلفية شفافة
+      console.log('✅ تم إخفاء شريط التنقل بنجاح');
+    } catch (error) {
+      console.error('❌ فشل في إخفاء شريط التنقل:', error);
+    }
+  };
+
+  hideNavigationBar();
+}, []);
+
+
   
   // ✅ إعداد معالجات الإشعارات والتطبيق
   useEffect(() => {
