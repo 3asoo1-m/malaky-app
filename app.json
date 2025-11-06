@@ -2,7 +2,7 @@
   "expo": {
     "name": "الدجاج الملكي",
     "slug": "almalaky-broast-app",
-    "version": "1.0.1",
+    "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "malakyapp",
     "userInterfaceStyle": "light",
