@@ -694,11 +694,10 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     paddingHorizontal: scale(20),
-    paddingTop: scale(50),
-    paddingBottom: scale(20),
+    paddingTop: scale(90),
   },
   headerTop: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     marginBottom: scale(16),
   },
@@ -706,7 +705,7 @@ const styles = StyleSheet.create({
     padding: scale(8),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: scale(20),
-    marginRight: scale(12),
+    marginLeft: scale(12),
   },
   headerTitleContainer: {
     flexDirection: 'row',

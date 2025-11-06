@@ -1,6 +1,6 @@
 // مسار الملف: app/(modal)/address-form.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -26,18 +28,67 @@ const Card = ({ children, style }: { children: React.ReactNode; style?: any }) =
   <View style={[styles.card, style]}>{children}</View>
 );
 
-// ✅ مكون التبديل
-const Switch = ({ value, onValueChange }: { value: boolean; onValueChange: (value: boolean) => void }) => (
-  <TouchableOpacity
-    style={[styles.switch, value && styles.switchActive]}
-    onPress={() => onValueChange(!value)}
-    activeOpacity={0.8}
-  >
-    <View style={[styles.switchThumb, value && styles.switchThumbActive]} />
-  </TouchableOpacity>
-);
+// ✅ مكون التبديل مع Animation مبسط
+const Switch = ({ value, onValueChange }: { value: boolean; onValueChange: (value: boolean) => void }) => {
+  const animatedValue = useRef(new Animated.Value(value ? 1 : 0)).current;
 
-// ✅ مكون زر الراديو المعدل والمحسن
+  useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: value ? 1 : 0,
+      duration: 300,
+      easing: Easing.bezier(0.4, 0.0, 0.2, 1),
+      useNativeDriver: true,
+    }).start();
+  }, [value]);
+
+  const handlePress = () => {
+    onValueChange(!value);
+  };
+
+  const thumbPosition = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [scale(-1), scale(-20)]
+  });
+
+  const backgroundColor = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#E5E7EB', '#DC2626']
+  });
+
+  const scaleValue = animatedValue.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, 1.1, 1]
+  });
+
+  return (
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.8}>
+      <Animated.View style={[styles.switch, { backgroundColor }]}>
+        <Animated.View 
+          style={[
+            styles.switchThumb,
+            {
+              transform: [
+                { translateX: thumbPosition },
+                { scale: scaleValue }
+              ],
+            }
+          ]}
+        >
+          <Animated.View 
+            style={{
+              opacity: animatedValue,
+              transform: [{ scale: animatedValue }],
+            }}
+          >
+            <Ionicons name="checkmark" size={scale(12)} color="#DC2626" />
+          </Animated.View>
+        </Animated.View>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+// ✅ مكون زر الراديو المعدل
 const RadioButton = ({ 
   selected, 
   onPress, 
@@ -50,35 +101,56 @@ const RadioButton = ({
   icon: React.ReactNode; 
   label: string; 
   backgroundColor: string;
-}) => (
-  <TouchableOpacity
-    style={[
-      styles.radioButton,
-      selected && styles.radioButtonSelected,
-      { borderColor: selected ? '#DC2626' : '#E5E7EB' }
-    ]}
-    onPress={onPress}
-    activeOpacity={0.8}
-  >
-    <View style={styles.radioContent}>
-      <View style={[styles.radioIconContainer, { backgroundColor }]}>
-        {icon}
-      </View>
-      <Text style={[
-        styles.radioLabel,
-        selected && styles.radioLabelSelected
+}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.radioButton,
+        selected && styles.radioButtonSelected,
+        { borderColor: selected ? '#DC2626' : '#E5E7EB' }
+      ]}
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={0.8}
+    >
+      <Animated.View style={[styles.radioContent, { transform: [{ scale: scaleAnim }] }]}>
+        <View style={[styles.radioIconContainer, { backgroundColor }]}>
+          {icon}
+        </View>
+        <Text style={[
+          styles.radioLabel,
+          selected && styles.radioLabelSelected
+        ]}>
+          {label}
+        </Text>
+      </Animated.View>
+      <View style={[
+        styles.radioOuter,
+        selected && styles.radioOuterSelected
       ]}>
-        {label}
-      </Text>
-    </View>
-    <View style={[
-      styles.radioOuter,
-      selected && styles.radioOuterSelected
-    ]}>
-      {selected && <View style={styles.radioInner} />}
-    </View>
-  </TouchableOpacity>
-);
+        {selected && <View style={styles.radioInner} />}
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 
 interface Zone {
   id: number;
@@ -379,7 +451,7 @@ export default function AddressFormScreen() {
                   {/* ✅ اسم العنوان الجديد */}
                   <View style={styles.inputGroup}>
                     <Text style={styles.label}>
-                      اسم العنوان <Text style={styles.required}>*</Text>
+                       اختر اسم لعنوانك <Text style={styles.required}>*</Text>
                     </Text>
                     <TextInput
                       value={addressName}
@@ -549,7 +621,7 @@ const styles = StyleSheet.create({
     paddingTop: scale(50),
   },
   headerTop: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
@@ -623,7 +695,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: scale(8),
-    marginBottom: scale(8), // تقليل المسافة
+    marginBottom: scale(8),
   },
   sectionTitle: {
     fontSize: fontScale(18),
@@ -632,6 +704,7 @@ const styles = StyleSheet.create({
   },
   sectionDescription: {
     fontSize: fontScale(14),
+    textAlign: 'center',
     color: '#6B7280',
     marginBottom: scale(16),
     lineHeight: scale(20),
@@ -645,8 +718,8 @@ const styles = StyleSheet.create({
   },
   radioButton: {
     flex: 1,
-    minHeight: scale(90), // زيادة الارتفاع
-    padding: scale(16), // زيادة المساحة الداخلية
+    minHeight: scale(90),
+    padding: scale(16),
     borderRadius: scale(12),
     borderWidth: 2,
     backgroundColor: 'white',
@@ -657,11 +730,11 @@ const styles = StyleSheet.create({
   },
   radioContent: {
     alignItems: 'center',
-    gap: scale(12), // زيادة المسافة بين الأيقونة والنص
+    gap: scale(12),
     marginBottom: scale(12),
   },
   radioIconContainer: {
-    padding: scale(12), // زيادة حجم الأيقونة
+    padding: scale(12),
     borderRadius: scale(12),
     width: scale(48),
     height: scale(48),
@@ -669,7 +742,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   radioLabel: {
-    fontSize: fontScale(14), // زيادة حجم النص
+    fontSize: fontScale(14),
     color: '#6B7280',
     textAlign: 'center',
     fontWeight: '500',
@@ -706,6 +779,7 @@ const styles = StyleSheet.create({
     gap: scale(8),
   },
   label: {
+    textAlign: 'left',
     fontSize: fontScale(14),
     fontWeight: '600',
     color: '#374151',
@@ -734,7 +808,7 @@ const styles = StyleSheet.create({
     marginTop: scale(-4),
   },
 
-  // التبديل
+  // التبديل مع Animation
   switchContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -745,12 +819,14 @@ const styles = StyleSheet.create({
   },
   switchLabel: {
     fontSize: fontScale(16),
+    textAlign: 'left',
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: scale(4),
   },
   switchDescription: {
     fontSize: fontScale(12),
+    textAlign: 'left',
     color: '#6B7280',
     lineHeight: scale(16),
   },
@@ -758,29 +834,20 @@ const styles = StyleSheet.create({
     width: scale(51),
     height: scale(31),
     borderRadius: scale(15.5),
-    backgroundColor: '#E5E7EB',
     padding: scale(2),
     justifyContent: 'center',
-  },
-  switchActive: {
-    backgroundColor: '#DC2626',
   },
   switchThumb: {
     width: scale(27),
     height: scale(27),
     borderRadius: scale(13.5),
     backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  switchThumbActive: {
-    transform: [{ translateX: scale(20) }],
+  switchIcon: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // بطاقة النصيحة
@@ -792,7 +859,7 @@ const styles = StyleSheet.create({
   },
   tipContent: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: scale(12),
   },
   tipTexts: {
@@ -800,6 +867,7 @@ const styles = StyleSheet.create({
   },
   tipTitle: {
     fontSize: fontScale(14),
+    textAlign: 'left',
     fontWeight: '600',
     color: '#1E40AF',
     marginBottom: scale(4),
@@ -807,6 +875,7 @@ const styles = StyleSheet.create({
   tipDescription: {
     fontSize: fontScale(12),
     color: '#374151',
+    textAlign: 'left',
     lineHeight: scale(16),
   },
 
@@ -840,7 +909,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: scale(8),
@@ -876,7 +945,7 @@ const pickerSelectStyles = StyleSheet.create({
     borderColor: '#E5E7EB',
     borderRadius: scale(12),
     color: '#1F2937',
-    paddingRight: scale(30),
+    paddingRight: scale(40),
     backgroundColor: '#F9FAFB',
     textAlign: 'right',
   },

@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#C62828', // اللون الأحمر الداكن
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    paddingBottom: 30, // مساحة للأجهزة التي لا تحتوي على زر رئيسي
+    paddingBottom: 15, // مساحة للأجهزة التي لا تحتوي على زر رئيسي
 
     // تحديد الموضع في الأسفل
     position: 'absolute',
@@ -74,6 +74,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  
   navButton: {
     flex: 1,
     alignItems: 'center',

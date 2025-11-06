@@ -313,7 +313,7 @@ const ProfileListItem = ({
         {/* ... بقية المكونات تبقى كما هي ... */}
         <View style={styles.promoContainer}>
           <ImageBackground
-            source={{ uri: 'https://images.unsplash.com/photo-1710143608680-6ed21d27fd82?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmcmllZCUyMGNoaWNrZW4lMjBicm9hc3R8ZW58MXx8fHwxNzYxNjA5MjIzfDA&ixlib=rb-4.1.0&q=80&w=1080' }}
+            source={{ uri: 'https://dgplcadvneqpohxqlilg.supabase.co/storage/v1/object/public/menu_image/prom.png' }}
             style={styles.promoImage}
             imageStyle={styles.promoImageStyle}
           >

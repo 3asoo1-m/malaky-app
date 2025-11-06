@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     paddingTop: scale(50),
   },
   headerTop: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
@@ -599,17 +599,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statsTitle: {
+    textAlign: 'left',
     fontSize: fontScale(16),
     fontWeight: '600',
     color: '#991B1B',
     marginBottom: scale(4),
   },
   statsSubtitle: {
+    textAlign: 'left',
     fontSize: fontScale(12),
     color: '#DC2626',
   },
   statsDefault: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
     flex: 1,
   },
   statsDefaultLabel: {
@@ -677,6 +679,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardTitle: {
+    textAlign: 'left',
     fontSize: fontScale(16),
     fontWeight: 'bold',
     color: '#1F2937',
@@ -696,7 +699,7 @@ const styles = StyleSheet.create({
   optionsMenu: {
     position: 'absolute',
     top: scale(30),
-    right: 0,
+    left: 0,
     width: scale(120),
     backgroundColor: 'white',
     borderRadius: scale(12),
@@ -736,17 +739,20 @@ const styles = StyleSheet.create({
     gap: scale(8),
   },
   addressLine1: {
+    textAlign: 'left',
     fontSize: fontScale(14),
     color: '#374151',
     lineHeight: scale(20),
   },
   addressCity: {
+    textAlign: 'left',
     fontSize: fontScale(13),
     color: '#6B7280',
   },
   deliveryPrice: {
     fontSize: fontScale(12),
     color: '#059669',
+    textAlign: 'left',
     fontWeight: '500',
     marginTop: scale(4),
   },
@@ -794,8 +800,8 @@ const styles = StyleSheet.create({
   },
   defaultBadge: {
     position: 'absolute',
-    top: scale(12),
-    left: scale(12),
+    top: scale(45),
+    right: scale(120),
     flexDirection: 'row',
     alignItems: 'center',
     gap: scale(4),
@@ -913,7 +919,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   addButtonContent: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: scale(12),
@@ -941,7 +947,7 @@ const styles = StyleSheet.create({
   },
   tipContent: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: scale(12),
   },
   tipTexts: {
@@ -949,12 +955,14 @@ const styles = StyleSheet.create({
   },
   tipTitle: {
     fontSize: fontScale(14),
+    textAlign: 'left',
     fontWeight: '600',
     color: '#1E40AF',
     marginBottom: scale(4),
   },
   tipDescription: {
     fontSize: fontScale(12),
+    textAlign: 'left',
     color: '#374151',
     lineHeight: scale(18),
   },

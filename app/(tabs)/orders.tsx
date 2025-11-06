@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
     paddingTop: scale(50),
   },
   headerTop: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
   },

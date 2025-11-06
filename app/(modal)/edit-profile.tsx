@@ -220,7 +220,7 @@ export default function EditProfileModal() {
                     placeholder="أدخل رقم هاتفك"
                     placeholderTextColor="#9CA3AF"
                     keyboardType="phone-pad"
-                    textAlign="right"
+                    textAlign="left"
                   />
                 </View>
                 <Text style={styles.inputHint}>للتحديثات الخاصة بالطلبات وتنسيق التوصيل</Text>
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     borderRadius: scale(75),
   },
   headerContent: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     paddingHorizontal: scale(20),
     paddingTop: scale(60),
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     padding: scale(8),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: scale(20),
-    marginRight: scale(10),
+    marginLeft: scale(10),
   },
   headerTitle: {
     fontSize: fontScale(20),
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     fontWeight: '600',
     color: '#374151',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   required: {
     color: '#DC2626',
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
   inputHint: {
     fontSize: fontScale(12),
     color: '#6B7280',
-    textAlign: 'right',
+    textAlign: 'left',
     marginTop: scale(4),
   },
   // بطاقة المعلومات
@@ -499,13 +499,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E40AF',
     marginBottom: scale(4),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   infoDescription: {
     fontSize: fontScale(12),
     color: '#374151',
     lineHeight: scale(18),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   // أزرار الإجراء
   actionsContainer: {
