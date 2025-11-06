@@ -47,7 +47,7 @@ const Switch = ({ value, onValueChange }: { value: boolean; onValueChange: (valu
 
   const thumbPosition = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [scale(-1), scale(-20)]
+    outputRange: [scale(2), scale(22)]
   });
 
   const backgroundColor = animatedValue.interpolate({
@@ -151,7 +151,6 @@ const RadioButton = ({
   );
 };
 
-
 interface Zone {
   id: number;
   city: string;
@@ -168,22 +167,23 @@ export default function AddressFormScreen() {
   const returnTo = params.returnTo as string;
   const fromCart = params.fromCart === 'true';
   
-  const existingAddress = addressString ? JSON.parse(addressString) : null;
-  const isEditing = !!existingAddress;
+  // ✅ تحسين التعامل مع البيانات
+  const [existingAddress, setExistingAddress] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   // --- حالات النموذج ---
-  const [addressName, setAddressName] = useState(existingAddress?.address_name || '');
-  const [streetAddress, setStreetAddress] = useState(existingAddress?.street_address || '');
-  const [notes, setNotes] = useState(existingAddress?.notes || '');
+  const [addressName, setAddressName] = useState('');
+  const [streetAddress, setStreetAddress] = useState('');
+  const [notes, setNotes] = useState('');
   const [addressLabel, setAddressLabel] = useState<'home' | 'work' | 'other'>('home');
-  const [isDefault, setIsDefault] = useState(existingAddress?.is_default || false);
+  const [isDefault, setIsDefault] = useState(false);
   
   const [allZones, setAllZones] = useState<Zone[]>([]);
   const [cities, setCities] = useState<{ label: string; value: string }[]>([]);
   const [areas, setAreas] = useState<{ label: string; value: number }[]>([]);
   
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
-  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(existingAddress?.delivery_zone_id || null);
+  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -232,7 +232,37 @@ export default function AddressFormScreen() {
     }
   };
 
-  // جلب جميع المناطق عند تحميل الشاشة
+  // ✅ useEffect منفصل لتهيئة بيانات العنوان الموجود
+  useEffect(() => {
+    if (addressString) {
+      try {
+        const parsedAddress = JSON.parse(addressString);
+        setExistingAddress(parsedAddress);
+        setIsEditing(true);
+        
+        // تعيين بيانات النموذج
+        setAddressName(parsedAddress.address_name || '');
+        setStreetAddress(parsedAddress.street_address || '');
+        setNotes(parsedAddress.notes || '');
+        setIsDefault(parsedAddress.is_default || false);
+        
+        // تحديد نوع العنوان
+        if (parsedAddress.notes?.includes('عمل') || parsedAddress.notes?.includes('مكتب')) {
+          setAddressLabel('work');
+        } else if (parsedAddress.notes?.includes('منزل') || parsedAddress.notes?.includes('بيت')) {
+          setAddressLabel('home');
+        } else {
+          setAddressLabel('other');
+        }
+
+        console.log('تم تحميل بيانات العنوان:', parsedAddress);
+      } catch (error) {
+        console.error('Error parsing address:', error);
+      }
+    }
+  }, [addressString]);
+
+  // ✅ جلب المناطق - الإصدار المصحح النهائي
   useEffect(() => {
     const fetchZones = async () => {
       const { data, error } = await supabase
@@ -242,60 +272,61 @@ export default function AddressFormScreen() {
 
       if (data) {
         setAllZones(data);
-        // استخراج المدن الفريدة
+
         const uniqueCities = [...new Set(data.map(zone => zone.city))];
         setCities(uniqueCities.map(city => ({ label: city, value: city })));
-        
-        // إذا كنا نعدل عنوانًا، قم بتعيين المدينة والمناطق
-        if (isEditing && existingAddress) {
-          const zone = data.find(z => z.id === existingAddress.delivery_zone_id);
+
+        // ✅ تعيين المدينة والمنطقة فقط إذا كان تعديل
+        if (isEditing && existingAddress?.delivery_zone_id) {
+          const zone = data.find(zone => zone.id === existingAddress.delivery_zone_id);
           if (zone) {
+            console.log('تم العثور على المنطقة:', zone);
+            
+            // ✅ تعيين المدينة أولاً
             setSelectedCity(zone.city);
-            // تحديث قائمة المناطق بناءً على المدينة المحددة
+
+            // ✅ ثم تعيين المناطق بناءً على المدينة
             const filteredAreas = data
-              .filter(z => z.city === zone.city)
-              .map(z => ({ label: z.area_name, value: z.id }));
+              .filter(zoneItem => zoneItem.city === zone.city)
+              .map(zoneItem => ({ label: zoneItem.area_name, value: zoneItem.id }));
             setAreas(filteredAreas);
-            
-            // استخراج اسم العنوان من الملاحظات إذا كان موجوداً
-            if (existingAddress.notes) {
-              const nameMatch = existingAddress.notes.match(/^(.*?)(?:\s•|$)/);
-              if (nameMatch && nameMatch[1]) {
-                setAddressName(nameMatch[1]);
-              }
-            }
-            
-            // تحديد نوع العنوان بناءً على الملاحظات
-            if (existingAddress.notes?.includes('عمل') || existingAddress.notes?.includes('مكتب')) {
-              setAddressLabel('work');
-            } else if (existingAddress.notes?.includes('منزل') || existingAddress.notes?.includes('بيت')) {
-              setAddressLabel('home');
-            } else {
-              setAddressLabel('other');
-            }
+
+            // ✅ تأخير تعيين المنطقة المختارة لضمان تحميل القائمة أولاً
+            setTimeout(() => {
+              setSelectedZoneId(existingAddress.delivery_zone_id);
+              console.log('تم تعيين المنطقة المختارة:', existingAddress.delivery_zone_id);
+            }, 400);
           }
         }
+      } else if (error) {
+        console.error('Error fetching zones:', error);
       }
       setLoading(false);
     };
-    fetchZones();
-  }, []);
 
-  // تحديث قائمة المناطق عند تغيير المدينة
+    fetchZones();
+  }, [isEditing, existingAddress]);
+
+  // ✅ تحديث قائمة المناطق عند تغيير المدينة - مصحح
   useEffect(() => {
     if (selectedCity) {
       const filteredAreas = allZones
         .filter(zone => zone.city === selectedCity)
         .map(zone => ({ label: zone.area_name, value: zone.id }));
       setAreas(filteredAreas);
-      // إعادة تعيين المنطقة المختارة عند تغيير المدينة
-      if (!isEditing || selectedCity !== allZones.find(z => z.id === selectedZoneId)?.city) {
-        setSelectedZoneId(null);
+      
+      // إذا كنا نعدل عنوانًا، تأكد من أن المنطقة المختارة لا تزال متاحة
+      if (isEditing && existingAddress && selectedZoneId) {
+        const currentZone = allZones.find(zone => zone.id === selectedZoneId);
+        if (currentZone && currentZone.city !== selectedCity) {
+          setSelectedZoneId(null);
+        }
       }
     } else {
       setAreas([]);
+      setSelectedZoneId(null);
     }
-  }, [selectedCity, allZones]);
+  }, [selectedCity, allZones, isEditing, existingAddress, selectedZoneId]);
 
   // --- دوال التحقق والحفظ ---
   const validate = () => {
@@ -321,7 +352,7 @@ export default function AddressFormScreen() {
       street_address: streetAddress,
       notes: addressNotes,
       is_default: isDefault,
-      address_name: addressName, // ✅ حقل جديد
+      address_name: addressName,
     };
 
     try {
@@ -367,6 +398,20 @@ export default function AddressFormScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // ✅ الحصول على تسمية المنطقة المحددة
+  const getSelectedAreaLabel = () => {
+    if (!selectedZoneId) return '';
+    const selectedArea = areas.find(area => area.value === selectedZoneId);
+    return selectedArea ? selectedArea.label : '';
+  };
+
+  // ✅ الحصول على تسمية المدينة المحددة
+  const getSelectedCityLabel = () => {
+    if (!selectedCity) return '';
+    const selectedCityObj = cities.find(city => city.value === selectedCity);
+    return selectedCityObj ? selectedCityObj.label : '';
   };
 
   return (
@@ -472,7 +517,10 @@ export default function AddressFormScreen() {
                       onValueChange={(value) => setSelectedCity(value)}
                       items={cities}
                       value={selectedCity}
-                      placeholder={{ label: 'اختر مدينتك...', value: null }}
+                      placeholder={{ 
+                        label: selectedCity ? getSelectedCityLabel() : 'اختر مدينتك...', 
+                        value: null 
+                      }}
                       style={pickerSelectStyles}
                       useNativeAndroidPickerStyle={false}
                       Icon={() => <Ionicons name="chevron-down" size={scale(20)} color="#6B7280" />}
@@ -490,7 +538,7 @@ export default function AddressFormScreen() {
                       items={areas}
                       value={selectedZoneId}
                       placeholder={{ 
-                        label: selectedCity ? 'اختر منطقتك...' : 'اختر المدينة أولاً...', 
+                        label: selectedZoneId ? getSelectedAreaLabel() : (selectedCity ? 'اختر منطقتك...' : 'اختر المدينة أولاً...'), 
                         value: null 
                       }}
                       style={pickerSelectStyles}
@@ -593,6 +641,8 @@ export default function AddressFormScreen() {
     </View>
   );
 }
+
+// ... باقي التنسيقات تبقى كما هي بدون تغيير ...
 
 // --- التنسيقات المحدثة ---
 const styles = StyleSheet.create({

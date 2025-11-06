@@ -380,23 +380,38 @@ export default function OrdersScreen() {
       }
       
       // ✅ معالجة البيانات لتناسب الواجهة
-      const processedOrders: Order[] = (data || []).map(order => ({
-        id: order.id,
-        created_at: order.created_at,
-        total_price: order.total_price,
-        status: order.status,
-        order_type: order.order_type,
-        subtotal: order.subtotal,
-        delivery_price: order.delivery_price,
-        user_address_id: order.user_address_id,
-        branch_id: order.branch_id,
-        items_count: Array.isArray(order.order_items) 
-          ? order.order_items.reduce((total, item) => total + (item.quantity || 1), 0)
-          : 0,
-        user_address: Array.isArray(order.user_addresses) 
-          ? order.user_addresses[0] || null
-          : order.user_addresses || null
-      }));
+      const processedOrders: Order[] = (data || []).map(order => {
+  const userAddress = Array.isArray(order.user_addresses) 
+    ? order.user_addresses[0] || null
+    : order.user_addresses || null;
+
+  // تحويل delivery_zones إلى كائن واحد (أخذ أول عنصر إذا كان موجود)
+  const deliveryZone = Array.isArray(userAddress?.delivery_zones)
+    ? userAddress.delivery_zones[0] || null
+    : userAddress?.delivery_zones || null;
+
+  return {
+    id: order.id,
+    created_at: order.created_at,
+    total_price: order.total_price,
+    status: order.status,
+    order_type: order.order_type,
+    subtotal: order.subtotal,
+    delivery_price: order.delivery_price,
+    user_address_id: order.user_address_id,
+    branch_id: order.branch_id,
+    items_count: Array.isArray(order.order_items) 
+      ? order.order_items.reduce((total, item) => total + (item.quantity || 1), 0)
+      : 0,
+    user_address: userAddress
+      ? {
+          ...userAddress,
+          delivery_zones: deliveryZone, // تحويل المصفوفة إلى كائن واحد
+        }
+      : null
+  };
+});
+
       
       setOrders(processedOrders);
 

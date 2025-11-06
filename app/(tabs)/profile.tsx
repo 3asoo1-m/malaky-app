@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Image, // ✅ استيراد مكون الصورة
+  Image,
   ImageBackground,
 } from 'react-native';
 import { useAuth } from '@/lib/useAuth';
@@ -28,9 +28,7 @@ interface UserProfile {
   avatar_url?: string;
   points: number;
   loyalty_level: 'bronze' | 'silver' | 'gold' | 'platinum';
-  // ✅ إضافة حقول الإحصائيات (ستحتاج لجلبها من استعلام آخر)
   orders_count: number;
-  reviews_count: number;
   favorites_count: number;
 }
 
@@ -53,22 +51,44 @@ const Badge = ({ text, style }: { text: string; style?: any }) => (
   </View>
 );
 
-//  مكون مساعد لإنشاء أزرار القائمة - غير مستعمل حاليا !!
+// ✅ مكون مساعد لإنشاء أزرار القائمة مع دعم علامة "قريباً" - تعريف واحد فقط
 const ProfileListItem = ({ 
-  icon, text, onPress, color = '#333', badge, iconBgColor = '#f8f9fa'
+  icon, 
+  text, 
+  onPress, 
+  color = '#333', 
+  badge, 
+  iconBgColor = '#f8f9fa',
+  comingSoon = false
 }: { 
-  icon: React.ReactNode; text: string; onPress: () => void; color?: string; badge?: string; iconBgColor?: string;
+  icon: React.ReactNode; 
+  text: string; 
+  onPress: () => void; 
+  color?: string; 
+  badge?: string; 
+  iconBgColor?: string;
+  comingSoon?: boolean;
 }) => (
-  <TouchableOpacity style={styles.listItem} onPress={onPress}>
+  <TouchableOpacity 
+    style={[styles.listItem, comingSoon && styles.comingSoonItem]} 
+    onPress={comingSoon ? () => {} : onPress}
+    disabled={comingSoon}
+  >
     <View style={styles.listItemContent}>
       <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
         {icon}
       </View>
-      <Text style={[styles.listItemText, { color }]}>{text}</Text>
+      <Text style={[styles.listItemText, { color }, comingSoon && styles.comingSoonText]}>{text}</Text>
     </View>
     <View style={styles.listItemRight}>
-      {badge && <Badge text={badge} style={styles.listItemBadge} />}
-      <Ionicons name="chevron-forward-outline" size={scale(18)} color="#A0A0A0" />
+      {comingSoon ? (
+        <Badge text="قريباً" style={styles.comingSoonBadge} />
+      ) : (
+        <>
+          {badge && <Badge text={badge} style={styles.listItemBadge} />}
+          <Ionicons name="chevron-back-outline" size={scale(18)} color="#A0A0A0" />
+        </>
+      )}
     </View>
   </TouchableOpacity>
 );
@@ -79,6 +99,51 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
+  // ✅ دالة لجلب الإحصائيات الحقيقية
+  const fetchUserStats = async (userId: string) => {
+    try {
+      // محاولة استخدام دوال RPC أولاً
+      const { data: ordersData, error: ordersError } = await supabase
+        .rpc('get_user_orders_count', { user_id: userId });
+
+      const { data: favoritesData, error: favoritesError } = await supabase
+        .rpc('get_user_favorites_count', { user_id: userId });
+
+      // إذا فشلت دوال RPC، استخدم الاستعلامات المباشرة
+      if (ordersError || favoritesError) {
+        console.log('استخدام الاستعلامات المباشرة بدلاً من RPC...');
+        
+        // جلب عدد الطلبات مباشرة
+        const { count: ordersCount, error: ordersDirectError } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId);
+
+        // جلب عدد المفضلة مباشرة
+        const { count: favoritesCount, error: favoritesDirectError } = await supabase
+          .from('user_favorites')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId);
+
+        return {
+          orders_count: ordersCount || 0,
+          favorites_count: favoritesCount || 0
+        };
+      }
+
+      return {
+        orders_count: ordersData || 0,
+        favorites_count: favoritesData || 0
+      };
+    } catch (error) {
+      console.error('Error in fetchUserStats:', error);
+      return {
+        orders_count: 0,
+        favorites_count: 0
+      };
+    }
+  };
+
   // ✅ جلب بيانات المستخدم الكاملة من جدول profiles
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -88,9 +153,7 @@ export default function ProfileScreen() {
       }
 
       try {
-        // ✅ تحديث الاستعلام لجلب كل البيانات المطلوبة
-        // ملاحظة: orders_count, reviews_count, favorites_count هي أسماء مقترحة.
-        // قد تحتاج إلى إنشاء دوال RPC في Supabase لحسابها.
+        // جلب البيانات الأساسية أولاً
         const { data, error } = await supabase
           .from('profiles')
           .select('first_name, last_name, phone, avatar_url, points, loyalty_level')
@@ -100,19 +163,21 @@ export default function ProfileScreen() {
         if (error) throw error;
         
         if (data) {
-          // ✅ هنا يمكنك إضافة جلب للإحصائيات إذا كانت متوفرة
-          // حاليًا سنستخدم قيمًا افتراضية للإحصائيات
+          // ✅ جلب الإحصائيات الحقيقية واستبدال البيانات الوهمية
+          const userStats = await fetchUserStats(user.id);
+          
           setProfile({
             ...data,
             email: user.email,
-            orders_count: 28, // قيمة وهمية مؤقتًا
-            reviews_count: 12, // قيمة وهمية مؤقتًا
-            favorites_count: 8, // قيمة وهمية مؤقتًا
+            orders_count: userStats.orders_count, // ✅ بيانات حقيقية
+            favorites_count: userStats.favorites_count, // ✅ بيانات حقيقية
           });
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
         // استخدام البيانات من user_metadata كبديل
+        const userStats = await fetchUserStats(user.id);
+        
         setProfile({
           first_name: user.user_metadata?.first_name || '',
           last_name: user.user_metadata?.last_name || '',
@@ -121,9 +186,8 @@ export default function ProfileScreen() {
           avatar_url: user.user_metadata?.avatar_url || undefined,
           points: 0,
           loyalty_level: 'bronze',
-          orders_count: 0,
-          reviews_count: 0,
-          favorites_count: 0,
+          orders_count: userStats.orders_count, // ✅ بيانات حقيقية
+          favorites_count: userStats.favorites_count, // ✅ بيانات حقيقية
         });
       } finally {
         setLoadingProfile(false);
@@ -138,29 +202,29 @@ export default function ProfileScreen() {
     await supabase.auth.signOut();
   };
 
-// ✅ إعدادات مستويات الولاء مع TypeScript آمن
-interface LoyaltyTier {
-  name: string;
-  next: string | null;
-  goal: number;
-  color: string;
-}
+  // ✅ إعدادات مستويات الولاء مع TypeScript آمن
+  interface LoyaltyTier {
+    name: string;
+    next: string | null;
+    goal: number;
+    color: string;
+  }
 
-interface LoyaltyTiers {
-  bronze: LoyaltyTier;
-  silver: LoyaltyTier;
-  gold: LoyaltyTier;
-  platinum: LoyaltyTier;
-}
+  interface LoyaltyTiers {
+    bronze: LoyaltyTier;
+    silver: LoyaltyTier;
+    gold: LoyaltyTier;
+    platinum: LoyaltyTier;
+  }
 
-const loyaltyTiers: LoyaltyTiers = {
-  bronze: { name: 'برونزي', next: 'silver', goal: 100, color: '#CD7F32' },
-  silver: { name: 'فضي', next: 'gold', goal: 500, color: '#C0C0C0' },
-  gold: { name: 'ذهبي', next: 'platinum', goal: 1000, color: '#FFD700' },
-  platinum: { name: 'بلاتيني', next: null, goal: Infinity, color: '#E5E4E2' },
-};
+  const loyaltyTiers: LoyaltyTiers = {
+    bronze: { name: 'برونزي', next: 'silver', goal: 100, color: '#CD7F32' },
+    silver: { name: 'فضي', next: 'gold', goal: 500, color: '#C0C0C0' },
+    gold: { name: 'ذهبي', next: 'platinum', goal: 1000, color: '#FFD700' },
+    platinum: { name: 'بلاتيني', next: null, goal: Infinity, color: '#E5E4E2' },
+  };
 
-// ✅ الحصول على التيار الحالي بطريقة آمنة
+  // ✅ الحصول على التيار الحالي بطريقة آمنة
   const currentTier = profile ? loyaltyTiers[profile.loyalty_level as keyof LoyaltyTiers] : loyaltyTiers.bronze;
   const nextTier = currentTier.next ? loyaltyTiers[currentTier.next as keyof LoyaltyTiers] : null;
   const loyaltyProgress = profile ? (profile.points / currentTier.goal) * 100 : 0;
@@ -182,75 +246,34 @@ const loyaltyTiers: LoyaltyTiers = {
   const initials = (profile.first_name?.[0] || '') + (profile.last_name?.[0] || '');
 
   const showComingSoonAlert = (featureName: string) => {
-  alert(`🚧 ${featureName} - قريباً!\n\nهذه الميزة قيد التطوير وسيتم إضافتها قريباً.`);
-};
-
-  // ✅ مكون مساعد لإنشاء أزرار القائمة مع دعم علامة "قريباً"
-const ProfileListItem = ({ 
-  icon, 
-  text, 
-  onPress, 
-  color = '#333', 
-  badge, 
-  iconBgColor = '#f8f9fa',
-  comingSoon = false // ✅ إضافة خاصية جديدة
-}: { 
-  icon: React.ReactNode; 
-  text: string; 
-  onPress: () => void; 
-  color?: string; 
-  badge?: string; 
-  iconBgColor?: string;
-  comingSoon?: boolean; // ✅ خاصية جديدة
-}) => (
-  <TouchableOpacity 
-    style={[styles.listItem, comingSoon && styles.comingSoonItem]} 
-    onPress={comingSoon ? () => {} : onPress} // ✅ تعطيل الضغط إذا كانت قريباً
-    disabled={comingSoon} // ✅ تعطيل الزر
-  >
-    <View style={styles.listItemContent}>
-      <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
-        {icon}
-      </View>
-      <Text style={[styles.listItemText, { color }, comingSoon && styles.comingSoonText]}>{text}</Text>
-    </View>
-    <View style={styles.listItemRight}>
-      {comingSoon ? (
-        <Badge text="قريباً" style={styles.comingSoonBadge} />
-      ) : (
-        <>
-          {badge && <Badge text={badge} style={styles.listItemBadge} />}
-          <Ionicons name="chevron-back-outline" size={scale(18)} color="#A0A0A0" />
-        </>
-      )}
-    </View>
-  </TouchableOpacity>
-);
-
-
+    alert(`🚧 ${featureName} - قريباً!\n\nهذه الميزة قيد التطوير وسيتم إضافتها قريباً.`);
+  };
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* ... الهيدر يبقى كما هو ... */}
+        {/* الهيدر */}
         <View style={styles.header}>
-            <View style={styles.headerBackground} />
-            <View style={styles.headerContent}>
-                <View style={styles.headerTop}>
-                    <Text style={styles.headerTitle}>الملف الشخصي</Text>
-                    <View style={styles.headerIcons}>
-                        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/(tabs)/notifications')}><Ionicons name="notifications-outline" size={scale(20)} color="white" /></TouchableOpacity>
-                        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/(modal)/edit-profile')}><Ionicons name="settings-outline" size={scale(20)} color="white" /></TouchableOpacity>
-                    </View>
-                </View>
+          <View style={styles.headerBackground} />
+          <View style={styles.headerContent}>
+            <View style={styles.headerTop}>
+              <Text style={styles.headerTitle}>الملف الشخصي</Text>
+              <View style={styles.headerIcons}>
+                <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/(tabs)/notifications')}>
+                  <Ionicons name="notifications-outline" size={scale(20)} color="white" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/(modal)/edit-profile')}>
+                  <Ionicons name="settings-outline" size={scale(20)} color="white" />
+                </TouchableOpacity>
+              </View>
             </View>
+          </View>
         </View>
 
         <View style={styles.profileCardContainer}>
           <Card style={styles.profileCard}>
             <View style={styles.profileInfo}>
               <View style={styles.avatarContainer}>
-                {/* ✅ عرض صورة الأفاتار أو الأحرف الأولى */}
                 {profile.avatar_url ? (
                   <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
                 ) : (
@@ -294,23 +317,23 @@ const ProfileListItem = ({
           </Card>
         </View>
 
-        {/* ✅ الإحصائيات الديناميكية */}
+        {/* ✅ الإحصائيات الديناميكية الحقيقية */}
         <View style={styles.statsContainer}>
           <Card style={[styles.statCard, styles.statCard1]}>
-            <Text style={[styles.statNumber, styles.statNumber1]}>{profile.orders_count}</Text>
+            <Text style={[styles.statNumber, styles.statNumber1]}>
+              {profile.orders_count}
+            </Text>
             <Text style={styles.statLabel}>الطلبات</Text>
           </Card>
-          <Card style={[styles.statCard, styles.statCard2]}>
-            <Text style={[styles.statNumber, styles.statNumber2]}>{profile.reviews_count}</Text>
-            <Text style={styles.statLabel}>التقييمات</Text>
-          </Card>
           <Card style={[styles.statCard, styles.statCard3]}>
-            <Text style={[styles.statNumber, styles.statNumber3]}>{profile.favorites_count}</Text>
+            <Text style={[styles.statNumber, styles.statNumber3]}>
+              {profile.favorites_count}
+            </Text>
             <Text style={styles.statLabel}>المفضلة</Text>
           </Card>
         </View>
 
-        {/* ... بقية المكونات تبقى كما هي ... */}
+        {/* بقية المكونات */}
         <View style={styles.promoContainer}>
           <ImageBackground
             source={{ uri: 'https://dgplcadvneqpohxqlilg.supabase.co/storage/v1/object/public/menu_image/prom.png' }}
@@ -326,60 +349,60 @@ const ProfileListItem = ({
         </View>
 
         <View style={styles.menuSection}>
-  <Card style={styles.menuCard}>
-    <ProfileListItem
-      icon={<Ionicons name="person-outline" size={scale(20)} color="#6B7280" />}
-      text="ملفي الشخصي" 
-      onPress={() => router.push('/(modal)/edit-profile')} 
-      iconBgColor="#F9FAFB"
-    />
-    <ProfileListItem
-      icon={<MaterialCommunityIcons name="receipt-text-outline" size={scale(20)} color="#F97316" />}
-      text="طلباتي" 
-      onPress={() => router.push('/(tabs)/orders')}
-      badge={profile.orders_count > 0 ? profile.orders_count.toString() : undefined}
-      iconBgColor="#FFF7ED"
-    />
-    <View style={styles.separator} />
-    <ProfileListItem
-      icon={<Ionicons name="heart-outline" size={scale(20)} color="#EC4899" />}
-      text="المفضلة" 
-      onPress={() => router.push('/(tabs)/favorites')} 
-      iconBgColor="#FDF2F8"
-    />
-    <View style={styles.separator} />
-    <ProfileListItem
-      icon={<Ionicons name="location-outline" size={scale(20)} color="#10B981" />}
-      text="عناويني" 
-      onPress={() => router.push({ pathname: '/(tabs)/addresses', params: { from: 'profile' } })} 
-      iconBgColor="#ECFDF5"
-    />
-    <View style={styles.separator} />
-    <ProfileListItem
-      icon={<Ionicons name="card-outline" size={scale(20)} color="#3B82F6" />}
-      text="طرق الدفع" 
-      onPress={() => showComingSoonAlert('طرق الدفع')} 
-      iconBgColor="#EFF6FF"
-      comingSoon={true} // ✅ إضافة علامة قريباً
-    />
-    <View style={styles.separator} />
-    <ProfileListItem
-      icon={<FontAwesome5 name="gift" size={scale(18)} color="#8B5CF6" />}
-      text="المكافآت والعروض" 
-      onPress={() => showComingSoonAlert('المكافآت والعروض')}       badge="2" 
-      iconBgColor="#FAF5FF"
-      comingSoon={true} // ✅ إضافة علامة قريباً
-    />
-    <View style={styles.separator} />
-    <View style={styles.separator} />
-    <ProfileListItem
-      icon={<Ionicons name="help-circle-outline" size={scale(20)} color="#14B8A6" />}
-      text="المساعدة والدعم" 
-      onPress={() => router.push('/(modal)/support')} 
-      iconBgColor="#F0FDFA"
-    />
-  </Card>
-</View>
+          <Card style={styles.menuCard}>
+            <ProfileListItem
+              icon={<Ionicons name="person-outline" size={scale(20)} color="#6B7280" />}
+              text="ملفي الشخصي" 
+              onPress={() => router.push('/(modal)/edit-profile')} 
+              iconBgColor="#F9FAFB"
+            />
+            <ProfileListItem
+              icon={<MaterialCommunityIcons name="receipt-text-outline" size={scale(20)} color="#F97316" />}
+              text="طلباتي" 
+              onPress={() => router.push('/(tabs)/orders')}
+              badge={profile.orders_count > 0 ? profile.orders_count.toString() : undefined}
+              iconBgColor="#FFF7ED"
+            />
+            <View style={styles.separator} />
+            <ProfileListItem
+              icon={<Ionicons name="heart-outline" size={scale(20)} color="#EC4899" />}
+              text="المفضلة" 
+              onPress={() => router.push('/(tabs)/favorites')} 
+              iconBgColor="#FDF2F8"
+            />
+            <View style={styles.separator} />
+            <ProfileListItem
+              icon={<Ionicons name="location-outline" size={scale(20)} color="#10B981" />}
+              text="عناويني" 
+              onPress={() => router.push({ pathname: '/(tabs)/addresses', params: { from: 'profile' } })} 
+              iconBgColor="#ECFDF5"
+            />
+            <View style={styles.separator} />
+            <ProfileListItem
+              icon={<Ionicons name="card-outline" size={scale(20)} color="#3B82F6" />}
+              text="طرق الدفع" 
+              onPress={() => showComingSoonAlert('طرق الدفع')} 
+              iconBgColor="#EFF6FF"
+              comingSoon={true}
+            />
+            <View style={styles.separator} />
+            <ProfileListItem
+              icon={<FontAwesome5 name="gift" size={scale(18)} color="#8B5CF6" />}
+              text="المكافآت والعروض" 
+              onPress={() => showComingSoonAlert('المكافآت والعروض')}
+              badge="2" 
+              iconBgColor="#FAF5FF"
+              comingSoon={true}
+            />
+            <View style={styles.separator} />
+            <ProfileListItem
+              icon={<Ionicons name="help-circle-outline" size={scale(20)} color="#14B8A6" />}
+              text="المساعدة والدعم" 
+              onPress={() => router.push('/(modal)/support')} 
+              iconBgColor="#F0FDFA"
+            />
+          </Card>
+        </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={scale(20)} color="#DC2626" />
@@ -397,7 +420,6 @@ const ProfileListItem = ({
 
 // ✅ إضافة تنسيق لصورة الأفاتار
 const styles = StyleSheet.create({
-  // ... (جميع التنسيقات السابقة)
   avatarImage: {
     width: scale(80),
     height: scale(80),
@@ -405,7 +427,6 @@ const styles = StyleSheet.create({
     borderWidth: scale(4),
     borderColor: 'white',
   },
-  // ... (أكمل بقية التنسيقات من الكود الأصلي)
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
@@ -482,7 +503,7 @@ const styles = StyleSheet.create({
     marginBottom: scale(20),
   },
   avatarContainer: {
-    marginRight: scale(15),
+    marginLeft: scale(15),
   },
   avatar: {
     width: scale(80),
@@ -512,7 +533,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start', // ✅ يضبط المحاذاة للنصوص لليمين
   },
   nameContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: scale(8),
     marginBottom: scale(4),
@@ -526,11 +547,11 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     color: '#6B7280',
     marginBottom: scale(2),
-    marginRight:scale(12),
+    alignItems: 'center',
   },
   userEmail: {
     fontSize: fontScale(12),
-    marginRight:scale(12),
+    alignItems: 'center',
     color: '#9CA3AF',
   },
 

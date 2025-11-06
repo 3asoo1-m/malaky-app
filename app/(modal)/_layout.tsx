@@ -22,6 +22,14 @@ export default function ModalLayout() {
           headerShown: false, 
         }} 
       />
+      <Stack.Screen 
+        name="support" 
+        options={{ 
+          presentation: 'modal',
+          // ✅ إخفاء الهيدر الافتراضي
+          headerShown: false, 
+        }} 
+      />
     </Stack>
     
   );
