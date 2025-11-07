@@ -306,7 +306,7 @@ const OrderCard = React.memo(({ item, index }: { item: Order; index: number }) =
           >
             <MaterialCommunityIcons name="receipt-text-outline" size={scale(16)} color="white" />
             <Text style={styles.detailsButtonText}>عرض التفاصيل</Text>
-            <Ionicons name="chevron-forward-outline" size={scale(16)} color="white" />
+            <Ionicons name="chevron-back-outline" size={scale(16)} color="white" />
           </TouchableOpacity>
         </View>
       </Card>
@@ -791,6 +791,9 @@ const styles = StyleSheet.create({
     marginBottom: scale(16),
   },
   orderHeader: {
+    borderTopLeftRadius: scale(12),
+    borderTopRightRadius: scale(12),
+
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -858,6 +861,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   addressText: {
+    textAlign: 'left',
     flex: 1,
     fontSize: fontScale(14),
     color: '#6B7280',
@@ -898,10 +902,12 @@ const styles = StyleSheet.create({
     borderRadius: scale(20),
   },
   orderFooter: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: scale(16),
+    borderBottomLeftRadius: scale(12),
+    borderBottomRightRadius: scale(12),
     backgroundColor: '#F9FAFB',
   },
   totalContainer: {

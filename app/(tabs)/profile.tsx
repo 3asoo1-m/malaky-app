@@ -405,8 +405,8 @@ export default function ProfileScreen() {
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={scale(20)} color="#DC2626" />
           <Text style={styles.logoutText}>تسجيل الخروج</Text>
+          <Ionicons name="log-out-outline" size={scale(20)} color="#DC2626" />
         </TouchableOpacity>
 
         <View style={styles.versionInfo}>
@@ -728,7 +728,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     padding: scale(10),
     borderRadius: scale(12),
-    marginRight: scale(12),
+    marginLeft: scale(12),
   },
   listItemText: {
     fontSize: fontScale(16),

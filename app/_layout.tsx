@@ -1,6 +1,4 @@
-// مسار الملف: app/_layout.tsx
-
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '@/lib/useAuth';
 import { ActivityIndicator, View, I18nManager, Text } from 'react-native';
@@ -34,11 +32,9 @@ import ar from '@/locales/ar.json';
 // --- تهيئة اللغة العربية وإجبار RTL ---
 const initializeArabicRTL = () => {
   try {
-    // إجبار تنسيق RTL
     I18nManager.forceRTL(true);
     I18nManager.allowRTL(true);
     
-    // منع تغيير الاتجاه تلقائياً
     if (I18nManager.swapLeftAndRightInRTL) {
       I18nManager.swapLeftAndRightInRTL(false);
     }
@@ -60,7 +56,7 @@ const initializeI18n = async () => {
             translation: ar
           }
         },
-        lng: 'ar', // إجبار اللغة العربية
+        lng: 'ar',
         fallbackLng: 'ar',
         interpolation: {
           escapeValue: false
@@ -73,18 +69,44 @@ const initializeI18n = async () => {
   }
 };
 
-// --- استدعاء التهيئة فوراً ---
-initializeArabicRTL();
-initializeI18n();
+const InitializationWrapper = () => {
+  const [isI18nInitialized, setIsI18nInitialized] = useState(false);
 
+  useEffect(() => {
+    initializeArabicRTL();
+    
+    const init = async () => {
+      await initializeI18n();
+      setIsI18nInitialized(true);
+    };
+    
+    init();
+  }, []);
 
+  if (!isI18nInitialized) {
+    return (
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        backgroundColor: '#fff'
+      }}>
+        <ActivityIndicator size="large" color="#1D3557" />
+        <Text style={{ marginTop: 10, fontSize: 16 }}>
+          جاري تهيئة التطبيق...
+        </Text>
+      </View>
+    );
+  }
+
+  return <AuthGuard />;
+};
 
 const AuthGuard = () => {
   const { user, initialLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
-  // ✅ استخدام نظام الصيانة والتحديثات داخل AuthGuard
   const { 
     loading: configLoading, 
     showMaintenance, 
@@ -93,7 +115,7 @@ const AuthGuard = () => {
     handleUpdate 
   } = useAppConfig();
 
-  // ✅ التأكد من تطبيق إعدادات RTL عند كل تحميل
+  // ✅ التأكد من تطبيق إعدادات RTL
   useEffect(() => {
     initializeArabicRTL();
   }, []);
@@ -126,34 +148,33 @@ const AuthGuard = () => {
     checkForOTAUpdates();
   }, []);
 
-  useEffect(() => {
-    if (initialLoading || configLoading) return;
+// ✅ الحل الأفضل
+useEffect(() => {
+  if (initialLoading || configLoading) return;
 
-    // ✅ إذا كان التطبيق تحت الصيانة أو يحتاج تحديث إجباري، لا نتحقق من المصادقة
-    if (showMaintenance || showForceUpdate) {
-      return;
+  if (showMaintenance || showForceUpdate) {
+    return;
+  }
+
+  // ✅ تحسين التحقق من segments
+  if (!segments || !Array.isArray(segments) || segments.length < 1) {
+    return;
+  }
+
+  const inAuthGroup = segments[0] === '(auth)';
+
+  if (user) {
+    if (inAuthGroup) {
+      router.replace('/');
     }
-
-    const inAuthGroup = segments[0] === '(auth)';
-
-    if (user) {
-      // المستخدم مسجل دخوله
-      if (inAuthGroup) {
-        router.replace('/');
-      }
-      // ✅ تسجيل التوكن عند تسجيل الدخول
-      console.log("User authenticated. Registering for push notifications...");
-      registerForPushNotificationsAsync();
-
-    } else {
-      // المستخدم غير مسجل دخوله
-      if (!inAuthGroup) {
-        router.replace('/(auth)/login'); 
-      }
+    registerForPushNotificationsAsync();
+  } else {
+    if (!inAuthGroup) {
+      router.replace('/(auth)/login'); 
     }
-  }, [user, initialLoading, configLoading, showMaintenance, showForceUpdate]);
+  }
+}, [user, initialLoading, configLoading, showMaintenance, showForceUpdate, segments]);
 
-  // ✅ عرض شاشات الصيانة والتحديث إذا لزم الأمر
   if (configLoading || initialLoading) {
     return (
       <View style={{ 
@@ -161,7 +182,7 @@ const AuthGuard = () => {
         justifyContent: 'center', 
         alignItems: 'center', 
         backgroundColor: '#fff',
-        direction: 'rtl' // إضافة دعم RTL للشاشة
+        direction: 'rtl'
       }}>
         <ActivityIndicator size="large" color="#1D3557" />
         <Text style={{ 
@@ -169,8 +190,8 @@ const AuthGuard = () => {
           fontSize: 16, 
           fontFamily: 'Cairo-Regular', 
           color: '#1D3557',
-          textAlign: 'right', // محاذاة النص لليمين
-          writingDirection: 'rtl' // اتجاه الكتابة
+          textAlign: 'right',
+          writingDirection: 'rtl'
         }}>
           {configLoading ? 'جاري التحقق من التحديثات...' : 'جاري التحميل...'}
         </Text>
@@ -178,12 +199,10 @@ const AuthGuard = () => {
     );
   }
 
-  // ✅ عرض شاشة الصيانة
   if (showMaintenance) {
     return <MaintenanceScreen />;
   }
 
-  // ✅ عرض شاشة التحديث الإجباري
   if (showForceUpdate) {
     return <ForceUpdateScreen />;
   }
@@ -192,40 +211,31 @@ const AuthGuard = () => {
 };
 
 export default function RootLayout() {
-  
   useEffect(() => {
-  const hideNavigationBar = async () => {
-    try {
-      await NavigationBar.setVisibilityAsync('hidden'); // إخفاء الشريط
-      await NavigationBar.setBehaviorAsync('overlay-swipe'); // يسمح بالسحب لإظهاره مؤقتًا
-      await NavigationBar.setBackgroundColorAsync('transparent'); // يجعل الخلفية شفافة
-      console.log('✅ تم إخفاء شريط التنقل بنجاح');
-    } catch (error) {
-      console.error('❌ فشل في إخفاء شريط التنقل:', error);
-    }
-  };
+    const hideNavigationBar = async () => {
+      try {
+        await NavigationBar.setVisibilityAsync('hidden');
+        await NavigationBar.setBehaviorAsync('overlay-swipe');
+        await NavigationBar.setBackgroundColorAsync('transparent');
+        console.log('✅ تم إخفاء شريط التنقل بنجاح');
+      } catch (error) {
+        console.error('❌ فشل في إخفاء شريط التنقل:', error);
+      }
+    };
 
-  hideNavigationBar();
-}, []);
+    hideNavigationBar();
+  }, []);
 
-
-  
-  // ✅ إعداد معالجات الإشعارات والتطبيق
   useEffect(() => {
-    // إعداد معالجات النقر على الإشعارات
     const { removeReceivedListener, removeResponseListener } = setupNotificationHandlers();
 
-    // التعامل مع حالة التطبيق (عندما يعود المستخدم للتطبيق)
     const subscription = AppState.addEventListener('change', (nextAppState) => {
-      // إذا عاد المستخدم إلى التطبيق وهو في المقدمة
       if (nextAppState === 'active') {
         console.log('App has come to the foreground, clearing badge count.');
-        // مسح عداد الإشعارات على أيقونة التطبيق
         clearBadgeCount();
       }
     });
 
-    // دالة التنظيف (Cleanup function)
     return () => {
       removeReceivedListener();
       removeResponseListener();
@@ -238,9 +248,8 @@ export default function RootLayout() {
       <AuthProvider>
         <FavoritesProvider>
           <CartProvider>
-            {/* ✅ إضافة إعدادات RTL إضافية */}
             <View style={{ flex: 1, direction: 'rtl' }}>
-              <AuthGuard />
+              <InitializationWrapper />
             </View>
           </CartProvider>
         </FavoritesProvider>

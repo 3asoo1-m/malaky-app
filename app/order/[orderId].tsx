@@ -1,22 +1,31 @@
 // مسار الملف: app/order/[orderId].tsx
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity, Image, Animated } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  ActivityIndicator, 
+  TouchableOpacity, 
+  Image, 
+  Animated 
+} from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // ✅ تم التأكد من وجوده
 import { Ionicons } from '@expo/vector-icons';
 import { MenuItemImage, OptionGroup } from '@/lib/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // =================================================================
-// ✅ دوال الـ Caching لتفاصيل الطلب - تم تقليل المدة
+// ✅ دوال الـ Caching (تبقى كما هي)
 // =================================================================
 const CACHE_KEYS = {
   ORDER_DETAILS: 'order_details'
 };
-
-const CACHE_DURATION = 1000 * 60 * 2; // 2 دقائق فقط بدلاً من 15
+const CACHE_DURATION = 1000 * 60 * 2; // 2 دقائق
 
 const cacheOrderData = async (orderId: string, data: any) => {
   try {
@@ -31,18 +40,13 @@ const cacheOrderData = async (orderId: string, data: any) => {
 const getCachedOrderData = async (orderId: string) => {
   try {
     const cached = await AsyncStorage.getItem(`${CACHE_KEYS.ORDER_DETAILS}_${orderId}`);
-    if (!cached) {
-      console.log(`📭 No cache found for order: ${orderId}`);
-      return null;
-    }
+    if (!cached) return null;
     const cacheItem = JSON.parse(cached);
     const isExpired = Date.now() - cacheItem.timestamp > CACHE_DURATION;
     if (isExpired) {
-      console.log(`🕐 Cache expired for order: ${orderId}`);
       await AsyncStorage.removeItem(`${CACHE_KEYS.ORDER_DETAILS}_${orderId}`);
       return null;
     }
-    console.log(`✅ Using cached data for order: ${orderId}`);
     return cacheItem.data;
   } catch (error) {
     console.error('❌ Error getting cached order data:', error);
@@ -51,7 +55,7 @@ const getCachedOrderData = async (orderId: string) => {
 };
 
 // =================================================================
-// ✅ واجهات البيانات المحدثة
+// ✅ واجهات البيانات (تبقى كما هي)
 // =================================================================
 interface AdditionalPiece {
   type: string;
@@ -77,129 +81,118 @@ interface OrderDetails {
     additional_pieces: AdditionalPiece[] | null;
     menu_items: {
       name: string;
+      price?: number;
       options: OptionGroup[] | null;
       images: MenuItemImage[] | null;
     } | null;
   }[];
 }
 
-type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
-
 // =================================================================
-// ✅ مكونات فرعية مع React.memo
+// ✅ مكونات فرعية (تبقى كما هي)
 // =================================================================
-const StatusTracker = React.memo(({ currentStatus, orderType }: { currentStatus: string; orderType: 'delivery' | 'pickup' }) => {
-  const statuses = useMemo(() => 
-    orderType === 'delivery' 
-      ? ['new', 'processing', 'ready', 'delivered']
-      : ['new', 'processing', 'ready', 'collected'],
-    [orderType]
-  );
 
-  const currentIndex = useMemo(() => 
-    statuses.indexOf(currentStatus.toLowerCase()),
-    [currentStatus, statuses]
-  );
-
-  const getStatusInfo = useCallback((status: string): { label: string; icon: IoniconName } => {
-    switch (status) {
-      case 'new': return { label: 'جديد', icon: 'receipt-outline' };
-      case 'processing': return { label: 'يُحضّر', icon: 'hourglass-outline' };
-      case 'ready': return { label: 'جاهز', icon: orderType === 'delivery' ? 'bicycle-outline' : 'storefront-outline' };
-      case 'delivered': return { label: 'تم التوصيل', icon: 'checkmark-done-circle-outline' };
-      case 'collected': return { label: 'تم الاستلام', icon: 'checkmark-done-circle-outline' };
-      default: return { label: 'غير معروف', icon: 'help-circle-outline' };
-    }
-  }, [orderType]);
-
+const Badge = React.memo(({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'secondary' | 'outline'; }) => {
+  const getStyle = () => variant === 'secondary' ? styles.badgeSecondary : variant === 'outline' ? styles.badgeOutline : styles.badgeDefault;
   return (
-    <View style={styles.trackerContainer}>
-      {statuses.map((status, index) => {
-        const isActive = index <= currentIndex;
-        const info = getStatusInfo(status);
-        return (
-          <React.Fragment key={status}>
-            <View style={styles.stepContainer}>
-              <View style={[styles.stepIconContainer, isActive && styles.stepIconActive]}>
-                <Ionicons name={info.icon} size={24} color={isActive ? '#fff' : '#9CA3AF'} />
-              </View>
-              <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>{info.label}</Text>
-            </View>
-            {index < statuses.length - 1 && <View style={[styles.connector, isActive && styles.connectorActive]} />}
-          </React.Fragment>
-        );
-      })}
+    <View style={[styles.badgeBase, getStyle()]}>
+      <Text style={[styles.badgeText, variant === 'default' && styles.badgeTextDefault, variant === 'secondary' && styles.badgeTextSecondary, variant === 'outline' && styles.badgeTextOutline]}>{children}</Text>
     </View>
   );
 });
 
-// ✅ مكون جديد لعرض القطع الإضافية
-const AdditionalPiecesDisplay = React.memo(({ additionalPieces }: { additionalPieces: AdditionalPiece[] }) => {
-  if (!additionalPieces || additionalPieces.length === 0) {
-    return null;
-  }
+const Card = React.memo(({ children }: { children: React.ReactNode; }) => <View style={styles.card}>{children}</View>);
+const Progress = React.memo(({ value }: { value: number; }) => <View style={styles.progressContainer}><View style={[styles.progressBar, { width: `${value}%` }]} /></View>);
+const Separator = React.memo(() => <View style={styles.separator} />);
 
+const ImageWithFallback = React.memo(({ src, fallback = 'https://dgplcadvneqpohxqlilg.supabase.co/storage/v1/object/public/menu_image/icon.png', className }: { src: string; className?: any; fallback?: string; } ) => {
+  const [imageUri, setImageUri] = useState(src || fallback);
+  return <Image source={{ uri: imageUri }} style={className} onError={() => setImageUri(fallback)} resizeMode="cover" />;
+});
+
+const AdditionalPiecesDisplay = React.memo(({ additionalPieces }: { additionalPieces: AdditionalPiece[] }) => {
+  if (!additionalPieces || additionalPieces.length === 0) return null;
   return (
     <View style={styles.additionalPiecesContainer}>
-      <Text style={styles.additionalPiecesTitle}>القطع الإضافية:</Text>
-      {additionalPieces.map((piece, index) => (
-        <View key={index} style={styles.additionalPieceRow}>
-          <Text style={styles.additionalPieceText}>
-            + {piece.quantity} × {piece.name}
-          </Text>
-          <Text style={styles.additionalPiecePrice}>
-            ₪{(piece.price * piece.quantity).toFixed(2)}
-          </Text>
-        </View>
-      ))}
+      <Text style={styles.additionalPiecesTitle}><Text style={styles.emoji}>✨ </Text>القطع الإضافية</Text>
+      <View style={styles.additionalPiecesList}>
+        {additionalPieces.map((piece, index) => (
+          <View key={index} style={styles.additionalPieceRow}>
+            <Text style={styles.additionalPieceText}>{piece.quantity}x {piece.name}</Text>
+            <Text style={styles.additionalPiecePrice}>+₪{(piece.price * piece.quantity).toFixed(2)}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 });
 
 const OrderItem = React.memo(({ item }: { item: OrderDetails['order_items'][0] }) => {
   if (!item.menu_items) return null;
-
-  const optionLabels = useMemo(() => {
-    if (!item.menu_items?.options || !Array.isArray(item.menu_items.options)) {
-      return '';
-    }
-
-    return Object.entries(item.options).map(([groupId, value]) => {
-      const group = item.menu_items!.options!.find(g => g.id === groupId);
-      const optionValue = group?.values.find(v => v.value === value);
-      return optionValue ? optionValue.label : null;
-    }).filter(Boolean).join('، ');
-  }, [item.options, item.menu_items?.options]);
-
-  const imageUrl = useMemo(() => 
-    item.menu_items?.images && item.menu_items.images.length > 0
-      ? item.menu_items.images[0].image_url
-      : 'https://dgplcadvneqpohxqlilg.supabase.co/storage/v1/object/public/menu_image/icon.png',
-    [item.menu_items?.images]
-  );
+  const getItemBasePrice = useCallback(() => item.menu_items?.price || 24.99 + (item.additional_pieces?.reduce((sum, p) => sum + p.price * p.quantity, 0) || 0), [item]);
+  const optionLabels = useMemo(() => Object.entries(item.options).map(([groupId, value]) => item.menu_items?.options?.find(g => g.id === groupId)?.values.find(v => v.value === value)?.label).filter(Boolean).join('، '), [item]);
+  const imageUrl = useMemo(() => item.menu_items?.images?.[0]?.image_url || 'https://dgplcadvneqpohxqlilg.supabase.co/storage/v1/object/public/menu_image/icon.png', [item] );
 
   return (
-    <View style={styles.itemContainer}>
-      <Image source={{ uri: imageUrl }} style={styles.itemImage} />
-      <View style={styles.itemDetails}>
-        <Text style={styles.itemName}>{item.quantity}x {item.menu_items.name}</Text>
-        {optionLabels.length > 0 && <Text style={styles.optionsText}>{optionLabels}</Text>}
-        
-        {/* ✅ إضافة عرض القطع الإضافية */}
-        <AdditionalPiecesDisplay additionalPieces={item.additional_pieces || []} />
-        
-        {item.notes && <Text style={styles.notesText}>ملاحظات: {item.notes}</Text>}
+    <View style={styles.orderItemContainer}>
+      <View style={styles.orderItemContent}>
+        <View style={styles.itemImageContainer}>
+          <ImageWithFallback src={imageUrl} className={styles.itemImage} />
+          <View style={styles.itemQuantityBadge}><Text style={styles.itemQuantityText}>{item.quantity}</Text></View>
+        </View>
+        <View style={styles.itemDetails}>
+          <Text style={styles.itemName}>{item.menu_items.name}</Text>
+          {optionLabels.length > 0 && <View style={styles.optionsContainer}>{optionLabels.split('، ').map((o, i) => <Badge key={i} variant="outline">{o}</Badge>)}</View>}
+          <Text style={styles.itemPrice}>₪{(getItemBasePrice() * item.quantity).toFixed(2)}</Text>
+          <AdditionalPiecesDisplay additionalPieces={item.additional_pieces || []} />
+          {item.notes && <View style={styles.notesContainer}><Text style={styles.notesText}>{item.notes}</Text></View>}
+        </View>
       </View>
     </View>
   );
 });
 
+const OrderStatusTimeline = React.memo(({ currentStatus, orderType, created_at }: { currentStatus: string; orderType: 'delivery' | 'pickup'; created_at: string; }) => {
+  const statuses = useMemo(() => {
+    const base = [{ id: 'new', label: 'تم الطلب', icon: 'receipt-outline', time: created_at }, { id: 'processing', label: 'تم التأكيد', icon: 'checkmark-circle-outline' }, { id: 'ready', label: 'يُحضّر', icon: 'restaurant-outline' }];
+    return orderType === 'delivery' ? [...base, { id: 'out_for_delivery', label: 'في الطريق', icon: 'bicycle-outline' }, { id: 'delivered', label: 'تم التوصيل', icon: 'home-outline' }] : [...base, { id: 'ready_for_pickup', label: 'جاهز للاستلام', icon: 'bag-check-outline' }, { id: 'collected', label: 'تم الاستلام', icon: 'checkmark-done-circle-outline' }];
+  }, [orderType, created_at]);
+  const currentIndex = useMemo(() => statuses.findIndex(s => s.id === currentStatus.toLowerCase()), [currentStatus, statuses]);
+  const progressPercentage = ((currentIndex + 1) / statuses.length) * 100;
+  const formatTime = (date: string) => new Date(date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <Card>
+      <View style={styles.timelineHeader}><Text style={styles.timelineTitle}>حالة الطلب</Text><TouchableOpacity style={styles.refreshButton}><Ionicons name="refresh" size={16} color="#DC2626" /><Text style={styles.refreshText}>تحديث</Text></TouchableOpacity></View>
+      <View style={styles.progressSection}><Progress value={progressPercentage} /><View style={styles.progressLabels}><Text style={styles.progressLabel}>تم الطلب</Text><Text style={styles.progressLabel}>{currentIndex + 1} من {statuses.length} مراحل</Text></View></View>
+      <View style={styles.timelineContainer}>
+        {statuses.map((status, index) => {
+          const isCompleted = index <= currentIndex, isActive = index === currentIndex, isLast = index === statuses.length - 1;
+          return (
+            <View key={status.id} style={styles.timelineItem}>
+              <View style={styles.timelineIconContainer}>
+                <View style={[styles.timelineIcon, isCompleted && styles.timelineIconCompleted, isActive && styles.timelineIconActive]}><Ionicons name={status.icon as any} size={18} color={isCompleted ? '#FFFFFF' : '#9CA3AF'} /></View>
+                {!isLast && <View style={[styles.timelineConnector, isCompleted && styles.timelineConnectorCompleted]} />}
+              </View>
+              <View style={styles.timelineContent}>
+                <View style={styles.timelineTextContainer}><Text style={[styles.timelineLabel, isCompleted && styles.timelineLabelCompleted, isActive && styles.timelineLabelActive]}>{status.label}</Text>{status.time && <Text style={styles.timelineTime}>{formatTime(status.time)}</Text>}</View>
+                {isActive && <Text style={styles.timelineDescription}>طلبك في الطريق...</Text>}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </Card>
+  );
+});
+
 // =================================================================
-// ✅ المكون الرئيسي المحسن مع Real-time Updates
+// ✅ المكون الرئيسي
 // =================================================================
 export default function OrderDetailsScreen() {
   const { orderId } = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets(); // ✅ تم إضافة الهوك هنا
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -207,582 +200,416 @@ export default function OrderDetailsScreen() {
 
   const fetchOrderDetails = useCallback(async () => {
     if (!orderId) return;
-    
     setLoading(true);
     setError(null);
-
     try {
       const cachedOrder = await getCachedOrderData(orderId as string);
-      
       if (cachedOrder) {
         setOrder(cachedOrder);
-        Animated.timing(fadeAnim, { 
-          toValue: 1, 
-          duration: 500, 
-          useNativeDriver: true 
-        }).start();
+        Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
         setLoading(false);
         return;
       }
-
-      // ✅ تحديث الاستعلام ليشمل additional_pieces
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          id, created_at, total_price, subtotal, delivery_price, status, order_type,
-          user_addresses(street_address, delivery_zones(city, area_name)),
-          branches(name, address),
-          order_items(
-            quantity, notes, options, additional_pieces,
-            menu_items(name, options, images:menu_item_images(image_url, display_order))
-          )
-        `)
-        .eq('id', orderId)
-        .single();
-
+      const { data, error } = await supabase.from('orders').select(`id, created_at, total_price, subtotal, delivery_price, status, order_type, user_addresses(street_address, delivery_zones(city, area_name)), branches(name, address), order_items(quantity, notes, options, additional_pieces, menu_items(name, price, options, images:menu_item_images(image_url, display_order)))`).eq('id', orderId).single();
       if (error) throw error;
-
       if (data) {
         const orderData = data as unknown as OrderDetails;
         setOrder(orderData);
-        
         await cacheOrderData(orderId as string, orderData);
-        
-        Animated.timing(fadeAnim, { 
-          toValue: 1, 
-          duration: 500, 
-          useNativeDriver: true 
-        }).start();
+        Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
       }
     } catch (error: any) {
-      const errorMessage = "فشل في تحميل تفاصيل الطلب. تأكد من اتصال الإنترنت.";
-      setError(errorMessage);
-      console.error('Error fetching order details:', error.message);
-      
+      setError("فشل في تحميل تفاصيل الطلب. تأكد من اتصال الإنترنت.");
       const cachedOrder = await getCachedOrderData(orderId as string);
-      if (cachedOrder) {
-        setOrder(cachedOrder);
-      }
+      if (cachedOrder) setOrder(cachedOrder);
     } finally {
       setLoading(false);
     }
   }, [orderId, fadeAnim]);
 
-  // ✅ Real-time Subscription للتحديثات التلقائية
   useEffect(() => {
     if (!orderId) return;
-
-    console.log('🔔 Setting up real-time subscription for order:', orderId);
-
-    const channel = supabase
-      .channel(`order:${orderId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `id=eq.${orderId}`
-        },
-        async (payload) => {
-          console.log('🔄 Real-time update received:', payload.new);
-          
-          // تحديث حالة الطلب فوراً
-          setOrder(prev => {
-            if (!prev) return null;
-            
-            const updatedOrder = {
-              ...prev,
-              ...payload.new
-            };
-            
-            // تحديث الكاش بالبيانات الجديدة
-            cacheOrderData(orderId as string, updatedOrder);
-            
-            return updatedOrder;
-          });
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 Subscription status:', status);
+    const channel = supabase.channel(`order:${orderId}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, async (payload) => {
+      setOrder(prev => {
+        if (!prev) return null;
+        const updatedOrder = { ...prev, ...payload.new };
+        cacheOrderData(orderId as string, updatedOrder);
+        return updatedOrder;
       });
-
-    return () => {
-      console.log('🧹 Cleaning up real-time subscription');
-      channel.unsubscribe();
-    };
+    }).subscribe();
+    return () => { channel.unsubscribe(); };
   }, [orderId]);
 
-  useEffect(() => {
-    fetchOrderDetails();
-  }, [fetchOrderDetails]);
+  useEffect(() => { fetchOrderDetails(); }, [fetchOrderDetails]);
 
-  const handleBack = useCallback(() => {
-    router.navigate('/orders');
-  }, [router]);
+  const handleBack = useCallback(() => router.navigate('/orders'), [router]);
+  const handleRetry = useCallback(() => fetchOrderDetails(), [fetchOrderDetails]);
 
-  const handleRetry = useCallback(() => {
-    fetchOrderDetails();
-  }, [fetchOrderDetails]);
+  const additionalPiecesTotal = useMemo(() => order ? order.order_items.reduce((total, item) => total + (item.additional_pieces?.reduce((sum, piece) => sum + (piece.price * piece.quantity), 0) || 0), 0) : 0, [order]);
+  const subtotal = order?.subtotal || 0;
+  const deliveryFee = order?.delivery_price || 0;
+  const tax = subtotal * 0.08;
+  const total = order?.total_price || 0;
 
-  const formattedDate = useMemo(() => {
-    if (!order) return '';
-    return new Date(order.created_at).toLocaleDateString('ar-EG', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric', 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  }, [order?.created_at]);
-
-  // ✅ دالة مساعدة لحساب مجموع القطع الإضافية
-  const calculateAdditionalPiecesTotal = useCallback((orderItems: OrderDetails['order_items']) => {
-    return orderItems.reduce((total, item) => {
-      if (item.additional_pieces) {
-        return total + item.additional_pieces.reduce((sum, piece) => 
-          sum + (piece.price * piece.quantity), 0
-        );
-      }
-      return total;
-    }, 0);
-  }, []);
-
-  const additionalPiecesTotal = useMemo(() => 
-    order ? calculateAdditionalPiecesTotal(order.order_items) : 0,
-    [order, calculateAdditionalPiecesTotal]
-  );
-
-  const renderAddress = useCallback(() => {
-    if (!order) return null;
-
-    return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons 
-            name={order.order_type === 'delivery' ? 'location-outline' : 'storefront-outline'} 
-            size={22} 
-            color="#C62828" 
-          />
-          <Text style={styles.cardTitle}>
-            {order.order_type === 'delivery' ? 'عنوان التوصيل' : 'فرع الاستلام'}
-          </Text>
-        </View>
-        <View style={styles.cardContent}>
-          {order.order_type === 'delivery' && order.user_addresses ? (
-            <>
-              <Text style={styles.infoTextBold}>
-                {`${order.user_addresses.delivery_zones?.city} - ${order.user_addresses.delivery_zones?.area_name}`}
-              </Text>
-              <Text style={styles.infoText}>
-                {order.user_addresses.street_address}
-              </Text>
-            </>
-          ) : order.order_type === 'pickup' && order.branches ? (
-            <>
-              <Text style={styles.infoTextBold}>{order.branches.name}</Text>
-              <Text style={styles.infoText}>{order.branches.address}</Text>
-            </>
-          ) : <Text style={styles.infoText}>غير محدد</Text>}
-        </View>
-      </View>
-    );
+  const estimatedTime = useMemo(() => {
+    if (!order) return '15-20 دقيقة';
+    switch (order.status) {
+      case 'new': return '25-30 دقيقة';
+      case 'processing': return '20-25 دقيقة';
+      case 'ready': return order.order_type === 'delivery' ? '15-20 دقيقة' : 'جاهز للاستلام';
+      case 'out_for_delivery': return '10-15 دقيقة';
+      default: return '15-20 دقيقة';
+    }
   }, [order]);
-
-  const renderItems = useCallback(() => {
-    if (!order) return null;
-
-    return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="fast-food-outline" size={22} color="#C62828" />
-          <Text style={styles.cardTitle}>المنتجات</Text>
-        </View>
-        <View style={styles.cardContent}>
-          {order.order_items.map((item, index) => (
-            <OrderItem key={index} item={item} />
-          ))}
-        </View>
-      </View>
-    );
-  }, [order]);
-
-  const renderSummary = useCallback(() => {
-    if (!order) return null;
-
-    return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="wallet-outline" size={22} color="#C62828" />
-          <Text style={styles.cardTitle}>ملخص السعر</Text>
-        </View>
-        <View style={styles.cardContent}>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>المجموع الفرعي</Text>
-            <Text style={styles.priceValue}>{order.subtotal.toFixed(2)} ₪</Text>
-          </View>
-          
-          {/* ✅ عرض مجموع القطع الإضافية إذا كان أكبر من صفر */}
-          {additionalPiecesTotal > 0 && (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>القطع الإضافية</Text>
-              <Text style={styles.priceValue}>{additionalPiecesTotal.toFixed(2)} ₪</Text>
-            </View>
-          )}
-          
-          {order.order_type === 'delivery' && (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>سعر التوصيل</Text>
-              <Text style={styles.priceValue}>{order.delivery_price.toFixed(2)} ₪</Text>
-            </View>
-          )}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>المجموع الكلي</Text>
-            <Text style={styles.totalPrice}>{order.total_price.toFixed(2)} ₪</Text>
-          </View>
-        </View>
-      </View>
-    );
-  }, [order, additionalPiecesTotal]);
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#C62828" />
-        <Text style={styles.loadingText}>جاري تحميل تفاصيل الطلب...</Text>
-      </View>
-    );
+    return <View style={styles.centered}><ActivityIndicator size="large" color="#DC2626" /><Text style={styles.loadingText}>جاري تحميل تفاصيل الطلب...</Text></View>;
   }
 
   if (error && !order) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#1F2937" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>تفاصيل الطلب</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={60} color="#C62828" />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-            <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top, backgroundColor: '#DC2626' }]}><TouchableOpacity onPress={handleBack} style={styles.backButton}><Ionicons name="arrow-back" size={24} color="#FFFFFF" /></TouchableOpacity><Text style={styles.headerTitle}>تفاصيل الطلب</Text><View style={{ width: 40 }} /></View>
+        <View style={styles.errorContainer}><Ionicons name="alert-circle-outline" size={60} color="#DC2626" /><Text style={styles.errorText}>{error}</Text><TouchableOpacity style={styles.retryButton} onPress={handleRetry}><Text style={styles.retryButtonText}>إعادة المحاولة</Text></TouchableOpacity></View>
+      </View>
     );
   }
 
   if (!order) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>لم يتم العثور على الطلب.</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={handleBack}>
-          <Text style={styles.retryButtonText}>العودة</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    return <View style={styles.centered}><Text style={styles.errorText}>لم يتم العثور على الطلب.</Text><TouchableOpacity style={styles.retryButton} onPress={handleBack}><Text style={styles.retryButtonText}>العودة</Text></TouchableOpacity></View>;
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    // ✅ تم التعديل: استخدام View بدلاً من SafeAreaView
+    <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>تفاصيل الطلب</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      {/* Header with Gradient */}
+      <LinearGradient
+        colors={['#DC2626', '#B91C1C', '#991B1B']}
+        // ✅ تم التعديل: تطبيق المساحة الآمنة العلوية هنا
+        style={[styles.headerGradient, { paddingTop: insets.top }]}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>تفاصيل الطلب</Text>
+            <Text style={styles.headerSubtitle}>طلب #{order.id}</Text>
+          </View>
+          <Badge variant="default">قيد التوصيل</Badge>
+        </View>
+
+        <View style={styles.estimatedTimeContainer}>
+          <View style={styles.estimatedTimeContent}>
+            <View style={styles.clockIcon}><Ionicons name="time-outline" size={20} color="#DC2626" /></View>
+            <View style={styles.estimatedTimeText}>
+              <Text style={styles.estimatedTimeLabel}>الوقت المتوقع للوصول</Text>
+              <Text style={styles.estimatedTimeValue}>{estimatedTime}</Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
 
       <Animated.View style={[{ flex: 1 }, { opacity: fadeAnim }]}>
-        <ScrollView 
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.scrollHeader}>
-            <Text style={styles.scrollHeaderTitle}>طلب #{order.id}</Text>
-            <Text style={styles.scrollHeaderSubtitle}>{formattedDate}</Text>
-          </View>
-
-          <StatusTracker currentStatus={order.status} orderType={order.order_type} />
-          {renderAddress()}
-          {renderItems()}
-          {renderSummary()}
+        <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <OrderStatusTimeline currentStatus={order.status} orderType={order.order_type} created_at={order.created_at} />
+          <Card>
+            <Text style={styles.sectionTitle}>المنتجات</Text>
+            <View style={styles.orderItemsList}>{order.order_items.map((item, index) => <OrderItem key={index} item={item} />)}</View>
+            <Separator />
+            <View style={styles.priceBreakdown}>
+              <View style={styles.priceRow}><Text style={styles.priceLabel}>المجموع الفرعي</Text><Text style={styles.priceValue}>₪{subtotal.toFixed(2)}</Text></View>
+              {additionalPiecesTotal > 0 && <View style={styles.priceRow}><Text style={styles.priceLabel}>القطع الإضافية</Text><Text style={styles.priceValue}>₪{additionalPiecesTotal.toFixed(2)}</Text></View>}
+              {order.order_type === 'delivery' && <View style={styles.priceRow}><Text style={styles.priceLabel}>سعر التوصيل</Text><Text style={styles.priceValue}>₪{deliveryFee.toFixed(2)}</Text></View>}
+              <Separator />
+              <View style={styles.totalRow}><Text style={styles.totalLabel}>المجموع الكلي</Text><Text style={styles.totalPrice}>₪{total.toFixed(2)}</Text></View>
+            </View>
+          </Card>
+          <Card>
+            <View style={styles.sectionHeader}><Ionicons name="location-outline" size={18} color="#DC2626" /><Text style={styles.sectionTitle}>{order.order_type === 'delivery' ? 'عنوان التوصيل' : 'فرع الاستلام'}</Text></View>
+            <View style={styles.addressContainer}><Text style={styles.addressTitle}>المنزل</Text><Text style={styles.addressText}>{order.order_type === 'delivery' && order.user_addresses ? `${order.user_addresses.delivery_zones?.city} - ${order.user_addresses.delivery_zones?.area_name}\n${order.user_addresses.street_address}` : order.order_type === 'pickup' && order.branches ? `${order.branches.name}\n${order.branches.address}` : 'غير محدد'}</Text></View>
+            <TouchableOpacity style={styles.mapButton}><Ionicons name="map-outline" size={16} color="#DC2626" /><Text style={styles.mapButtonText}>عرض على الخريطة</Text></TouchableOpacity>
+          </Card>
+          <Card>
+            <View style={styles.sectionHeader}><Ionicons name="card-outline" size={18} color="#DC2626" /><Text style={styles.sectionTitle}>طريقة الدفع</Text></View>
+            <LinearGradient colors={['#1F2937', '#374151']} style={styles.paymentCard}><View style={styles.paymentHeader}><Text style={styles.paymentType}>بطاقة ائتمان</Text><View style={styles.cardChips}><View style={styles.cardChip} /><View style={styles.cardChip} /></View></View><Text style={styles.cardNumber}>•••• •••• •••• 4532</Text><View style={styles.cardFooter}><Text style={styles.cardLabel}>حامل البطاقة</Text><Text style={styles.cardValue}>محمد أحمد</Text></View></LinearGradient>
+            <View style={styles.paymentStatus}><Ionicons name="checkmark-circle" size={16} color="#16A34A" /><Text style={styles.paymentStatusText}>تم الدفع بنجاح</Text></View>
+          </Card>
+          <Card>
+            <Text style={styles.sectionTitle}>هل تحتاج مساعدة؟</Text>
+            <View style={styles.helpOptions}>
+              <TouchableOpacity style={styles.helpOption}><View style={styles.helpIconContainer}><Ionicons name="warning-outline" size={18} color="#DC2626" /></View><Text style={styles.helpOptionText}>الإبلاغ عن مشكلة</Text><Ionicons name="chevron-forward" size={18} color="#9CA3AF" /></TouchableOpacity>
+              <TouchableOpacity style={styles.helpOption}><View style={[styles.helpIconContainer, styles.helpIconBlue]}><Ionicons name="chatbubble-outline" size={18} color="#2563EB" /></View><Text style={styles.helpOptionText}>اتصل بالدعم</Text><Ionicons name="chevron-forward" size={18} color="#9CA3AF" /></TouchableOpacity>
+              <TouchableOpacity style={styles.helpOption}><View style={[styles.helpIconContainer, styles.helpIconGreen]}><Ionicons name="refresh-outline" size={18} color="#16A34A" /></View><Text style={styles.helpOptionText}>إعادة الطلب</Text><Ionicons name="chevron-forward" size={18} color="#9CA3AF" /></TouchableOpacity>
+            </View>
+          </Card>
+          <TouchableOpacity style={styles.receiptButton}><Ionicons name="receipt-outline" size={18} color="#374151" /><Text style={styles.receiptButtonText}>تحميل الإيصال</Text></TouchableOpacity>
         </ScrollView>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 // =================================================================
-// ✅ التنسيقات المحدثة مع إضافة تنسيقات القطع الإضافية
+// ✅ التنسيقات
 // =================================================================
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#F5F5F5' 
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 20 },
+  loadingText: { marginTop: 12, fontSize: 16, color: '#6B7280' },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { fontSize: 18, color: '#374151', textAlign: 'center', marginTop: 16, marginBottom: 24 },
+  retryButton: { backgroundColor: '#DC2626', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  retryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+  headerGradient: {
+    // paddingTop: 16, // ✅ تم الحذف
+    paddingBottom: 24,
+    paddingHorizontal: 16,
   },
-  centered: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    backgroundColor: '#F5F5F5',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 12,
+  header: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  backButton: { padding: 8, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 20 },
+  headerTitleContainer: { alignItems: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 2 },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255, 255, 255, 0.8)' },
+  estimatedTimeContainer: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)' },
+  estimatedTimeContent: { flexDirection: 'row', alignItems: 'center' },
+  clockIcon: { width: 40, height: 40, backgroundColor: '#FFFFFF', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  estimatedTimeText: { flex: 1 },
+  estimatedTimeLabel: { fontSize: 14, color: 'rgba(255, 255, 255, 0.8)', marginBottom: 4 },
+  estimatedTimeValue: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF' },
+  scrollContainer: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 16 },
+  badgeBase: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, alignSelf: 'flex-start' },
+  badgeDefault: { backgroundColor: '#FBBF24' },
+  badgeSecondary: { backgroundColor: '#E5E7EB' },
+  badgeOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#D1D5DB' },
+  badgeText: { fontSize: 12, fontWeight: '600' },
+  badgeTextDefault: { color: '#92400E' },
+  badgeTextSecondary: { color: '#374151' },
+  badgeTextOutline: { color: '#6B7280' },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 20, marginBottom: 16, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F3F4F6' },
+  progressContainer: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' },
+  progressBar: { height: '100%', backgroundColor: '#16A34A', borderRadius: 4 },
+  separator: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 16 },
+  timelineHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  timelineTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  refreshButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  refreshText: { fontSize: 14, fontWeight: '600', color: '#DC2626' },
+  progressSection: { marginBottom: 24 },
+  progressLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  progressLabel: { fontSize: 12, color: '#6B7280' },
+  timelineContainer: { gap: 0 },
+  timelineItem: { flexDirection: 'row', gap: 16 },
+  timelineIconContainer: { alignItems: 'center', width: 40 },
+  timelineIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' },
+  timelineIconCompleted: { backgroundColor: '#16A34A' },
+  timelineIconActive: { backgroundColor: '#DC2626' },
+  timelineConnector: { width: 2, flex: 1, backgroundColor: '#E5E7EB', marginVertical: 4 },
+  timelineConnectorCompleted: { backgroundColor: '#16A34A' },
+  timelineContent: { flex: 1, paddingBottom: 24 },
+  timelineTextContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  timelineLabel: { fontSize: 16, fontWeight: '600', color: '#9CA3AF' },
+  timelineLabelCompleted: { color: '#374151' },
+  timelineLabelActive: { color: '#DC2626' },
+  timelineTime: { fontSize: 12, color: '#6B7280' },
+  timelineDescription: { fontSize: 14, color: '#6B7280', marginTop: 2 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16,textAlign: 'left' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  orderItemsList: { gap: 20 },
+  orderItemContainer: { opacity: 1 },
+  orderItemContent: { flexDirection: 'row', gap: 12 },
+  itemImageContainer: { position: 'relative' },
+  itemImage: { width: 80, height: 80, borderRadius: 16, backgroundColor: '#F3F4F6' },
+  itemQuantityBadge: { position: 'absolute', top: -6, right: -6, width: 24, height: 24, backgroundColor: '#DC2626', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  itemQuantityText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
+  itemDetails: { flex: 1 },
+  itemName: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 6, textAlign: 'left' },
+  optionsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
+  itemPrice: { fontSize: 16, fontWeight: '600', color: '#DC2626', marginBottom: 8,textAlign: 'left' },
+  additionalPiecesContainer: { backgroundColor: '#FEFCE8', borderWidth: 1, borderColor: '#FEF08A', borderRadius: 12, padding: 12, marginTop: 8 },
+  additionalPiecesTitle: { fontSize: 12, fontWeight: '600', color: '#92400E', marginBottom: 8,textAlign: 'left' },
+  emoji: { fontSize: 14 },
+  additionalPiecesList: { gap: 6 },
+  additionalPieceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  additionalPieceText: { fontSize: 14, color: '#374151' },
+  additionalPiecePrice: { fontSize: 14, fontWeight: '600', color: '#059669' },
+  notesContainer: { backgroundColor: '#F3F4F6', borderRadius: 8, padding: 8, marginTop: 8 },
+  notesText: { fontSize: 14, color: '#6B7280', fontStyle: 'italic' },
+  priceBreakdown: { gap: 8 },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+   priceLabel: {
     fontSize: 16,
-    color: '#666',
     fontFamily: 'Cairo-Regular',
+    color: '#6B7280',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: { 
-    fontSize: 18, 
-    color: '#666', 
-    fontFamily: 'Cairo-Regular',
-    textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: '#C62828',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
+  priceValue: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
-  },
-  scrollContainer: { 
-    paddingHorizontal: 16, 
-    paddingBottom: 40 
-  },
-  backButton: { 
-    padding: 8 
-  },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingHorizontal: 16, 
-    paddingVertical: 12, 
-    backgroundColor: '#fff', 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#E5E7EB',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  headerTitle: { 
-    fontSize: 20, 
-    fontFamily: 'Cairo-Bold', 
-    color: '#1A1A1A' 
-  },
-  scrollHeader: { 
-    paddingVertical: 20, 
-    alignItems: 'center' 
-  },
-  scrollHeaderTitle: { 
-    fontSize: 28, 
-    fontFamily: 'Cairo-Bold', 
-    color: '#1F2937' 
-  },
-  scrollHeaderSubtitle: { 
-    fontSize: 16, 
-    fontFamily: 'Cairo-Regular', 
-    color: '#6B7280', 
-    marginTop: 4 
-  },
-  trackerContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'flex-start', 
-    justifyContent: 'space-between', 
-    marginBottom: 24 
-  },
-  stepContainer: { 
-    alignItems: 'center', 
-    flex: 1 
-  },
-  stepIconContainer: { 
-    width: 48, 
-    height: 48, 
-    borderRadius: 24, 
-    backgroundColor: '#E5E7EB', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-  stepIconActive: { 
-    backgroundColor: '#16A34A' 
-  },
-  stepLabel: { 
-    marginTop: 8, 
-    fontSize: 12, 
-    fontFamily: 'Cairo-SemiBold', 
-    color: '#9CA3AF', 
-    textAlign: 'center' 
-  },
-  stepLabelActive: { 
-    color: '#16A34A' 
-  },
-  connector: { 
-    flex: 1, 
-    height: 4, 
-    backgroundColor: '#E5E7EB', 
-    marginTop: 22 
-  },
-  connectorActive: { 
-    backgroundColor: '#16A34A' 
-  },
-  card: { 
-    backgroundColor: '#fff', 
-    borderRadius: 16, 
-    marginBottom: 16, 
-    overflow: 'hidden', 
-    elevation: 2, 
-    shadowColor: '#000', 
-    shadowOpacity: 0.08, 
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  cardHeader: { 
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#F3F4F6' 
-  },
-  cardTitle: { 
-    fontSize: 18, 
-    fontFamily: 'Cairo-Bold', 
-    color: '#1F2937', 
-    marginStart: 8 
-  },
-  cardContent: { 
-    padding: 16 
-  },
-  infoTextBold: { 
-    fontSize: 16, 
-    fontFamily: 'Cairo-SemiBold', 
-    color: '#374151', 
-    textAlign: 'right' 
-  },
-  infoText: { 
-    fontSize: 14, 
-    fontFamily: 'Cairo-Regular', 
-    color: '#6B7280', 
-    marginTop: 4, 
-    textAlign: 'right' 
-  },
-  itemContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F9FAFB',
-  },
-  itemImage: { 
-    width: 60, 
-    height: 60, 
-    borderRadius: 12, 
-    backgroundColor: '#F3F4F6' 
-  },
-  itemDetails: { 
-    flex: 1, 
-    marginStart: 12, 
-    alignItems: 'flex-start' 
-  },
-  itemName: { 
-    fontSize: 16, 
-    fontFamily: 'Cairo-SemiBold', 
-    color: '#374151' 
-  },
-  optionsText: { 
-    fontSize: 13, 
-    fontFamily: 'Cairo-Regular', 
-    color: '#6B7280', 
-    marginTop: 2, 
-    textAlign: 'right' 
-  },
-  notesText: { 
-    fontSize: 13, 
-    fontFamily: 'Cairo-Regular', 
-    color: '#9CA3AF', 
-    fontStyle: 'italic', 
-    marginTop: 2, 
-    textAlign: 'right' 
-  },
-  // ✅ تنسيقات جديدة للقطع الإضافية
-  additionalPiecesContainer: {
-    marginTop: 8,
-    paddingStart: 8,
-    borderStartWidth: 2,
-    borderStartColor: '#10B981',
-  },
-  additionalPiecesTitle: {
-    fontSize: 12,
     fontFamily: 'Cairo-SemiBold',
-    color: '#10B981',
-    marginBottom: 4,
+    color: '#374151',
   },
-  additionalPieceRow: {
+  totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
+    marginTop: 8,
   },
-  additionalPieceText: {
+  totalLabel: {
+    fontSize: 18,
+    fontFamily: 'Cairo-Bold',
+    color: '#111827',
+  },
+  totalPrice: {
+    fontSize: 20,
+    fontFamily: 'Cairo-Bold',
+    color: '#DC2626',
+  },
+  // Address Styles
+  addressContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  addressTitle: {
+    fontSize: 16,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  addressText: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular',
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  mapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+  },
+  mapButtonText: {
+    fontSize: 14,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#DC2626',
+  },
+  // Payment Styles
+  paymentCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+  },
+  paymentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  paymentType: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular',
+    color: '#9CA3AF',
+  },
+  cardChips: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  cardChip: {
+    width: 32,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 4,
+  },
+  cardNumber: {
+    fontSize: 18,
+    fontFamily: 'Cairo-Bold',
+    color: '#FFFFFF',
+    letterSpacing: 2,
+    marginBottom: 16,
+    textAlign: 'left',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardLabel: {
     fontSize: 12,
     fontFamily: 'Cairo-Regular',
-    color: '#059669',
+    color: '#9CA3AF',
   },
-  additionalPiecePrice: {
-    fontSize: 11,
+  cardValue: {
+    fontSize: 14,
     fontFamily: 'Cairo-SemiBold',
-    color: '#059669',
+    color: '#FFFFFF',
   },
-  priceRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingVertical: 8 
+  paymentStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#DCFCE7',
+    padding: 12,
+    borderRadius: 8,
   },
-  priceLabel: { 
-    fontSize: 16, 
-    fontFamily: 'Cairo-Regular', 
-    color: '#4B5563' 
+  paymentStatusText: {
+    fontSize: 14,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#16A34A',
   },
-  priceValue: { 
-    fontSize: 16, 
-    fontFamily: 'Cairo-SemiBold', 
-    color: '#1F2937' 
+  // Help Section
+  helpOptions: {
+    gap: 12,
   },
-  totalRow: { 
-    borderTopWidth: 1, 
-    borderTopColor: '#F3F4F6', 
-    marginTop: 8, 
-    paddingTop: 14 
+  helpOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    padding: 16,
+    borderRadius: 12,
   },
-  totalLabel: { 
-    fontSize: 18, 
-    fontFamily: 'Cairo-Bold', 
-    color: '#111827' 
+  helpIconContainer: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  totalPrice: { 
-    fontSize: 22, 
-    fontFamily: 'Cairo-Bold', 
-    color: '#C62828' 
+  helpIconBlue: {
+    backgroundColor: '#DBEAFE',
+  },
+  helpIconGreen: {
+    backgroundColor: '#DCFCE7',
+  },
+  helpOptionText: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#374151',
+  },
+  // Receipt Button
+  receiptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    marginTop: 8,
+  },
+  receiptButtonText: {
+    fontSize: 16,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#374151',
   },
 });

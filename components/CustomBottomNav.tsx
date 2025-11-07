@@ -35,7 +35,7 @@ export default function CustomBottomNav() {
             style={styles.navButton}
             onPress={() => {
               // استخدم as any لتجاوز تدقيق TypeScript الصارم والمضي قدمًا
-              router.push(item.href as any);
+              router.navigate(item.href as any);
             }}
           >
             <Ionicons
