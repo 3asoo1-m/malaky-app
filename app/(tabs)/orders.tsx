@@ -902,7 +902,7 @@ const styles = StyleSheet.create({
     borderRadius: scale(20),
   },
   orderFooter: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: scale(16),

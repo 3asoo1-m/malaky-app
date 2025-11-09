@@ -141,8 +141,7 @@ const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: Car
 {item.additionalPieces && item.additionalPieces.length > 0 && (
   <View style={styles.additionalPiecesContainer}>
     <View style={styles.additionalPiecesHeader}>
-      <Text style={styles.additionalPiecesIcon}>✨</Text>
-      <Text style={styles.additionalPiecesTitle}>قطع إضافية</Text>
+      <Text style={styles.additionalPiecesTitle}>قطع إضافية ✨</Text>
     </View>
     
     {/* حاوية البطاقات المرنة */}
