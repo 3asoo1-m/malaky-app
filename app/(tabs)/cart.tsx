@@ -118,14 +118,14 @@ const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: Car
         <Ionicons name="trash-outline" size={20} color="#C62828" />
       </TouchableOpacity>
       
-<TouchableOpacity onPress={() => onPress(item)}> 
+      <TouchableOpacity onPress={() => onPress(item)}> 
         <Image source={{ uri: imageUrl }} style={styles.itemImage} />
       </TouchableOpacity>
       
       <View style={styles.itemDetails}>
-<TouchableOpacity onPress={() => onPress(item)}> 
-          <Text style={styles.itemName}>{item.product.name}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity onPress={() => onPress(item)}> 
+            <Text style={styles.itemName}>{item.product.name}</Text>
+           </TouchableOpacity>
         
         {optionLabels.length > 0 && (
           <View style={styles.optionsContainer}>
@@ -137,23 +137,30 @@ const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: Car
           </View>
         )}
         
-        {item.additionalPieces && item.additionalPieces.length > 0 && (
-          <View style={styles.additionalPiecesContainer}>
-            <View style={styles.additionalPiecesHeader}>
-              <Text style={styles.additionalPiecesTitle}>✨ قطع إضافية</Text>
-            </View>
-            {item.additionalPieces.map((piece, index) => (
-              <View key={index} style={styles.additionalPieceRow}>
-                <Text style={styles.additionalPieceText}>
-                  {piece.quantity}x {piece.name}
-                </Text>
-                <Text style={styles.additionalPiecePrice}>
-                  +{(piece.price * piece.quantity).toFixed(2)} ₪
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
+{/* Additional Pieces - تصميم Figma الجديد */}
+{item.additionalPieces && item.additionalPieces.length > 0 && (
+  <View style={styles.additionalPiecesContainer}>
+    <View style={styles.additionalPiecesHeader}>
+      <Text style={styles.additionalPiecesIcon}>✨</Text>
+      <Text style={styles.additionalPiecesTitle}>قطع إضافية</Text>
+    </View>
+    
+    {/* حاوية البطاقات المرنة */}
+    <View style={styles.additionalPiecesGrid}>
+      {item.additionalPieces.map((piece, index) => (
+        <View key={index} style={styles.additionalPieceCard}>
+          <Text style={styles.additionalPieceName} numberOfLines={1}>
+            {piece.quantity}x {piece.name}
+          </Text>
+          <Text style={styles.additionalPiecePrice}>
+            +{(piece.price * piece.quantity).toFixed(2)} ₪
+          </Text>
+        </View>
+      ))}
+    </View>
+  </View>
+)}
+
         
         {item.notes && (
           <Text style={styles.notesText}>ملاحظات: {item.notes}</Text>
@@ -163,17 +170,18 @@ const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: Car
       <View style={styles.itemActions}>
         <View style={styles.quantitySelector}>
           <TouchableOpacity 
-            onPress={() => onUpdate(item.id, -1)} 
-            style={styles.quantityButton}
-          >
-            <Ionicons name="remove" size={16} color="#C62828" />
-          </TouchableOpacity>
-          <Text style={styles.quantityText}>{item.quantity}</Text>
-          <TouchableOpacity 
             onPress={() => onUpdate(item.id, 1)} 
             style={[styles.quantityButton, styles.quantityButtonPlus]}
           >
             <Ionicons name="add" size={16} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.quantityText}>{item.quantity}</Text>
+          <TouchableOpacity 
+            onPress={() => onUpdate(item.id, -1)} 
+            style={styles.quantityButton}
+            disabled={item.quantity === 1} // تعطيل الزر عند كمية 1
+          >
+            <Ionicons name="remove" size={16} color={item.quantity === 1 ? '#9ca3af' : '#C62828'} />
           </TouchableOpacity>
         </View>
         <Text style={styles.itemPriceText}>{(item.totalPrice).toFixed(2)} ₪</Text>
@@ -1416,26 +1424,23 @@ stepItem: {
   },
 
   // --- أنماط عناصر السلة - تصميم جديد ---
-  cartItemContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+cartItemContainer: {
+  backgroundColor: '#fff',
+  borderRadius: 20,
+  padding: 16,
+  marginBottom: 14,
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.08,
+  shadowRadius: 6,
+  elevation: 3,
+},
   deleteButton: {
     position: 'absolute',
     top: 16,
-    left: 16,
+    right: 16,
     zIndex: 1,
     width: 32,
     height: 32,
@@ -1444,64 +1449,81 @@ stepItem: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  itemImage: {
-    width: 96,
-    height: 96,
-    borderRadius: 12,
-    marginRight: 16,
-  },
-  itemDetails: {
-    flex: 1,
-    marginRight: 12,
-  },
-  itemName: {
-    fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
+itemImage: {
+  width: 70,
+  height: 70,
+  borderRadius: 12,
+  marginRight: 12,
+  backgroundColor: '#f3f4f6',
+},
+itemDetails: {
+  flex: 1,
+  justifyContent: 'flex-start',
+},
+itemName: {
+  fontSize: 15,
+  fontFamily: 'Cairo-Bold',
+  color: '#1f2937',
+  marginBottom: 4,
+},
   optionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: 8,
     gap: 4,
   },
-  optionBadge: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
+optionBadge: {
+  backgroundColor: '#f3f4f6',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 6,
+  marginRight: 6,
+},
   optionText: {
     fontSize: 12,
     fontFamily: 'Cairo-Regular',
     color: '#6b7280',
   },
-  additionalPiecesContainer: {
-    backgroundColor: '#fefce8',
-    borderWidth: 1,
-    borderColor: '#fef08a',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-  },
-  additionalPiecesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  additionalPiecesTitle: {
+additionalPiecesContainer: {
+  backgroundColor: '#FFFBEB', // لون أصفر فاتح جدًا
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#FEF3C7', // حدود صفراء باهتة
+  padding: 12,
+  marginTop: 12, // مسافة فوق الحاوية
+  alignSelf: 'stretch', // تأكد من أنها تمتد
+},
+additionalPiecesHeader: {
+  flexDirection: 'row-reverse', // أيقونة يمين، نص يسار
+  alignItems: 'center',
+  marginBottom: 10,
+},
+additionalPiecesTitle: {
     fontSize: 12,
     fontFamily: 'Cairo-SemiBold',
     color: '#854d0e',
     marginLeft: 4,
   },
-  additionalPieceRow: {
+ additionalPiecesFlexRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    flexWrap: 'wrap',
+    gap: 8,
   },
+  additionalPieceFlexCard: {
+    backgroundColor: '#fef9c3',
+    borderWidth: 1,
+    borderColor: '#fde047',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // القيم الافتراضية
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 'auto',
+  },
+
   additionalPieceText: {
     fontSize: 12,
     fontFamily: 'Cairo-Regular',
@@ -1512,47 +1534,54 @@ stepItem: {
     fontFamily: 'Cairo-SemiBold',
     color: '#22c55e',
   },
+  //-----------------
+  
+  //-----------------
   notesText: {
     fontSize: 12,
     fontFamily: 'Cairo-Regular',
     color: '#6b7280',
     fontStyle: 'italic',
   },
-  itemActions: {
-    alignItems: 'flex-end',
-  },
-  quantitySelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 20,
-    padding: 4,
-    marginBottom: 8,
-  },
-  quantityButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quantityButtonPlus: {
-    backgroundColor: '#C62828',
-  },
-  quantityText: {
-    fontSize: 14,
-    fontFamily: 'Cairo-SemiBold',
-    color: '#1f2937',
-    marginHorizontal: 12,
-    minWidth: 20,
-    textAlign: 'center',
-  },
-  itemPriceText: {
-    fontSize: 16,
-    fontFamily: 'Cairo-Bold',
-    color: '#C62828',
-  },
+itemActions: {
+  alignItems: 'center', // ✨ إصلاح: محاذاة الكمية والسعر للمركز
+  justifyContent: 'space-between', // ✨ إصلاح: توزيع المسافة بين الكمية والسعر
+  alignSelf: 'stretch', // ✨ إصلاح: اجعله يمتد عمودياً
+  paddingRight: 8, // ✨ إصلاح: إضافة مسافة على اليسار
+},
+quantitySelector: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#f3f4f6',
+  borderRadius: 20,
+  paddingHorizontal: 6,
+  paddingVertical: 4,
+  alignSelf: 'center',
+},
+quantityButton: {
+  width: 28,
+  height: 28,
+  borderRadius: 14,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+quantityButtonPlus: {
+  backgroundColor: '#C62828',
+},
+quantityText: {
+  fontSize: 14,
+  fontFamily: 'Cairo-Bold',
+  color: '#1f2937',
+  marginHorizontal: 10,
+},
+itemPriceText: {
+  fontSize: 15,
+  fontFamily: 'Cairo-Bold',
+  color: '#C62828',
+  marginTop: 8,
+  textAlign: 'center',
+},
+
 
   // --- أنماط القائمة ---
   listContentContainer: {
@@ -1633,28 +1662,28 @@ stepItem: {
   priceSummaryFooter: {
     marginBottom: 16,
   },
-  checkoutButton: {
-    backgroundColor: '#C62828',
-    padding: 16,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#C62828',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  checkoutButtonText: {
-    fontSize: 18,
-    fontFamily: 'Cairo-Bold',
-    color: '#fff',
-    marginRight: 8,
-  },
+checkoutButton: {
+  backgroundColor: '#C62828',
+  paddingVertical: 14,
+  borderRadius: 12,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginHorizontal: 16,
+  marginTop: 12,
+  shadowColor: '#C62828',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.25,
+  shadowRadius: 8,
+  elevation: 6,
+},
+
+checkoutButtonText: {
+  fontSize: 16,
+  fontFamily: 'Cairo-Bold',
+  color: '#fff',
+  marginLeft: 6,
+},
 
   // --- أزرار التنقل في النافذة - تصميم جديد ---
 modalActions: {
@@ -1836,35 +1865,44 @@ continueText: {
     textAlignVertical: 'top',
     minHeight: 80,
   },
-  promoContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  promoInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 14,
-    fontFamily: 'Cairo-Regular',
-    color: '#1f2937',
-  },
-  promoButton: {
-    backgroundColor: '#C62828',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    justifyContent: 'center',
-  },
+promoContainer: {
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  padding: 16,
+  marginHorizontal: 16,
+  marginTop: 10,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  elevation: 2,
+},
+promoInput: {
+  flex: 1,
+  borderWidth: 1,
+  borderColor: '#e5e7eb',
+  borderRadius: 12,
+  padding: 12,
+  fontSize: 14,
+  fontFamily: 'Cairo-Regular',
+  color: '#1f2937',
+  backgroundColor: '#fff',
+},
+promoButton: {
+  backgroundColor: '#C62828',
+  paddingHorizontal: 16,
+  borderRadius: 10,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
   promoButtonDisabled: {
     backgroundColor: '#9ca3af',
   },
-  promoButtonText: {
-    fontSize: 14,
-    fontFamily: 'Cairo-SemiBold',
-    color: '#fff',
-  },
+promoButtonText: {
+  fontSize: 14,
+  fontFamily: 'Cairo-Bold',
+  color: '#fff',
+},
   promoSuccess: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1882,8 +1920,17 @@ continueText: {
     marginLeft: 8,
   },
   priceSummary: {
-    paddingTop: 8,
-  },
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  padding: 16,
+  marginHorizontal: 16,
+  marginTop: 12,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  elevation: 3,
+},
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1903,22 +1950,26 @@ continueText: {
   discountText: {
     color: '#22c55e',
   },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingTop: 16,
-    marginTop: 8,
-  },
-  totalLabel: {
-    fontSize: 18,
-    fontFamily: 'Cairo-Bold',
-    color: '#1f2937',
-  },
-  totalPrice: {
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#C62828',
-  },
+
+totalRow: {
+  borderTopWidth: 1,
+  borderTopColor: '#f3f4f6',
+  paddingTop: 12,
+  marginTop: 8,
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+},
+totalLabel: {
+  fontSize: 16,
+  fontFamily: 'Cairo-Bold',
+  color: '#1f2937',
+},
+totalPrice: {
+  fontSize: 18,
+  fontFamily: 'Cairo-Bold',
+  color: '#C62828',
+},
 
   // --- شاشة التحميل ---
   loadingContainer: {
