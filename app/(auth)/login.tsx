@@ -802,7 +802,7 @@ export default function LoginScreen() {
           <View style={styles.footer}>
             <View style={styles.footerRow}>
               <Crown size={16} color={COLORS.emailPrimary} />
-              <Text style={styles.footerText}>دجاج بروستد بجودة ملكية</Text>
+              <Text style={styles.footerText}>دجاج بروست بجودة ملكية</Text>
             </View>
             
             <View style={styles.footerBadge}>
@@ -811,7 +811,7 @@ export default function LoginScreen() {
             </View>
             
             <Text style={styles.footerCopyright}>
-              © 2025 ملكي بروست تشكن. جميع الحقوق محفوظة
+              الدجاج الملكي بروست . جميع الحقوق محفوظة © 2025
             </Text>
           </View>
         </ScrollView>
@@ -918,7 +918,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   badgesContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap: 8,
   },
   badge: {
@@ -954,7 +954,7 @@ const styles = StyleSheet.create({
   },
 
   tabsContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     backgroundColor: 'rgba(243, 244, 246, 0.8)',
     borderRadius: 16,
     padding: 6,
@@ -962,7 +962,7 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -992,7 +992,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   inputContainer: { 
-    flexDirection: 'row-reverse', 
+    flexDirection: 'row', 
     alignItems: 'center', 
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
     borderRadius: 12, 
@@ -1010,7 +1010,7 @@ const styles = StyleSheet.create({
   inputField: { 
     flex: 1, 
     fontSize: 16, 
-    textAlign: 'right', 
+    textAlign: 'left', 
     color: COLORS.darkGray 
   },
   emailphoneinputField:{
@@ -1029,18 +1029,18 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    textAlign: 'right',
+    textAlign: 'left',
     fontWeight: '500',
   },
 
   optionsContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
   },
   rememberMeContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
   },
   checkbox: {
@@ -1066,7 +1066,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
   },
   forgotPasswordContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
@@ -1076,7 +1076,7 @@ const styles = StyleSheet.create({
   },
 
   animatedButton: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     paddingVertical: 16, 
     borderRadius: 16, 
     alignItems: 'center', 
@@ -1126,7 +1126,7 @@ const styles = StyleSheet.create({
   },
 
   socialContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap: 12,
     marginBottom: 20,
   },
@@ -1175,7 +1175,7 @@ const styles = StyleSheet.create({
   },
 
   signupContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 16,
@@ -1188,7 +1188,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
   },
   signupLinkContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },
@@ -1201,7 +1201,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerRow: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
     gap: 8,
@@ -1211,7 +1211,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
   },
   footerBadge: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     paddingHorizontal: 12,

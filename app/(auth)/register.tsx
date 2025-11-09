@@ -883,7 +883,7 @@ export default function RegisterScreen() {
             <AnimatedLogo />
             
             <View style={styles.titleContainer}>
-              <Text style={styles.title}>انضم إلى عائلة ملكي!</Text>
+              <Text style={styles.title}>انضم إلى عائلة الملكي!</Text>
               <Text style={styles.subtitle}>سجل الآن واستمتع بعروض حصرية وخدمة ملكية</Text>
             </View>
 
@@ -1019,7 +1019,7 @@ export default function RegisterScreen() {
                   <Lock size={20} color={formErrors.password ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                   <TextInput
                     ref={passwordRef}
-                    style={styles.inputField}
+                    style={styles.emailphoneinputField}
                     placeholder="••••••••"
                     value={password}
                     onChangeText={(value) => handleFieldChange('password', value)}
@@ -1058,7 +1058,7 @@ export default function RegisterScreen() {
                   <Lock size={20} color={formErrors.confirmPassword ? colors.primary : COLORS.gray} style={styles.inputIcon} />
                   <TextInput
                     ref={confirmPasswordRef}
-                    style={styles.inputField}
+                    style={styles.emailphoneinputField}
                     placeholder="••••••••"
                     value={confirmPassword}
                     onChangeText={(value) => handleFieldChange('confirmPassword', value)}
@@ -1188,7 +1188,7 @@ export default function RegisterScreen() {
             </View>
             
             <Text style={styles.footerCopyright}>
-              © 2025 الدجاج الملكي بروست. جميع الحقوق محفوظة
+              الدجاج الملكي بروست. جميع الحقوق محفوظة © 2025
             </Text>
           </View>
         </ScrollView>
@@ -1295,7 +1295,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   badgesContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap: 8,
   },
   badge: {
@@ -1331,7 +1331,7 @@ const styles = StyleSheet.create({
   },
 
   tabsContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     backgroundColor: 'rgba(243, 244, 246, 0.8)',
     borderRadius: 16,
     padding: 6,
@@ -1339,7 +1339,7 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -1366,7 +1366,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   nameContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 16,
     gap: 12,
@@ -1378,7 +1378,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   inputContainer: { 
-    flexDirection: 'row-reverse', 
+    flexDirection: 'row', 
     alignItems: 'center', 
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
     borderRadius: 12, 
@@ -1411,7 +1411,7 @@ const styles = StyleSheet.create({
 
   errorText: {
     fontSize: 12,
-    textAlign: 'right',
+    textAlign: 'left',
     marginTop: 4,
     marginRight: 4,
     fontWeight: '500',
@@ -1422,7 +1422,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   strengthBars: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap: 4,
     marginBottom: 4,
   },
@@ -1434,7 +1434,7 @@ const styles = StyleSheet.create({
   strengthText: {
     fontSize: 12,
     color: COLORS.gray,
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   termsContainer: {
@@ -1442,8 +1442,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   checkboxContainer: {
-    flexDirection: 'row-reverse',
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     gap: 8,
   },
   checkbox: {
@@ -1464,7 +1464,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.gray,
     lineHeight: 20,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   termsLink: {
     fontWeight: '600',
@@ -1501,23 +1501,6 @@ const styles = StyleSheet.create({
     flex: 1,
     width: 150,
   },
-
-  guestButton: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 16,
-    gap: 8,
-  },
-  guestButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-
   separatorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1537,7 +1520,7 @@ const styles = StyleSheet.create({
   },
 
   socialContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap: 12,
     marginBottom: 20,
   },
@@ -1586,7 +1569,7 @@ const styles = StyleSheet.create({
   },
 
   loginLinkContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 16,
@@ -1599,7 +1582,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
   },
   loginLink: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },
@@ -1612,7 +1595,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerRow: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
     gap: 8,
@@ -1622,7 +1605,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
   },
   footerBadge: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     paddingHorizontal: 12,
