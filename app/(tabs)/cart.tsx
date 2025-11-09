@@ -145,10 +145,10 @@ const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: Car
     </View>
     
     {/* حاوية البطاقات المرنة */}
-    <View style={styles.additionalPiecesGrid}>
+    <View>
       {item.additionalPieces.map((piece, index) => (
-        <View key={index} style={styles.additionalPieceCard}>
-          <Text style={styles.additionalPieceName} numberOfLines={1}>
+        <View key={index}>
+          <Text style={styles.additionalPieceText} numberOfLines={1}>
             {piece.quantity}x {piece.name}
           </Text>
           <Text style={styles.additionalPiecePrice}>
