@@ -625,52 +625,56 @@ export default function CartScreen() {
     );
   }, [items.length]);
 
-  const renderStepIndicator = () => {
-    const steps = [
-      { id: 1, label: 'نوع الطلب' },
-      { id: 2, label: orderType === 'delivery' ? 'العنوان' : 'الفرع' },
-      { id: 3, label: 'الدفع' },
-      { id: 4, label: 'التأكيد' }
-    ];
+const renderStepIndicator = () => {
+  const steps = [
+    { id: 1, label: 'نوع الطلب' },
+    { id: 2, label: orderType === 'delivery' ? 'العنوان' : 'الفرع' },
+    { id: 3, label: 'الدفع' },
+    { id: 4, label: 'التأكيد' }
+  ];
 
-    return (
-      <View style={styles.stepIndicator}>
-        {steps.map((step, index) => (
-          <View key={step.id} style={styles.stepItem}>
-            <View style={styles.stepContent}>
-              <View style={[
-                styles.stepCircle,
-                checkoutStep >= step.id ? styles.stepCircleActive : styles.stepCircleInactive
-              ]}>
-                {checkoutStep > step.id ? (
-                  <MaterialIcons name="check" size={16} color="#fff" />
-                ) : (
-                  <Text style={[
-                    styles.stepNumber,
-                    checkoutStep >= step.id ? styles.stepNumberActive : styles.stepNumberInactive
-                  ]}>
-                    {step.id}
-                  </Text>
-                )}
-              </View>
-              <Text style={[
-                styles.stepLabel,
-                checkoutStep >= step.id ? styles.stepLabelActive : styles.stepLabelInactive
-              ]}>
-                {step.label}
-              </Text>
+  return (
+    <View style={styles.stepIndicator}>
+      {steps.map((step, index) => (
+        <React.Fragment key={step.id}>
+          {/* حاوية الخطوة (الدائرة والنص) */}
+          <View style={styles.stepItem}>
+            <View style={[
+              styles.stepCircle,
+              checkoutStep >= step.id ? styles.stepCircleActive : styles.stepCircleInactive
+            ]}>
+              {checkoutStep > step.id ? (
+                <MaterialIcons name="check" size={18} color="#fff" />
+              ) : (
+                <Text style={[
+                  styles.stepNumber,
+                  checkoutStep >= step.id ? styles.stepNumberActive : styles.stepNumberInactive
+                ]}>
+                  {step.id}
+                </Text>
+              )}
             </View>
-            {index < steps.length - 1 && (
-              <View style={[
-                styles.stepLine,
-                checkoutStep > step.id ? styles.stepLineActive : styles.stepLineInactive
-              ]} />
-            )}
+            <Text style={[
+              styles.stepLabel,
+              checkoutStep >= step.id ? styles.stepLabelActive : styles.stepLabelInactive
+            ]}>
+              {step.label}
+            </Text>
           </View>
-        ))}
-      </View>
-    );
-  };
+
+          {/* عرض الخط الفاصل بين الخطوات */}
+          {index < steps.length - 1 && (
+            <View style={[
+              styles.stepLine,
+              checkoutStep > index + 1 ? styles.stepLineActive : styles.stepLineInactive
+            ]} />
+          )}
+        </React.Fragment>
+      ))}
+    </View>
+  );
+};
+
 
   // حالة التحميل أثناء الطلب
   if (isPlacingOrder) {
@@ -1132,19 +1136,17 @@ const styles = StyleSheet.create({
   },
 
   // --- مؤشر الخطوات (Step Indicator) - تصميم جديد ---
-  stepIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    backgroundColor: '#fff',
-  },
-  stepItem: {
-    flex: 1,
-    flexDirection: 'row', // ✨ إصلاح: لجعل الخط يظهر بجانب الدائرة
-    alignItems: 'center',
-  },
+ stepIndicator: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center', // ✨ إصلاح: التوسيط بدلاً من التوزيع
+  paddingHorizontal: 20,
+  paddingVertical: 24,
+  backgroundColor: '#fff',
+},
+stepItem: {
+  alignItems: 'center', // ✨ إصلاح: لا يحتاج إلى flex: 1
+},
   stepContent: {
   paddingVertical: 24, // ✨ إصلاح: يضيف مساحة عمودية فقط
   
