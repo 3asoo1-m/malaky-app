@@ -61,6 +61,7 @@ export interface Address {
   created_at: string;
   is_default: boolean;
   address_name: string | null;
+  label?: string; // ✅✅✅ تم إضافة هذه الخاصية لإصلاح الخطأ
   delivery_zones: {
     city: string;
     area_name: string;
@@ -121,20 +122,20 @@ export interface CartItem {
 export interface AddressItemProps {
   address: Address;
   isSelected: boolean;
-  onSelect: () => void;
+  onSelect: (address: Address) => void; // ✅✅✅ تم تعديل النوع هنا
 }
 
 export interface BranchItemProps {
   branch: Branch;
   isSelected: boolean;
-  onSelect: () => void;
+  onSelect: (branch: Branch) => void; // ✅✅✅ تم تعديل النوع هنا
 }
 
 export interface CartItemComponentProps {
   item: CartItem;
   onUpdate: (itemId: string, change: 1 | -1) => void;
   onRemove: (itemId: string) => void;
-  onPress: () => void;
+  onPress: (item: CartItem) => void; // ✅✅✅ تم تعديل النوع هنا
 }
 
 export interface OrderTypeSelectorProps {

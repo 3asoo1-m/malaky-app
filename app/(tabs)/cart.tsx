@@ -11,9 +11,9 @@ import {
   Image,
   ActivityIndicator,
   Modal,
-  Pressable,
   TextInput,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCart } from '@/lib/useCart';
@@ -35,14 +35,14 @@ import {
 } from '@/lib/types';
 import CustomBottomNav from '@/components/CustomBottomNav';
 
-// --- المكونات الفرعية المحدثة بالتصميم الجديد ---
+// --- المكونات الفرعية المحدثة ---
 const AddressItem = React.memo(({ address, isSelected, onSelect }: AddressItemProps) => {
-  const IconComponent = getIconComponent(address.label);
+  const IconComponent = getIconComponent(address.address_name);
   
   return (
     <TouchableOpacity
       style={[styles.locationOption, isSelected && styles.locationOptionSelected]}
-      onPress={onSelect}
+  onPress={() => onSelect(address)} // <--- هكذا هو الحل
     >
       <View style={styles.radioContainer}>
         {isSelected ? (
@@ -78,7 +78,7 @@ const AddressItem = React.memo(({ address, isSelected, onSelect }: AddressItemPr
 const BranchItem = React.memo(({ branch, isSelected, onSelect }: BranchItemProps) => (
   <TouchableOpacity
     style={[styles.locationOption, isSelected && styles.locationOptionSelected]}
-    onPress={onSelect}
+  onPress={() => onSelect(branch)} // <--- هكذا هو الحل
   >
     <View style={styles.radioContainer}>
       {isSelected ? (
@@ -118,10 +118,14 @@ const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: Car
         <Ionicons name="trash-outline" size={20} color="#C62828" />
       </TouchableOpacity>
       
-      <Image source={{ uri: imageUrl }} style={styles.itemImage} />
+<TouchableOpacity onPress={() => onPress(item)}> 
+        <Image source={{ uri: imageUrl }} style={styles.itemImage} />
+      </TouchableOpacity>
       
       <View style={styles.itemDetails}>
-        <Text style={styles.itemName}>{item.product.name}</Text>
+<TouchableOpacity onPress={() => onPress(item)}> 
+          <Text style={styles.itemName}>{item.product.name}</Text>
+        </TouchableOpacity>
         
         {optionLabels.length > 0 && (
           <View style={styles.optionsContainer}>
@@ -305,11 +309,18 @@ const BranchSection = React.memo(({
 });
 
 // دالة مساعدة للحصول على الأيقونة المناسبة
-const getIconComponent = (label: string) => {
+const getIconComponent = (label?: string | null) => {
+  if (!label) return Ionicons;
+  
   switch (label.toLowerCase()) {
     case 'home':
+    case 'المنزل':
       return Ionicons;
     case 'work':
+    case 'العمل':
+      return Ionicons;
+    case 'other':
+    case 'أخرى':
       return Ionicons;
     default:
       return Ionicons;
@@ -363,44 +374,74 @@ export default function CartScreen() {
 
   const fetchAddresses = useCallback(async () => {
     if (!user) return;
-    setLoadingAddresses(true);
-    const { data: rawData, error } = await supabase
-      .from('user_addresses')
-      .select(`id, street_address, notes, created_at, delivery_zones (city, area_name, delivery_price)`)
-      .eq('user_id', user.id)
-      .is('deleted_at', null) 
-      .order('created_at', { ascending: false });
     
-    if (error) { 
-      console.error('Error fetching addresses:', error.message); 
-    } else if (rawData) {
-      const formattedData: Address[] = rawData.map(addr => ({ 
-        ...addr, 
-        delivery_zones: Array.isArray(addr.delivery_zones) ? addr.delivery_zones[0] || null : addr.delivery_zones 
-      }));
-      setAvailableAddresses(formattedData);
+    setLoadingAddresses(true);
+    try {
+      const { data: rawData, error } = await supabase
+        .from('user_addresses')
+        .select(`id, street_address, notes, created_at, is_default, address_name, delivery_zones (city, area_name, delivery_price)`)
+        .eq('user_id', user.id)
+        .is('deleted_at', null) 
+        .order('created_at', { ascending: false });
+      
+      if (error) { 
+        console.error('Error fetching addresses:', error.message);
+        Alert.alert('خطأ', 'تعذر تحميل العناوين');
+      } else if (rawData) {
+        const formattedData: Address[] = rawData.map(addr => {
+          const deliveryZone = Array.isArray(addr.delivery_zones) ? addr.delivery_zones[0] || null : addr.delivery_zones;
+          
+          return {
+            id: addr.id,
+            street_address: addr.street_address,
+            notes: addr.notes,
+            created_at: addr.created_at,
+            is_default: addr.is_default,
+            address_name: addr.address_name,
+            delivery_zones: deliveryZone ? {
+              city: deliveryZone.city,
+              area_name: deliveryZone.area_name,
+              delivery_price: deliveryZone.delivery_price
+            } : null
+          };
+        });
+        setAvailableAddresses(formattedData);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      Alert.alert('خطأ', 'حدث خطأ غير متوقع');
+    } finally {
+      setLoadingAddresses(false);
     }
-    setLoadingAddresses(false);
   }, [user]);
 
   const fetchBranches = useCallback(async () => {
     setLoadingBranches(true);
-    const { data, error } = await supabase.from('branches').select('*').eq('is_active', true);
-    if (error) { 
-      console.error('Error fetching branches:', error.message); 
-    } else if (data) {
-      setAvailableBranches(data);
+    try {
+      const { data, error } = await supabase.from('branches').select('*').eq('is_active', true);
+      if (error) { 
+        console.error('Error fetching branches:', error.message);
+        Alert.alert('خطأ', 'تعذر تحميل الفروع');
+      } else if (data) {
+        setAvailableBranches(data);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      Alert.alert('خطأ', 'حدث خطأ غير متوقع');
+    } finally {
+      setLoadingBranches(false);
     }
-    setLoadingBranches(false);
   }, []);
 
-  useFocusEffect(useCallback(() => {
-    if (orderType === 'delivery') {
-      fetchAddresses();
-    } else if (orderType === 'pickup') {
-      fetchBranches();
-    }
-  }, [orderType, fetchAddresses, fetchBranches]));
+  useFocusEffect(
+    useCallback(() => {
+      if (orderType === 'delivery') {
+        fetchAddresses();
+      } else if (orderType === 'pickup') {
+        fetchBranches();
+      }
+    }, [orderType, fetchAddresses, fetchBranches])
+  );
 
   const handleSelectAddress = useCallback((address: Address) => {
     setSelectedAddress(address);
@@ -436,12 +477,22 @@ export default function CartScreen() {
   }, [updateQuantity]);
 
   const handleRemoveFromCart = useCallback((itemId: string) => {
-    removeFromCart(itemId);
+    Alert.alert(
+      'حذف المنتج',
+      'هل أنت متأكد من حذف هذا المنتج من السلة؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        { text: 'حذف', style: 'destructive', onPress: () => removeFromCart(itemId) }
+      ]
+    );
   }, [removeFromCart]);
 
   const handleApplyPromo = useCallback(() => {
     if (promoCode.toLowerCase() === 'malaky10') {
       setPromoApplied(true);
+      Alert.alert('نجاح', 'تم تطبيق كود الخصم بنجاح!');
+    } else {
+      Alert.alert('خطأ', 'كود الخصم غير صحيح');
     }
   }, [promoCode]);
 
@@ -483,6 +534,7 @@ export default function CartScreen() {
           user_address_id: orderType === 'delivery' ? selectedAddress?.id : null,
           branch_id: orderType === 'pickup' ? selectedBranch?.id : null,
           notes: orderNotes,
+          status: 'pending',
         })
         .select('id')
         .single();
@@ -508,12 +560,17 @@ export default function CartScreen() {
       if (itemsError) throw itemsError;
 
       setCheckoutModalVisible(false);
-      Alert.alert('نجاح!', 'تم استلام طلبك بنجاح.');
-      clearCart();
-      setPromoApplied(false);
-      setPromoCode('');
-      setOrderNotes('');
-      router.push('/');
+      Alert.alert(
+        'نجاح!', 
+        'تم استلام طلبك بنجاح. سيتم تجهيزه قريباً.',
+        [{ text: 'حسناً', onPress: () => {
+          clearCart();
+          setPromoApplied(false);
+          setPromoCode('');
+          setOrderNotes('');
+          router.push('/');
+        }}]
+      );
 
     } catch (error: any) {
       console.error('Error placing order:', error);
@@ -521,14 +578,18 @@ export default function CartScreen() {
     } finally {
       setPlacingOrder(false);
     }
-  }, [isPlacingOrder, user, items, finalTotal, subtotal, deliveryPrice, discount, orderType, selectedAddress, selectedBranch, orderNotes, clearCart, router]);
+  }, [
+    isPlacingOrder, user, items, finalTotal, subtotal, deliveryPrice, 
+    discount, orderType, selectedAddress, selectedBranch, orderNotes, 
+    clearCart, router
+  ]);
 
   const renderItem = useCallback(({ item }: { item: CartItem }) => (
     <CartItemComponent
       item={item}
       onUpdate={handleUpdateQuantity}
       onRemove={handleRemoveFromCart}
-      onPress={() => handleItemPress(item)}
+    onPress={handleItemPress} // <--- هكذا هو الحل الصحيح
     />
   ), [handleUpdateQuantity, handleRemoveFromCart, handleItemPress]);
 
@@ -538,11 +599,31 @@ export default function CartScreen() {
     <View style={styles.emptyContainer}>
       <Ionicons name="cart-outline" size={80} color="#e5e7eb" />
       <Text style={styles.emptyText}>سلّتك فارغة!</Text>
+      <Text style={styles.emptySubtext}>أضف بعض المنتجات اللذيذة لتبدأ</Text>
       <TouchableOpacity style={styles.browseButton} onPress={() => router.push('/')}>
+        <Ionicons name="restaurant-outline" size={16} color="#fff" style={{ marginRight: 8 }} />
         <Text style={styles.browseButtonText}>تصفح القائمة</Text>
       </TouchableOpacity>
     </View>
   ), [router]);
+
+  // إصلاح ListHeaderComponent
+  const ListHeaderComponent = useMemo(() => {
+    if (items.length === 0) return null;
+    
+    return (
+      <View style={styles.cartHeader}>
+        <View style={styles.cartTitleRow}>
+          <Text style={styles.sectionTitle}>المنتجات</Text>
+          <View style={styles.itemsCountBadge}>
+            <Text style={styles.itemsCountBadgeText}>
+              {items.length} {items.length === 1 ? 'منتج' : 'منتجات'}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }, [items.length]);
 
   const renderStepIndicator = () => {
     const steps = [
@@ -591,6 +672,21 @@ export default function CartScreen() {
     );
   };
 
+  // حالة التحميل أثناء الطلب
+  if (isPlacingOrder) {
+    return (
+      <View style={styles.fullScreen}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#C62828" />
+            <Text style={styles.loadingText}>جاري تأكيد طلبك...</Text>
+            <Text style={styles.loadingSubtext}>يرجى الانتظار</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.fullScreen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -634,7 +730,7 @@ export default function CartScreen() {
                 {/* Step Indicator */}
                 {checkoutStep < 4 && renderStepIndicator()}
 
-                <ScrollView style={styles.modalScrollView}>
+                <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
                   {/* الخطوة 1: نوع الطلب */}
                   {checkoutStep === 1 && (
                     <View style={styles.stepContent}>
@@ -691,7 +787,7 @@ export default function CartScreen() {
                               <Text style={styles.reviewItemQuantity}>الكمية: {item.quantity}</Text>
                             </View>
                             <Text style={styles.reviewItemPrice}>
-                              {(item.product.price * item.quantity).toFixed(2)} ₪
+                              {(item.totalPrice).toFixed(2)} ₪
                             </Text>
                           </View>
                         ))}
@@ -760,6 +856,7 @@ export default function CartScreen() {
                             onChangeText={setOrderNotes}
                             multiline
                             numberOfLines={3}
+                            textAlignVertical="top"
                           />
                         </View>
                       </View>
@@ -786,7 +883,9 @@ export default function CartScreen() {
                             onPress={handleApplyPromo}
                             disabled={promoApplied || !promoCode}
                           >
-                            <Text style={styles.promoButtonText}>تطبيق</Text>
+                            <Text style={styles.promoButtonText}>
+                              {promoApplied ? 'مطبق' : 'تطبيق'}
+                            </Text>
                           </TouchableOpacity>
                         </View>
                         {promoApplied && (
@@ -834,69 +933,62 @@ export default function CartScreen() {
                   )}
                 </ScrollView>
 
-                {/* أزرار التنقل */}
-                <View style={styles.modalActions}>
-                  {checkoutStep > 1 ? (
-                    <View style={styles.navigationButtons}>
-                      <TouchableOpacity
-                        style={styles.backButtonModal}
-                        onPress={() => setCheckoutStep(checkoutStep - 1)}
-                      >
-                        <Text style={styles.backButtonText}>رجوع</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity
-                        style={[
-                          styles.continueButton,
-                          ((checkoutStep === 2 && orderType === 'delivery' && !selectedAddress) ||
-                           (checkoutStep === 2 && orderType === 'pickup' && !selectedBranch)) &&
-                          styles.continueButtonDisabled
-                        ]}
-                        disabled={
-                          (checkoutStep === 2 && orderType === 'delivery' && !selectedAddress) ||
-                          (checkoutStep === 2 && orderType === 'pickup' && !selectedBranch)
-                        }
-                        onPress={() => {
-                          if (checkoutStep < 3) {
-                            setCheckoutStep(checkoutStep + 1);
-                          } else {
-                            handleCheckout();
-                          }
-                        }}
-                      >
-                        {checkoutStep === 3 ? (
-                          isPlacingOrder ? (
-                            <ActivityIndicator color="#fff" />
-                          ) : (
-                            <View style={styles.placeOrderContent}>
-                              <Ionicons name="receipt-outline" size={20} color="#fff" />
-                              <Text style={styles.placeOrderText}>تأكيد الطلب</Text>
-                            </View>
-                          )
-                        ) : (
-                          <View style={styles.continueContent}>
-                            <Text style={styles.continueText}>متابعة</Text>
-                            <Ionicons name="chevron-forward" size={20} color="#fff" />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={[
-                        styles.continueButton,
-                        !orderType && styles.continueButtonDisabled
-                      ]}
-                      disabled={!orderType}
-                      onPress={() => setCheckoutStep(2)}
-                    >
-                      <View style={styles.continueContent}>
-                        <Text style={styles.continueText}>متابعة</Text>
-                        <Ionicons name="chevron-forward" size={20} color="#fff" />
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                {/* أزرار التنقل - تصميم مُصلَح */}
+<View style={styles.modalActions}>
+  <View style={styles.navigationButtons}>
+    {/* عرض زر الرجوع فقط إذا كنا بعد الخطوة الأولى */}
+    {checkoutStep > 1 && (
+      <TouchableOpacity
+        style={styles.backButtonModal}
+        onPress={() => setCheckoutStep(checkoutStep - 1)}
+      >
+        <Text style={styles.backButtonText}>رجوع</Text>
+      </TouchableOpacity>
+    )}
+
+    {/* زر المتابعة / تأكيد الطلب (يظهر دائماً) */}
+    <TouchableOpacity
+      style={[
+        styles.continueButton,
+        // إذا لم يكن هناك زر رجوع، اجعل هذا الزر يملأ المساحة
+        checkoutStep === 1 && { flex: 1 }, 
+        // شروط تعطيل الزر
+        (checkoutStep === 1 && !orderType) && styles.continueButtonDisabled,
+        (checkoutStep === 2 && orderType === 'delivery' && !selectedAddress) && styles.continueButtonDisabled,
+        (checkoutStep === 2 && orderType === 'pickup' && !selectedBranch) && styles.continueButtonDisabled,
+      ]}
+      disabled={
+        (checkoutStep === 1 && !orderType) ||
+        (checkoutStep === 2 && orderType === 'delivery' && !selectedAddress) ||
+        (checkoutStep === 2 && orderType === 'pickup' && !selectedBranch)
+      }
+      onPress={() => {
+        if (checkoutStep < 3) {
+          setCheckoutStep(checkoutStep + 1);
+        } else {
+          handleCheckout();
+        }
+      }}
+    >
+      {checkoutStep === 3 ? (
+        isPlacingOrder ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <View style={styles.placeOrderContent}>
+            <Ionicons name="receipt-outline" size={20} color="#fff" />
+            <Text style={styles.placeOrderText}>تأكيد الطلب</Text>
+          </View>
+        )
+      ) : (
+        <View style={styles.continueContent}>
+          <Text style={styles.continueText}>متابعة</Text>
+          <Ionicons name="chevron-forward" size={20} color="#fff" />
+        </View>
+      )}
+    </TouchableOpacity>
+  </View>
+</View>
+
               </View>
             </View>
           </Modal>
@@ -915,21 +1007,10 @@ export default function CartScreen() {
               initialNumToRender={7}
               windowSize={5}
               contentContainerStyle={styles.listContentContainer}
-              ListHeaderComponent={
-                items.length > 0 && (
-                  <View style={styles.cartHeader}>
-                    <View style={styles.cartTitleRow}>
-                      <Text style={styles.sectionTitle}>المنتجات</Text>
-                      <View style={styles.itemsCountBadge}>
-                        <Text style={styles.itemsCountBadgeText}>
-                          {items.length} {items.length === 1 ? 'منتج' : 'منتجات'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                )
-              }
+              ListHeaderComponent={ListHeaderComponent}
               ListEmptyComponent={listEmptyComponent}
+              ListFooterComponent={items.length > 0 ? <View style={{ height: 100 }} /> : null}
+              showsVerticalScrollIndicator={false}
             />
             
             {items.length > 0 && (
@@ -962,8 +1043,9 @@ export default function CartScreen() {
   );
 }
 
-// نسيج الأنماط المحدث
+
 const styles = StyleSheet.create({
+  // --- الأنماط العامة ---
   fullScreen: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -971,11 +1053,25 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  separator: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 12,
+  },
+
+  // --- الهيدر الرئيسي ---
   header: {
     backgroundColor: '#C62828',
-    paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 25 : 10,
     paddingBottom: 15,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
   headerContent: {
     flexDirection: 'row',
@@ -992,7 +1088,8 @@ const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
-    marginLeft: 15,
+    marginLeft: 16,
+    alignItems: 'flex-start',
   },
   headerTitle: {
     fontSize: 20,
@@ -1016,51 +1113,62 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-Bold',
     color: '#92400e',
   },
+
+  // --- النافذة المنبثقة (Modal / Wizard) ---
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   modalContent: {
     flex: 1,
     backgroundColor: '#f8fafc',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
     marginTop: 50,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
   },
   modalScrollView: {
     flex: 1,
   },
+
+  // --- مؤشر الخطوات (Step Indicator) - تصميم جديد ---
   stepIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 24,
+    backgroundColor: '#fff',
   },
   stepItem: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'row', // ✨ إصلاح: لجعل الخط يظهر بجانب الدائرة
     alignItems: 'center',
   },
   stepContent: {
-    padding: 20,
-    alignItems: 'center',
+  paddingVertical: 24, // ✨ إصلاح: يضيف مساحة عمودية فقط
+  
   },
   stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    marginBottom: 8,
   },
   stepCircleActive: {
     backgroundColor: '#C62828',
+    borderColor: '#C62828',
   },
   stepCircleInactive: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#f3f4f6',
+    borderColor: '#e5e7eb',
   },
   stepNumber: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Cairo-Bold',
   },
   stepNumberActive: {
@@ -1071,8 +1179,8 @@ const styles = StyleSheet.create({
   },
   stepLabel: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
-    marginTop: 8,
+    fontFamily: 'Cairo-SemiBold',
+    marginTop: 4,
   },
   stepLabelActive: {
     color: '#1f2937',
@@ -1084,6 +1192,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 2,
     marginHorizontal: 8,
+    marginTop: -25,
   },
   stepLineActive: {
     backgroundColor: '#C62828',
@@ -1092,62 +1201,83 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e7eb',
   },
 
+  // --- الأقسام داخل النافذة ---
+  stepContentContainer: {
+    padding: 20,
+  },
   stepTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: 'Cairo-Bold',
     color: '#1f2937',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   sectionContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  padding: 20,
+  marginBottom: 16,
+  marginHorizontal: 16, // ✨ إصلاح: إضافة هوامش أفقية للتحكم بالعرض
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 2,
   },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 4,
+  borderWidth: 0,
+},
+
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Cairo-Bold',
     color: '#1f2937',
     marginLeft: 8,
   },
+
+  // --- اختيار نوع الطلب - تصميم جديد ---
   orderTypeContainer: {
     flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f8fafc',
     borderRadius: 16,
     padding: 4,
+    gap: 8,
   },
   orderTypeButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   orderTypeActive: {
     backgroundColor: '#C62828',
+    borderColor: '#C62828',
+    shadowColor: '#C62828',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   orderTypeText: {
     fontSize: 16,
     fontFamily: 'Cairo-SemiBold',
     marginLeft: 8,
+    color: '#6b7280',
   },
   orderTypeTextActive: {
     color: '#fff',
   },
+
+  // --- اختيار العنوان/الفرع - تصميم جديد ---
   locationOption: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1180,20 +1310,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 2,
     borderColor: '#d1d5db',
+    backgroundColor: '#fff',
   },
   addressIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     backgroundColor: '#fef2f2',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   branchIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -1219,6 +1350,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-Regular',
     color: '#6b7280',
     marginBottom: 2,
+    lineHeight: 20,
   },
   addressPhone: {
     fontSize: 14,
@@ -1267,24 +1399,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
+    padding: 16,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#C62828',
     borderStyle: 'dashed',
     backgroundColor: '#fef2f2',
   },
   addAddressText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Cairo-SemiBold',
     color: '#C62828',
     marginLeft: 8,
   },
+
+  // --- أنماط عناصر السلة - تصميم جديد ---
   cartItemContainer: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'flex-start',
     shadowColor: '#000',
@@ -1293,20 +1427,26 @@ const styles = StyleSheet.create({
       height: 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   deleteButton: {
     position: 'absolute',
-    top: 12,
-    left: 12,
+    top: 16,
+    left: 16,
     zIndex: 1,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   itemImage: {
-    width: 80,
-    height: 80,
+    width: 96,
+    height: 96,
     borderRadius: 12,
-    marginRight: 12,
+    marginRight: 16,
   },
   itemDetails: {
     flex: 1,
@@ -1322,14 +1462,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: 8,
+    gap: 4,
   },
   optionBadge: {
     backgroundColor: '#f3f4f6',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    marginRight: 6,
-    marginBottom: 4,
   },
   optionText: {
     fontSize: 12,
@@ -1389,9 +1528,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   quantityButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1412,6 +1551,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-Bold',
     color: '#C62828',
   },
+
+  // --- أنماط القائمة ---
   listContentContainer: {
     padding: 16,
     paddingBottom: 200,
@@ -1445,6 +1586,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-SemiBold',
     color: '#9ca3af',
     marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular',
+    color: '#9ca3af',
     marginBottom: 24,
   },
   browseButton: {
@@ -1452,12 +1598,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   browseButtonText: {
     fontSize: 16,
     fontFamily: 'Cairo-Bold',
     color: '#fff',
   },
+
+  // --- الفوتر الرئيسي ---
   footer: {
     position: 'absolute',
     bottom: 85,
@@ -1481,41 +1631,6 @@ const styles = StyleSheet.create({
   priceSummaryFooter: {
     marginBottom: 16,
   },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  priceLabel: {
-    fontSize: 14,
-    fontFamily: 'Cairo-Regular',
-    color: '#6b7280',
-  },
-  priceValue: {
-    fontSize: 14,
-    fontFamily: 'Cairo-SemiBold',
-    color: '#1f2937',
-  },
-  discountText: {
-    color: '#22c55e',
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingTop: 12,
-    marginTop: 4,
-  },
-  totalLabel: {
-    fontSize: 18,
-    fontFamily: 'Cairo-Bold',
-    color: '#1f2937',
-  },
-  totalPrice: {
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#C62828',
-  },
   checkoutButton: {
     backgroundColor: '#C62828',
     padding: 16,
@@ -1538,46 +1653,49 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginRight: 8,
   },
-  modalActions: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
+
+  // --- أزرار التنقل في النافذة - تصميم جديد ---
+modalActions: {
+  padding: 16, // ✨ تحسين: توحيد الحشوة الأفقية مع باقي الأقسام
+  paddingBottom: Platform.OS === 'ios' ? 34 : 20, // ✨ تحسين: زيادة المساحة الآمنة للأسفل
+  borderTopWidth: 1,
+  borderTopColor: '#f3f4f6', // ✨ تحسين: لون أفتح للخط الفاصل
+  backgroundColor: '#fff',
+},
+
   navigationButtons: {
     flexDirection: 'row',
     gap: 12,
   },
   backButtonModal: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    alignItems: 'center',
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
-    color: '#6b7280',
-  },
-  continueButton: {
-    flex: 2,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: '#C62828',
-    alignItems: 'center',
-    shadowColor: '#C62828',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
+  flex: 1,
+  paddingVertical: 16, // ✨ تحسين: استخدام padding عمودي فقط
+  borderRadius: 16, // ✨ تحسين: زيادة انحناء الزوايا
+  backgroundColor: '#f3f4f6', // ✨ تحسين: لون خلفية مميز ومحايد
+  alignItems: 'center',
+  borderWidth: 0, // ✨ تحسين: إزالة الحدود
+},
+backButtonText: {
+  fontSize: 16,
+  fontFamily: 'Cairo-Bold',
+  color: '#4b5563', // ✨ تحسين: لون أغمق قليلاً للوضوح
+},
+
+continueButton: {
+  flex: 2.5, // ✨ تحسين: جعله أكبر نسبةً لزر الرجوع
+  paddingVertical: 16, // ✨ تحسين: استخدام padding عمودي
+  borderRadius: 16, // ✨ تحسين: زيادة انحناء الزوايا ليتطابق مع زر الرجوع
+  backgroundColor: '#C62828',
+  alignItems: 'center',
+  // الظل يبقى كما هو، فهو ممتاز
+  shadowColor: '#C62828',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 6,
+},
   continueButtonDisabled: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: '#d1d5db',
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -1585,12 +1703,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  continueText: {
-    fontSize: 16,
-    fontFamily: 'Cairo-Bold',
-    color: '#fff',
-    marginRight: 8,
-  },
+continueText: {
+  fontSize: 17, // ✨ تحسين: تكبير الخط قليلاً
+  fontFamily: 'Cairo-Bold',
+  color: '#fff',
+  marginRight: 8,
+},
   placeOrderContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1601,14 +1719,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginLeft: 8,
   },
+
+  // --- أنماط الخطوة 3 (المراجعة والدفع) - تصميم جديد ---
   reviewItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   reviewItemImage: {
-    width: 50,
-    height: 50,
+    width: 64,
+    height: 64,
     borderRadius: 8,
     marginRight: 12,
   },
@@ -1619,7 +1739,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Cairo-SemiBold',
     color: '#1f2937',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   reviewItemQuantity: {
     fontSize: 12,
@@ -1631,14 +1751,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-SemiBold',
     color: '#C62828',
   },
-  deliveryDetails: {
-    // Add delivery details styles
-  },
+  deliveryDetails: {},
   deliveryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   deliveryLabel: {
     fontSize: 14,
@@ -1670,11 +1788,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-SemiBold',
     color: '#C62828',
     marginLeft: 4,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#e5e7eb',
-    marginVertical: 8,
   },
   paymentMethod: {
     flexDirection: 'row',
@@ -1767,6 +1880,84 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   priceSummary: {
-    // Add price summary styles
+    paddingTop: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  priceLabel: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular',
+    color: '#6b7280',
+  },
+  priceValue: {
+    fontSize: 14,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#374151',
+  },
+  discountText: {
+    color: '#22c55e',
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 16,
+    marginTop: 8,
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontFamily: 'Cairo-Bold',
+    color: '#1f2937',
+  },
+  totalPrice: {
+    fontSize: 20,
+    fontFamily: 'Cairo-Bold',
+    color: '#C62828',
+  },
+
+  // --- شاشة التحميل ---
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#1f2937',
+  },
+  loadingSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular',
+    color: '#6b7280',
+  },
+
+  // --- أنماط إضافية جديدة ---
+  stepContentWrapper: {
+    padding: 20,
+  },
+  cardShadow: {
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  gradientButton: {
+    backgroundColor: '#C62828',
+  },
+  outlineButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
   },
 });
