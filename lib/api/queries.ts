@@ -1,41 +1,44 @@
 // lib/api/queries.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query'; // ملاحظة: لا نحتاج useMutation أو useQueryClient هنا
 import { supabase } from '@/lib/supabase';
 import { CategoryWithItems, Promotion } from '@/lib/types';
 
-// 🔹 استعلامات القائمة مع معالجة أخطاء محسنة
+// 🔹 استعلامات القائمة مع "التخزين المؤقت القوي"
 export const useMenuData = () => {
   return useQuery({
     queryKey: ['menu'],
     queryFn: async (): Promise<CategoryWithItems[]> => {
       try {
-        console.log('🔄 جاري تحميل بيانات القائمة...');
+        console.log('🔄 (Menu) Fetching data from Supabase...');
         const { data, error } = await supabase.rpc('get_menu');
         
         if (error) {
-          console.error('❌ خطأ في تحميل القائمة:', error);
-          throw new Error(`فشل تحميل القائمة: ${error.message}`);
+          console.error('❌ Error fetching menu:', error);
+          throw new Error(`Failed to fetch menu: ${error.message}`);
         }
         
-        console.log('✅ تم تحميل بيانات القائمة بنجاح:', data?.length || 0, 'عنصر');
+        console.log('✅ (Menu) Data fetched successfully:', data?.length || 0, 'items');
         return data || [];
       } catch (error) {
-        console.error('❌ خطأ غير متوقع في تحميل القائمة:', error);
+        console.error('❌ Unexpected error fetching menu:', error);
         throw error;
       }
     },
-    retry: 2, // إعادة المحاولة مرتين
-    retryDelay: 1000, // انتظر ثانية بين المحاولات
-    staleTime: 1000 * 60 * 5, // 5 دقائق قبل اعتبار البيانات قديمة
+    // --- ✅ التحسينات هنا ---
+    staleTime: 1000 * 60 * 60, // 1 ساعة: لا تطلب البيانات مرة أخرى لمدة ساعة كاملة.
+    gcTime: 1000 * 60 * 90,    // 90 دقيقة: احتفظ بالبيانات في الكاش لمدة 90 دقيقة حتى لو لم تكن مستخدمة.
+    refetchOnWindowFocus: false, // لا تقم بإعادة الجلب عند عودة المستخدم للتطبيق.
+    retry: 1, // حاول مرة واحدة فقط في حالة الفشل.
   });
 };
 
-// 🔹 استعلامات الترويجات
+// 🔹 استعلامات العروض الترويجية
 export const usePromotions = () => {
   return useQuery({
     queryKey: ['promotions'],
     queryFn: async (): Promise<Promotion[]> => {
       try {
+        console.log('🔄 (Promotions) Fetching data from Supabase...');
         const { data, error } = await supabase
           .from('promotions')
           .select('*')
@@ -43,54 +46,52 @@ export const usePromotions = () => {
           .order('display_order');
         
         if (error) {
-          console.error('❌ خطأ في تحميل العروض:', error);
-          throw new Error(`فشل تحميل العروض: ${error.message}`);
+          console.error('❌ Error fetching promotions:', error);
+          throw new Error(`Failed to fetch promotions: ${error.message}`);
         }
         
+        console.log('✅ (Promotions) Data fetched successfully!');
         return data || [];
       } catch (error) {
-        console.error('❌ خطأ غير متوقع في تحميل العروض:', error);
+        console.error('❌ Unexpected error fetching promotions:', error);
         throw error;
       }
     },
+    // --- ✅ التحسينات هنا ---
+    staleTime: 1000 * 60 * 15, // 15 دقيقة: العروض قد تتغير بشكل أسرع من القائمة.
+    refetchOnWindowFocus: true, // من الجيد تحديث العروض عند عودة المستخدم.
     retry: 2,
   });
 };
 
-// 🔹 استعلامات الإشعارات
+// 🔹 استعلامات الإشعارات (الكود الحالي ممتاز ولا يحتاج تعديل)
 export const useNotifications = (userId: string | undefined) => {
   return useQuery({
-    // ✅ تعديل هنا: اجعل queryKey يعتمد على userId
-    // إذا كان userId هو undefined، سيكون المفتاح ['notifications', undefined]
-    // وهذا يضمن عدم تداخل الكاش بين المستخدمين المختلفين أو حالة عدم تسجيل الدخول
     queryKey: ['notifications', userId],
     queryFn: async (): Promise<number> => {
-      // ✅ إضافة شرط: لا تقم بتشغيل الاستعلام إذا لم يكن هناك userId
-      if (!userId) {
-        return 0;
-      }
+      if (!userId) return 0;
       
       try {
         const { count, error } = await supabase
           .from('notifications')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId) // الآن userId هو بالتأكيد string هنا
+          .eq('user_id', userId)
           .eq('is_read', false);
         
         if (error) {
-          console.error('❌ خطأ في تحميل الإشعارات:', error);
+          console.error('❌ Error fetching notifications:', error);
           return 0;
         }
         
         return count || 0;
       } catch (error) {
-        console.error('❌ خطأ غير متوقع في تحميل الإشعارات:', error);
+        console.error('❌ Unexpected error fetching notifications:', error);
         return 0;
       }
     },
-    // ✅ تعديل هنا: enabled يتحقق الآن من وجود userId
-    // سيعمل الاستعلام فقط إذا كان userId قيمة حقيقية (ليس undefined أو null)
     enabled: !!userId,
+    // الإشعارات يجب أن تكون محدثة دائمًا، لذلك نترك staleTime الافتراضي (0)
+    // وهذا يعني أنه سيتم إعادة جلبها في الخلفية عند الحاجة.
   });
 };
 

@@ -35,7 +35,7 @@ const FeaturedDeals: React.FC<FeaturedDealsProps> = ({ deals }) => {
         <View style={styles.dealInfo}>
           <View>
             <Text style={styles.priceLabel}>ابتداءً من</Text>
-            <Text style={styles.priceText}>{item.price} شيكل</Text>
+            <Text style={styles.priceText}>{item.price} ₪</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.cartButton}>
@@ -52,9 +52,9 @@ const FeaturedDeals: React.FC<FeaturedDealsProps> = ({ deals }) => {
           <Flame color={Colors.primary} size={24} />
           <Text style={styles.headerTitle}>عروض مميزة</Text>
         </View>
-        <TouchableOpacity>
+        {/* <TouchableOpacity>
           <Text style={styles.seeAllButton}>عرض الكل</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
       <FlatList
         data={deals}
@@ -63,7 +63,6 @@ const FeaturedDeals: React.FC<FeaturedDealsProps> = ({ deals }) => {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
-        inverted // لعرض القائمة من اليمين لليسار
       />
     </View>
   );

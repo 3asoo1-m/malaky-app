@@ -1,6 +1,10 @@
 // components/home/MealCard.tsx
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image'; // ✅ 1. استيراد Image من "expo-image"
+import { getOptimizedImageUrl } from '@/lib/utils'; // ✅ 1. استيراد الدالة الجديدة
+import { useFavorites } from '@/lib/useFavorites'; // ✅ 1. استيراد hook المفضلة الصحيح
+
 import { MenuItem } from '@/lib/types';
 import { Colors } from '@/styles';
 import { Heart, Plus, Minus, ShoppingCart } from 'lucide-react-native';
@@ -8,14 +12,26 @@ import { useCart } from '@/lib/useCart';
 import { useRouter } from 'expo-router'; // ✅ 1. استيراد useRouter
 
 const defaultImage = require('../../assets/images/icon.png');
+const blurhash = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4'; // هذا مجرد مثال، يمكنك إنشاء واحد لكل صورة
 
 const MealCard = ({ meal }: { meal: MenuItem }) => {
   const router = useRouter(); // ✅ 2. تهيئة الراوتر
   const { items, addToCart, updateQuantity } = useCart();
+  const { favoriteIds, toggleFavorite, loading: favoritesLoading } = useFavorites();
+  const isMealFavorite = favoriteIds.has(meal.id);
 
   // ابحث عن العناصر المطابقة للمنتج في السلة (بغض النظر عن الخيارات)
   const itemsInCart = items.filter(item => item.product.id === meal.id);
   const totalQuantity = itemsInCart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const originalImageUrl = meal.images?.[0]?.image_url;
+  
+  // اطلب نسخة صغيرة ومحسنة من الصورة (e.g., 300x300 pixels, webp format)
+  const optimizedImageUrl = originalImageUrl 
+    ? getOptimizedImageUrl(originalImageUrl, { width: 300, height: 300, format: 'webp', quality: 80 })
+    : null;
+
+  const imageSource = optimizedImageUrl ? { uri: optimizedImageUrl } : defaultImage;
 
   const [isFavorite, setIsFavorite] = React.useState(false);
 
@@ -48,22 +64,30 @@ const MealCard = ({ meal }: { meal: MenuItem }) => {
       updateQuantity(simpleCartItem.id, amount);
     }
   };
-
-    const imageUrl = meal.images?.[0]?.image_url;
-    const imageSource = imageUrl ? { uri: imageUrl } : defaultImage;
+  const handleToggleFavorite = () => {
+    // منع الضغط المتكرر أثناء التحميل
+    if (favoritesLoading) return;
+    toggleFavorite(meal.id);
+  };
 
   return (
     // ✅ 5. جعل البطاقة بأكملها قابلة للضغط للانتقال إلى التفاصيل
     <TouchableOpacity style={styles.card} onPress={( ) => router.push(`/item/${meal.id}`)}>
       <View>
-        <Image source={imageSource} style={styles.image} />
-        {meal.is_popular && (
-          <View style={[styles.badge, { backgroundColor: Colors.primary }]}>
-            <Text style={styles.badgeText}>الأكثر طلباً</Text>
-          </View>
-        )}
-        <TouchableOpacity style={styles.favoriteButton} onPress={() => setIsFavorite(!isFavorite)}>
-          <Heart size={18} color={isFavorite ? Colors.primary : '#333'} fill={isFavorite ? Colors.primary : 'transparent'} />
+         {/* ✅ 3. استخدام مكون Image الجديد مع خصائصه المحسنة */}
+        <Image
+          style={styles.image}
+          source={imageSource}
+          placeholder={{ blurhash }}
+          contentFit="cover"
+          transition={300}
+        />
+        <TouchableOpacity style={styles.favoriteButton} onPress={handleToggleFavorite} disabled={favoritesLoading}>
+          {favoritesLoading && favoriteIds.has(meal.id) ? ( // عرض مؤشر تحميل فقط على العنصر الذي يتم تحديثه
+            <ActivityIndicator size="small" color={Colors.primary} />
+          ) : (
+            <Heart size={18} color={isMealFavorite ? Colors.primary : '#333'} fill={isMealFavorite ? Colors.primary : 'transparent'} />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -73,7 +97,7 @@ const MealCard = ({ meal }: { meal: MenuItem }) => {
 
         <View style={styles.footer}>
           <View>
-            <Text style={styles.price}>{meal.price.toFixed(2)} ريال</Text>
+            <Text style={styles.price}>{meal.price.toFixed(2)} ₪</Text>
           </View>
 
           {/* ✅ 6. تعديل منطق العرض والضغط */}
@@ -108,7 +132,7 @@ const MealCard = ({ meal }: { meal: MenuItem }) => {
 
 const styles = StyleSheet.create({
     card: { width: '48%', backgroundColor: 'white', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, overflow: 'hidden' },
-    image: { width: '100%', height: 140, resizeMode: 'cover' },
+    image: { width: '100%', height: 140},
     badge: { position: 'absolute', top: 8, left: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
     badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
     favoriteButton: { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(255,255,255,0.8)', padding: 6, borderRadius: 99 },

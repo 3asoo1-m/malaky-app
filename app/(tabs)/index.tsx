@@ -5,6 +5,7 @@ import { View, Text, ScrollView, ActivityIndicator, RefreshControl, FlatList, Sa
 import { useMenuData, usePromotions } from '@/lib/api/queries';
 import { Stack } from 'expo-router';
 import { Colors } from '@/styles';
+
 import { useQueryClient } from '@tanstack/react-query';
 //import Voice, { SpeechResultsEvent } from '@react-native-voice/voice';
 
@@ -149,7 +150,7 @@ export default function HomeScreen() {
         return menuData?.filter(cat => cat.menu_items && cat.menu_items.length > 0).map(cat => cat.id) || [];
     }, [menuData]);
 
-    
+
     // --- Render Logic ---
     if (isLoadingMenu || isLoadingPromotions) {
         return (
@@ -170,7 +171,7 @@ export default function HomeScreen() {
 
 
     const listData = [
-        { type: 'header', id: 'header' },      // العنصر 0: العروض الترويجية
+        { type: 'header', id: 'header-section' },      // ✅ استخدام id فريد
         { type: 'categories', id: 'categories' },  // العنصر 1: قائمة الفئات (سيصبح لاصقًا)
         { type: 'meals', id: 'meals' }        // العنصر 2: شبكة الوجبات
     ];
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         color: Colors.textSecondary,
-        textAlign: 'right',
+        textAlign: 'left',
     },
     categoriesContainer: {
         backgroundColor: '#FFF',
