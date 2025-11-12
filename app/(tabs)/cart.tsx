@@ -35,6 +35,13 @@ import {
 } from '@/lib/types';
 import CustomBottomNav from '@/components/CustomBottomNav';
 
+interface WizardStepProps {
+  onNext: (data: any) => void;
+  onBack?: () => void;
+  onCancel?: () => void; // ✅ أضف خاصية onCancel
+  data: any;
+}
+
 // --- المكونات الفرعية المحدثة ---
 const AddressItem = React.memo(({ address, isSelected, onSelect }: AddressItemProps) => {
   const IconComponent = getIconComponent(address.address_name);
@@ -730,14 +737,49 @@ const renderStepIndicator = () => {
 
         {/* Modal الخطوات */}
         {isCheckoutModalVisible && (
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={true}
-            onRequestClose={() => setCheckoutModalVisible(false)}
-          >
-            <View style={styles.modalContainer}>
-              <View style={styles.modalContent}>
+  <Modal
+    animationType="slide"
+    transparent={true}
+    visible={true}
+    onRequestClose={() => setCheckoutModalVisible(false)}
+  >
+    <View style={styles.modalContainer}>
+      <View style={styles.modalContent}>
+        {/* ✅ الهيدر الجديد مع زر الإلغاء فقط */}
+        <View style={styles.modalHeader}>
+          <View style={styles.modalHeaderContent}>
+            <TouchableOpacity 
+              style={styles.modalCloseButton}
+              onPress={() => {
+                Alert.alert(
+                  'إلغاء الطلب',
+                  'هل تريد إلغاء الطلب والخروج؟',
+                  [
+                    {
+                      text: 'متابعة الطلب',
+                      style: 'cancel',
+                    },
+                    {
+                      text: 'نعم، إلغاء',
+                      style: 'destructive',
+                      onPress: () => setCheckoutModalVisible(false),
+                    },
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="close" size={24} color="#6B7280" />
+            </TouchableOpacity>
+            
+            <Text style={styles.modalTitle}>
+              {checkoutStep === 1 ? 'نوع الطلب' : 
+               checkoutStep === 2 ? (orderType === 'delivery' ? 'عنوان التوصيل' : 'فرع الاستلام') : 
+               'تفاصيل الطلب'}
+            </Text>
+            
+            <View style={{ width: 40 }} /> {/* عنصر نائب للمساحة */}
+          </View>
+        </View>
                 {/* Step Indicator */}
                 {checkoutStep < 4 && renderStepIndicator()}
 
@@ -2011,5 +2053,29 @@ totalPrice: {
     backgroundColor: 'transparent',
     borderWidth: 2,
     borderColor: '#e5e7eb',
+  }, modalHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    backgroundColor: '#FFF',
+  },
+  modalHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: 'Cairo-Bold',
+    color: '#1F2937',
+    textAlign: 'center',
   },
 });
