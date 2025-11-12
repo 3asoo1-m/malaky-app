@@ -194,7 +194,8 @@ const styles = StyleSheet.create({
   container: {
     height: 75,
     justifyContent: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#fcfcfcff',
+    borderRadius: 25,
   },
   contentContainer: {
     paddingHorizontal: 15,

@@ -1,10 +1,9 @@
 // components/home/CategoryList.tsx
-import React from 'react';
+import React, { useRef, useEffect } from 'react'; // ✅ 1. استيراد useRef و useEffect
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { Category } from '@/lib/types';
 import { Colors } from '@/styles';
 
-// ✅ الخطوة 1: تعريف نوع موحد للعنصر
 type ChipItem = {
   id: number | 'all';
   name: string;
@@ -18,10 +17,22 @@ interface CategoryListProps {
 
 const CategoryList: React.FC<CategoryListProps> = ({ categories, selectedCategory, onSelectCategory }) => {
   
-  // ✅ الخطوة 2: التأكد من أن المصفوفة تستخدم النوع الموحد
+  // ✅ 2. إنشاء مرجع للـ FlatList
+  const flatListRef = useRef<FlatList<ChipItem>>(null);
+  
   const allCategories: ChipItem[] = [{ id: 'all', name: 'الكل' }, ...categories];
 
-  // ✅ الخطوة 3: استخدام النوع الموحد في دالة العرض
+  // ✅ 3. استخدام useEffect للتمرير التلقائي
+  useEffect(() => {
+    // التأكد من وجود المرجع قبل محاولة التمرير
+    if (flatListRef.current) {
+      // استخدام setTimeout يضمن أن التمرير يحدث بعد اكتمال العرض الأولي
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 100); // تأخير بسيط لضمان الأداء
+    }
+  }, []); // المصفوفة الفارغة تعني أن هذا التأثير سيعمل مرة واحدة فقط عند تحميل المكون
+
   const renderItem = ({ item }: { item: ChipItem }) => {
     const isSelected = selectedCategory === item.id;
     return (
@@ -37,24 +48,32 @@ const CategoryList: React.FC<CategoryListProps> = ({ categories, selectedCategor
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>الفئات</Text>
-      <FlatList
-        data={allCategories}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        inverted // لعرض القائمة من اليمين لليسار
-      />
+    <View style={styles.stickyContainer}>
+      <View style={styles.container}>
+        <Text style={styles.title}>الفئات</Text>
+        <FlatList
+          ref={flatListRef} // ✅ 4. ربط المرجع بالـ FlatList
+          data={allCategories}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+        />
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  stickyContainer: {
+    backgroundColor: '#FFF',
+    zIndex: 10,
+    paddingBottom: 10, 
+  },
   container: {
-    marginTop: 24,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
   title: {
     fontSize: 20,
@@ -62,9 +81,10 @@ const styles = StyleSheet.create({
     color: Colors.text,
     paddingHorizontal: 16,
     marginBottom: 16,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   listContent: {
+    flexDirection: 'row',
     paddingHorizontal: 16,
     gap: 12,
   },

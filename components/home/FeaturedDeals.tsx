@@ -24,7 +24,6 @@ interface FeaturedDealsProps {
 const FeaturedDeals: React.FC<FeaturedDealsProps> = ({ deals }) => {
   const renderDeal = ({ item }: { item: Deal }) => (
     <TouchableOpacity style={styles.dealCard}>
-      {/* الآن item.gradient متوافق تمامًا */}
       <LinearGradient colors={item.gradient} style={styles.gradientHeader}>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{item.savings}</Text>
@@ -34,10 +33,9 @@ const FeaturedDeals: React.FC<FeaturedDealsProps> = ({ deals }) => {
       </LinearGradient>
       <View style={styles.dealContent}>
         <View style={styles.dealInfo}>
-          <Image source={item.image} style={styles.dealImage} />
           <View>
             <Text style={styles.priceLabel}>ابتداءً من</Text>
-            <Text style={styles.priceText}>{item.price} ريال</Text>
+            <Text style={styles.priceText}>{item.price} شيكل</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.cartButton}>
@@ -123,7 +121,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
     marginBottom: 8,
   },
   badgeText: {
@@ -135,22 +133,22 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   dealSubtitle: {
     color: 'white',
     opacity: 0.9,
     fontSize: 14,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   dealContent: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
   },
   dealInfo: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
   },
@@ -158,18 +156,17 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 12,
-    resizeMode: 'cover',
   },
   priceLabel: {
     fontSize: 14,
     color: Colors.textSecondary,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   priceText: {
     fontSize: 20,
     fontWeight: 'bold',
     color: Colors.primary,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   cartButton: {
     backgroundColor: Colors.primary,

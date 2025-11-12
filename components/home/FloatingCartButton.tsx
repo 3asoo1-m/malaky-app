@@ -3,32 +3,47 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ShoppingCart } from 'lucide-react-native';
 import { Colors } from '@/styles';
-
-// ✅ الحل: أضف النوع 'number' بشكل صريح
-// في تطبيق حقيقي، ستحصل على عدد العناصر من حالة السلة (Zustand, Redux, etc.)
-const cartItemCount: number = 5; // مثال
+import { useCart } from '@/lib/useCart'; // ✅ 1. استيراد hook السلة
+import { useRouter } from 'expo-router'; // ✅ 2. استيراد الراوتر للانتقال
 
 const FloatingCartButton = () => {
-  // الآن TypeScript يفهم أن cartItemCount هو رقم ويمكن مقارنته بـ 0
-  if (cartItemCount === 0) {
+  const router = useRouter(); // ✅ 3. تهيئة الراوتر
+
+  // ✅ 4. استدعاء بيانات السلة الحقيقية
+  // items هو مصفوفة كل العناصر في السلة
+  const { items } = useCart();
+
+  // ✅ 5. حساب العدد الإجمالي للقطع (وليس فقط عدد أنواع المنتجات)
+  const totalItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // ✅ 6. إذا كانت السلة فارغة، لا تعرض أي شيء
+  if (totalItemCount === 0) {
     return null;
   }
 
+  // ✅ 7. دالة للانتقال إلى شاشة السلة
+  const navigateToCart = () => {
+    router.push('/(tabs)/cart'); // تأكد من أن هذا هو المسار الصحيح لشاشة السلة
+  };
+
   return (
-    <TouchableOpacity style={styles.container}>
+    // ✅ 8. إضافة خاصية onPress للزر
+    <TouchableOpacity style={styles.container} onPress={navigateToCart}>
       <ShoppingCart color="white" size={28} />
       <View style={styles.badge}>
-        <Text style={styles.badgeText}>{cartItemCount}</Text>
+        {/* ✅ 9. عرض العدد الحقيقي من السلة */}
+        <Text style={styles.badgeText}>{totalItemCount}</Text>
       </View>
     </TouchableOpacity>
   );
 };
 
+// الأنماط تبقى كما هي
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 95,
-    right: 24,
+    bottom: 105, // أو أي قيمة تناسب تصميمك مع الـ Tab Bar
+    left: 24, // تم تغيير الاتجاه ليتناسب مع RTL
     backgroundColor: Colors.primary,
     width: 64,
     height: 64,

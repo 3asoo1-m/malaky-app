@@ -58,20 +58,28 @@ export const usePromotions = () => {
 };
 
 // 🔹 استعلامات الإشعارات
-export const useNotifications = (userId: string) => {
+export const useNotifications = (userId: string | undefined) => {
   return useQuery({
+    // ✅ تعديل هنا: اجعل queryKey يعتمد على userId
+    // إذا كان userId هو undefined، سيكون المفتاح ['notifications', undefined]
+    // وهذا يضمن عدم تداخل الكاش بين المستخدمين المختلفين أو حالة عدم تسجيل الدخول
     queryKey: ['notifications', userId],
     queryFn: async (): Promise<number> => {
+      // ✅ إضافة شرط: لا تقم بتشغيل الاستعلام إذا لم يكن هناك userId
+      if (!userId) {
+        return 0;
+      }
+      
       try {
         const { count, error } = await supabase
           .from('notifications')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
+          .eq('user_id', userId) // الآن userId هو بالتأكيد string هنا
           .eq('is_read', false);
         
         if (error) {
           console.error('❌ خطأ في تحميل الإشعارات:', error);
-          return 0; // لا نرمي خطأ هنا لأنها ليست حرجة
+          return 0;
         }
         
         return count || 0;
@@ -80,7 +88,9 @@ export const useNotifications = (userId: string) => {
         return 0;
       }
     },
-    enabled: !!userId, // يعمل فقط إذا كان userId موجوداً
+    // ✅ تعديل هنا: enabled يتحقق الآن من وجود userId
+    // سيعمل الاستعلام فقط إذا كان userId قيمة حقيقية (ليس undefined أو null)
+    enabled: !!userId,
   });
 };
 

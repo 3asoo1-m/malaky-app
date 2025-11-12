@@ -5,4 +5,6 @@ export const Colors = {
   text: '#1F2937', // أسود تقريبا
   textSecondary: '#6B7280', // رمادي
   border: '#E5E7EB', // رمادي فاتح
+  error: '#B00020', // لون أحمر داكن للأخطاء
+
 };

@@ -19,7 +19,7 @@ const ScrollToTopButton: React.FC<ScrollToTopButtonProps> = ({ onPress }) => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 108,
     right: 24,
     backgroundColor: 'white',
     width: 50,
