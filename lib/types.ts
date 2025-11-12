@@ -25,7 +25,9 @@ export interface MenuItemImage {
 }
 
 export interface MenuItem {
-  category_id: any;
+  is_popular: any;
+  image_url: any;
+  category_id: number | string;
   id: number;
   name: string;
   description: string | null;

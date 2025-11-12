@@ -12,6 +12,10 @@ import MaintenanceScreen from './maintenance';
 import ForceUpdateScreen from './force-update';
 import * as NavigationBar from 'expo-navigation-bar';
 
+// ✅ إضافة TanStack Query Provider
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/query-client';
+
 // ✅ استيراد نظام الإشعارات
 import { 
   registerForPushNotificationsAsync, 
@@ -148,32 +152,32 @@ const AuthGuard = () => {
     checkForOTAUpdates();
   }, []);
 
-// ✅ الحل الأفضل
-useEffect(() => {
-  if (initialLoading || configLoading) return;
+  // ✅ الحل الأفضل
+  useEffect(() => {
+    if (initialLoading || configLoading) return;
 
-  if (showMaintenance || showForceUpdate) {
-    return;
-  }
-
-  // ✅ تحسين التحقق من segments
-  if (!segments || !Array.isArray(segments) || segments.length < 1) {
-    return;
-  }
-
-  const inAuthGroup = segments[0] === '(auth)';
-
-  if (user) {
-    if (inAuthGroup) {
-      router.replace('/');
+    if (showMaintenance || showForceUpdate) {
+      return;
     }
-    registerForPushNotificationsAsync();
-  } else {
-    if (!inAuthGroup) {
-      router.replace('/(auth)/login'); 
+
+    // ✅ تحسين التحقق من segments
+    if (!segments || !Array.isArray(segments) || segments.length < 1) {
+      return;
     }
-  }
-}, [user, initialLoading, configLoading, showMaintenance, showForceUpdate, segments]);
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (user) {
+      if (inAuthGroup) {
+        router.replace('/');
+      }
+      registerForPushNotificationsAsync();
+    } else {
+      if (!inAuthGroup) {
+        router.replace('/(auth)/login'); 
+      }
+    }
+  }, [user, initialLoading, configLoading, showMaintenance, showForceUpdate, segments]);
 
   if (configLoading || initialLoading) {
     return (
@@ -245,15 +249,18 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <FavoritesProvider>
-          <CartProvider>
-            <View style={{ flex: 1, direction: 'rtl' }}>
-              <InitializationWrapper />
-            </View>
-          </CartProvider>
-        </FavoritesProvider>
-      </AuthProvider>
+      {/* ✅ إضافة QueryClientProvider في المستوى الأعلى */}
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <FavoritesProvider>
+            <CartProvider>
+              <View style={{ flex: 1, direction: 'rtl' }}>
+                <InitializationWrapper />
+              </View>
+            </CartProvider>
+          </FavoritesProvider>
+        </AuthProvider>
+      </QueryClientProvider>
     </SafeAreaProvider>
   );
 }
