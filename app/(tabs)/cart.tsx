@@ -20,7 +20,7 @@ import { useCart } from '@/lib/useCart';
 import { Ionicons, FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { 
   CartItem, 
   OrderType, 
@@ -343,6 +343,7 @@ const getIconComponent = (label?: string | null) => {
 
 // --- المكون الرئيسي المحدث (CartScreen) ---
 export default function CartScreen() {
+  const insets = useSafeAreaInsets(); // <-- أضف هذا السطر
   const router = useRouter();
   const { user } = useAuth();
   const params = useLocalSearchParams();
@@ -705,35 +706,43 @@ const renderStepIndicator = () => {
     );
   }
 
-  return (
+ return (
     <View style={styles.fullScreen}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* ✅ 1. إزالة edges={['top']} من هنا */}
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}> 
         {/* الهيدر المحدث */}
         <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <Ionicons name="arrow-back" size={24} color="#fff" />
-            </TouchableOpacity>
-            <View style={styles.headerText}>
-              <Text style={styles.headerTitle}>
-                {isCheckoutModalVisible && checkoutStep === 4 ? 'تأكيد الطلب' : 'الطلب'}
-              </Text>
-              {!isCheckoutModalVisible && items.length > 0 && (
-                <Text style={styles.headerSubtitle}>
-                  {items.length} {items.length === 1 ? 'منتج' : 'منتجات'} • {finalTotal.toFixed(2)} ₪
-                </Text>
-              )}
-            </View>
-            {isCheckoutModalVisible && checkoutStep < 4 && (
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>خطوة {checkoutStep} من 3</Text>
-              </View>
-            )}
-          </View>
+  <View style={[styles.headerContent, { paddingTop: insets.top + 10 }]}>
+    {/* العنصر الأول: زر الرجوع */}
+    <TouchableOpacity 
+      style={styles.backButton}
+      onPress={() => router.back()}
+    >
+      <Ionicons name="arrow-back" size={24} color="#fff" />
+    </TouchableOpacity>
+
+    {/* العنصر الثاني: حاوية العنوان (في المنتصف) */}
+    <View style={styles.headerText}>
+      <Text style={styles.headerTitle}>
+        {isCheckoutModalVisible && checkoutStep === 4 ? 'تأكيد الطلب' : 'الطلب'}
+      </Text>
+      {!isCheckoutModalVisible && items.length > 0 && (
+        <Text style={styles.headerSubtitle}>
+          {items.length} {items.length === 1 ? 'منتج' : 'منتجات'} • {finalTotal.toFixed(2)} ₪
+        </Text>
+      )}
+    </View>
+
+    {/* العنصر الثالث: عنصر نائب أو زر آخر */}
+    <View style={{ width: 40 }}>
+      {isCheckoutModalVisible && checkoutStep < 4 && (
+        <View style={styles.stepBadge}>
+          <Text style={styles.stepBadgeText}>خطوة {checkoutStep} من 3</Text>
         </View>
+      )}
+    </View>
+  </View>
+</View>
 
         {/* Modal الخطوات */}
         {isCheckoutModalVisible && (
@@ -1114,40 +1123,35 @@ const styles = StyleSheet.create({
 
   // --- الهيدر الرئيسي ---
   header: {
-    backgroundColor: '#C62828',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 25 : 10,
-    paddingBottom: 15,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    // لا نحدد ارتفاعاً هنا، سنجعله يعتمد على المحتوى
+    position: 'relative',
+    backgroundColor: '#C62828', // لون هيدر السلة
+    borderBottomLeftRadius: 30, // يمكنك استخدام scale(40) إذا قمت باستيرادها
+    borderBottomRightRadius: 30,
   },
   headerContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 20, // حشوة سفلية معقولة
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   backButton: {
-    width: 40,
-    height: 40,
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   headerText: {
-    flex: 1,
-    marginLeft: 16,
-    alignItems: 'flex-start',
+    // هذا الجزء سيتم وضعه في المنتصف
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center', // لتوسيط المحتوى الداخلي
   },
   headerTitle: {
     fontSize: 20,
     fontFamily: 'Cairo-Bold',
-    color: '#fff',
+    color: 'white',
   },
   headerSubtitle: {
     fontSize: 14,

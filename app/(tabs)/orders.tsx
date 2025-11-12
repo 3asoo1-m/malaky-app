@@ -17,7 +17,7 @@ import { useAuth } from '@/lib/useAuth';
 import { supabase } from '@/lib/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
-
+import ScreenHeader from '@/components/ui/ScreenHeader';
 // ✅ استيراد نظام التحليلات
 import { trackEvent, AnalyticsEvents } from '@/lib/analytics';
 import { scale, fontScale } from '@/lib/responsive';
@@ -544,10 +544,10 @@ export default function OrdersScreen() {
   return (
     <View style={styles.container}>
       {/* ✅ الهيدر الجديد مع التدرج اللوني */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <View style={styles.headerBackground} />
-        <View style={styles.headerContent}>
-          <View style={styles.headerTop}>
+      <View style={styles.header}>
+  <View style={styles.headerBackground} />
+  <View style={[styles.headerContent, { paddingTop: insets.top }]}>
+    <View style={styles.headerTop}>
             <TouchableOpacity onPress={handleBack} style={styles.backButton}>
               <Ionicons name="arrow-back" size={scale(24)} color="white" />
             </TouchableOpacity>
@@ -686,7 +686,7 @@ const styles = StyleSheet.create({
   
   // الهيدر
   header: {
-    height: scale(160),
+    height: scale(130),
     position: 'relative',
   },
   headerBackground: {
@@ -701,7 +701,9 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     paddingHorizontal: scale(20),
-    paddingTop: scale(50),
+    // paddingTop سيتم تطبيقه من insets
+    flex: 1, // اجعله يملأ المساحة
+    justifyContent: 'center', // قم بتوسيط المحتوى (headerTop) عمودياً
   },
   headerTop: {
     flexDirection: 'row-reverse',
