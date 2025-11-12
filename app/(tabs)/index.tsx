@@ -280,6 +280,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#FFF',
+        
     },
     loadingText: {
         marginTop: 10,
@@ -293,6 +294,8 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         flexGrow: 1,
+        paddingBottom: 80,
+
     },
     resultsHeader: {
         paddingHorizontal: 16,
