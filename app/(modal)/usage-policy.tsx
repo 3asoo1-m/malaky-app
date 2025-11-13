@@ -149,17 +149,26 @@ export default function UsagePolicyScreen() {
         style={styles.sectionHeader}
         onPress={() => toggleSection(index)}
       >
-        <Ionicons 
+          <Ionicons 
           name={expandedSection === index ? "chevron-up" : "chevron-down"} 
           size={scale(20)} 
           color="#9CA3AF" 
-        />
+          />
+
+
         <View style={styles.sectionTitleContainer}>
+
           <View style={[styles.sectionIcon, { backgroundColor: section.color }]}>
             <Ionicons name={section.icon} size={scale(20)} color={section.iconColor} />
           </View>
+
+
           <Text style={styles.sectionTitle}>{section.title}</Text>
+
+
         </View>
+
+
       </TouchableOpacity>
       
       {expandedSection === index && (
@@ -177,19 +186,30 @@ export default function UsagePolicyScreen() {
 
   const renderFeatureRule = (feature: FeatureRule, index: number) => (
     <View key={index} style={styles.featureCard}>
+
       <View style={styles.featureHeader}>
+
         <View style={styles.featureIconContainer}>
           <Ionicons name={feature.icon} size={scale(18)} color={feature.iconColor} />
         </View>
+
         <Text style={styles.featureTitle}>{feature.feature}</Text>
+
       </View>
+
       <View style={styles.rulesContainer}>
+
         {feature.rules.map((rule, ruleIndex) => (
+
           <View key={ruleIndex} style={styles.ruleItem}>
+
             <Ionicons name="ellipse" size={scale(6)} color={feature.iconColor} />
+
             <Text style={styles.ruleText}>{rule}</Text>
+
           </View>
         ))}
+
       </View>
     </View>
   );
@@ -211,7 +231,7 @@ export default function UsagePolicyScreen() {
         <View style={styles.section}>
           <View style={styles.welcomeCard}>
             <View style={styles.welcomeContent}>
-              <Text style={styles.welcomeTitle}>دليل استخدام التطبيق 📱</Text>
+              <Text style={styles.welcomeTitle}>دليل استخدام التطبيق</Text>
               <Text style={styles.welcomeText}>
                 هذه السياسة توضح كيفية الاستخدام الأمثل للتطبيق وخدماتنا. 
                 نرجو الالتزام بهذه الإرشادات لتجربة أفضل.
@@ -326,12 +346,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: scale(12),
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // بطاقة الترحيب
   welcomeCard: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#FFF',
     padding: scale(16),
@@ -352,7 +372,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#DBEAFE',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: scale(12),
+    marginRight: scale(12),
   },
   welcomeContent: {
     flex: 1,
@@ -362,20 +382,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: scale(8),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   welcomeText: {
     fontSize: fontScale(14),
     color: '#6B7280',
     lineHeight: scale(20),
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // الأقسام
   sectionsContainer: {
     gap: scale(12),
   },
-  sectionCard: {
+sectionCard: {
     backgroundColor: '#FFF',
     borderRadius: scale(16),
     shadowColor: '#000',
@@ -395,7 +415,7 @@ const styles = StyleSheet.create({
     padding: scale(16),
   },
   sectionTitleContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
@@ -412,7 +432,7 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   paragraphItem: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: scale(12),
   },
@@ -429,7 +449,7 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     color: '#6B7280',
     lineHeight: scale(20),
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // قواعد الميزات
@@ -485,21 +505,21 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     fontWeight: '600',
     color: '#1F2937',
-    textAlign: 'right',
+    textAlign: 'left',
     flex: 1,
   },
   rulesContainer: {
     gap: scale(8),
   },
   ruleItem: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
     gap: scale(8),
   },
   ruleText: {
     fontSize: fontScale(12),
     color: '#6B7280',
-    textAlign: 'right',
+    textAlign: 'left',
     lineHeight: scale(16),
     flex: 1,
   },
@@ -519,7 +539,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   tipsContent: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
     padding: scale(20),
     gap: scale(12),
@@ -538,18 +558,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFF',
     marginBottom: scale(8),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   tipsText: {
     fontSize: fontScale(14),
     color: 'rgba(255,255,255,0.9)',
-    textAlign: 'right',
+    textAlign: 'left',
     lineHeight: scale(20),
   },
 
   // بطاقة المخالفات
   violationCard: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#FFF',
     padding: scale(16),
@@ -580,14 +600,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: scale(12),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   violationLevels: {
     gap: scale(8),
     marginBottom: scale(12),
   },
   violationItem: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: scale(8),
   },
@@ -599,7 +619,7 @@ const styles = StyleSheet.create({
   violationText: {
     fontSize: fontScale(12),
     color: '#6B7280',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   violationNote: {
     fontSize: fontScale(12),

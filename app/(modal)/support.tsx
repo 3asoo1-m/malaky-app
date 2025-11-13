@@ -105,7 +105,7 @@ export default function SupportScreen() {
     { icon: 'document-text-outline', label: 'الشروط والأحكام', color: '#F3F4F6', iconColor: '#6B7280' },
     { icon: 'shield-checkmark-outline', label: 'سياسة الخصوصية', color: '#DBEAFE', iconColor: '#2563EB' },
     { icon: 'people-outline', label: 'إرشادات المجتمع', color: '#F3E8FF', iconColor: '#9333EA' },
-    { icon: 'people-outline', label: 'سياسة الإستخدام', color: '#F3E8FF', iconColor: '#e78617ff' },
+    { icon: 'phone-portrait-outline', label: 'سياسة الإستخدام', color: '#ffe6caff', iconColor: '#e78617ff' },
 
   ];
 

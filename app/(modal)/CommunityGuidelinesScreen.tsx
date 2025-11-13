@@ -95,6 +95,7 @@ export default function CommunityGuidelinesScreen() {
 
   const renderGuidelineSection = (section: GuidelineSection, index: number) => (
     <View key={index} style={styles.sectionCard}>
+
       <TouchableOpacity 
         style={styles.sectionHeader}
         onPress={() => toggleSection(index)}
@@ -104,12 +105,17 @@ export default function CommunityGuidelinesScreen() {
           size={scale(20)} 
           color="#9CA3AF" 
         />
+
+
         <View style={styles.sectionTitleContainer}>
-          <View style={[styles.sectionIcon, { backgroundColor: section.color }]}>
-            <Ionicons name={section.icon} size={scale(20)} color={section.iconColor} />
-          </View>
-          <Text style={styles.sectionTitle}>{section.title}</Text>
+
+            <View style={[styles.sectionIcon, { backgroundColor: section.color }]}>
+              <Ionicons name={section.icon} size={scale(20)} color={section.iconColor} />
+            </View>
+
+            <Text style={styles.sectionTitle}>{section.title}</Text>
         </View>
+
       </TouchableOpacity>
       
       {expandedSection === index && (
