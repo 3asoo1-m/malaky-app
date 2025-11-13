@@ -105,6 +105,8 @@ export default function SupportScreen() {
     { icon: 'document-text-outline', label: 'الشروط والأحكام', color: '#F3F4F6', iconColor: '#6B7280' },
     { icon: 'shield-checkmark-outline', label: 'سياسة الخصوصية', color: '#DBEAFE', iconColor: '#2563EB' },
     { icon: 'people-outline', label: 'إرشادات المجتمع', color: '#F3E8FF', iconColor: '#9333EA' },
+    { icon: 'people-outline', label: 'سياسة الإستخدام', color: '#F3E8FF', iconColor: '#e78617ff' },
+
   ];
 
   const toggleFaq = (index: number) => {
@@ -164,7 +166,19 @@ export default function SupportScreen() {
 
   const renderResourceItem = (resource: ResourceItem, index: number) => (
     <View key={index}>
-      <TouchableOpacity style={styles.resourceItem}>
+      <TouchableOpacity style={styles.resourceItem}
+      onPress={() => {
+        // ✅ إضافة التنقل للشاشات المختلفة حسب النوع
+        if (resource.label === 'إرشادات المجتمع') {
+          router.push('/(modal)/CommunityGuidelinesScreen');
+        } else if (resource.label === 'الشروط والأحكام') {
+          router.push('/(modal)/terms-of-service');
+        } else if (resource.label === 'سياسة الخصوصية') {
+          router.push('/(modal)/privacy-policy');
+        }else if (resource.label === 'سياسة الإستخدام') {
+          router.push('/(modal)/usage-policy');
+        }
+      }}>
         <Ionicons name="open-outline" size={18} color="#9CA3AF" />
         <Text style={styles.resourceLabel}>{resource.label}</Text>
         <View style={[styles.resourceIcon, { backgroundColor: resource.color }]}>

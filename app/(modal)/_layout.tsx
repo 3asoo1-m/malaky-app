@@ -30,6 +30,40 @@ export default function ModalLayout() {
           headerShown: false, 
         }} 
       />
+
+
+
+      <Stack.Screen 
+        name="CommunityGuidelinesScreen" 
+        options={{ 
+          presentation: 'modal',
+          // ✅ إخفاء الهيدر الافتراضي
+          headerShown: false, 
+        }} 
+      /><Stack.Screen 
+        name="privacy-policy" 
+        options={{ 
+          presentation: 'modal',
+          // ✅ إخفاء الهيدر الافتراضي
+          headerShown: false, 
+        }} 
+      />
+      <Stack.Screen 
+        name="terms-of-service" 
+        options={{ 
+          presentation: 'modal',
+          // ✅ إخفاء الهيدر الافتراضي
+          headerShown: false, 
+        }} 
+      />
+      <Stack.Screen 
+        name="usage-policy" 
+        options={{ 
+          presentation: 'modal',
+          // ✅ إخفاء الهيدر الافتراضي
+          headerShown: false, 
+        }} 
+      />
     </Stack>
     
   );
