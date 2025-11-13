@@ -544,29 +544,11 @@ export default function OrdersScreen() {
   return (
     <View style={styles.container}>
       {/* ✅ الهيدر الجديد مع التدرج اللوني */}
-      <View style={styles.header}>
-  <View style={styles.headerBackground} />
-  <View style={[styles.headerContent, { paddingTop: insets.top }]}>
-    <View style={styles.headerTop}>
-            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={scale(24)} color="white" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>طلباتي</Text>
-            <TouchableOpacity 
-              onPress={handleRefresh} 
-              style={styles.refreshButton}
-              disabled={refreshing}
-            >
-              <Ionicons 
-                name="refresh" 
-                size={scale(22)} 
-                color={refreshing ? "rgba(255,255,255,0.5)" : "white"} 
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
+          <ScreenHeader
+          title="طلباتي"
+          onRefreshPress={handleRefresh}
+          isRefreshing={refreshing}     // <--- هنا تمرر حالة التحميل لتعطيل الزر وتغيير لونه
+          />
       {/* ✅ تبويبات التصفية */}
       <View style={styles.tabsContainer}>
         <ScrollView 
@@ -683,49 +665,6 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: '#F8FAFC' 
   },
-  
-  // الهيدر
-  header: {
-    height: scale(130),
-    position: 'relative',
-  },
-  headerBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#DC2626',
-    borderBottomLeftRadius: scale(30),
-    borderBottomRightRadius: scale(30),
-  },
-  headerContent: {
-    paddingHorizontal: scale(20),
-    // paddingTop سيتم تطبيقه من insets
-    flex: 1, // اجعله يملأ المساحة
-    justifyContent: 'center', // قم بتوسيط المحتوى (headerTop) عمودياً
-  },
-  headerTop: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  backButton: {
-    padding: scale(8),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(20),
-  },
-  headerTitle: {
-    fontSize: fontScale(24),
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  refreshButton: {
-    padding: scale(8),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(20),
-  },
-
   // التبويبات
   tabsContainer: {
     backgroundColor: 'white',

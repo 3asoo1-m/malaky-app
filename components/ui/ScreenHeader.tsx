@@ -1,96 +1,112 @@
-// مسار الملف: components/ScreenHeader.tsx
+// مسار الملف: components/ui/ScreenHeader.tsx
+// مكون الهيدر - نسخة طبق الأصل من شاشة الطلبات
 
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import React, { useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { scale, fontScale } from '@/lib/responsive';
+
+// ============================================================
+// ✅ تعريف الأنواع (Types)
+// ============================================================
 
 interface ScreenHeaderProps {
   title: string;
-  subtitle?: string;
-  leftButton?: {
-    icon: React.ComponentProps<typeof Ionicons>['name'];
-    onPress: () => void;
-    disabled?: boolean;
-  };
-  rightButton?: {
-    icon: React.ComponentProps<typeof Ionicons>['name'];
-    onPress: () => void;
-    disabled?: boolean;
-  };
-  children?: React.ReactNode;
-  style?: ViewStyle;
+  onBackPress?: () => void;
+  onRefreshPress?: () => void;
+  isRefreshing?: boolean;
 }
 
-const ScreenHeader = ({
-  title,
-  subtitle,
-  leftButton,
-  rightButton,
-  children,
-  style,
-}: ScreenHeaderProps) => {
-  const insets = useSafeAreaInsets();
+// ============================================================
+// ✅ مكون الهيدر
+// ============================================================
 
-  return (
-    <View style={[styles.header, style]}>
-      <View style={styles.headerBackground} />
-      <View style={[styles.headerContent, { paddingTop: insets.top }]}>
-        <View style={styles.headerTop}>
-          {/* --- الزر الأيسر (على اليمين في RTL) --- */}
-          <View style={styles.buttonPlaceholder}>
-            {leftButton && (
-              <TouchableOpacity
-                onPress={leftButton.onPress}
-                style={styles.iconButton}
-                disabled={leftButton.disabled}
-              >
-                <Ionicons
-                  name={leftButton.icon}
-                  size={scale(24)}
-                  color={leftButton.disabled ? 'rgba(255,255,255,0.5)' : 'white'}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
+const ScreenHeader = React.memo(
+  ({
+    title,
+    onBackPress,
+    onRefreshPress,
+    isRefreshing = false,
+  }: ScreenHeaderProps) => {
+    const insets = useSafeAreaInsets();
+    const router = useRouter();
 
-          {/* --- العنوان الرئيسي والفرعي --- */}
-          <View style={styles.titleContainer}>
-            <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
-            {subtitle && <Text style={styles.headerSubtitle} numberOfLines={1}>{subtitle}</Text>}
-          </View>
+    // ✅ معالج زر الرجوع
+    const handleBackPress = useCallback(() => {
+      if (onBackPress) {
+        onBackPress();
+      } else {
+        router.back();
+      }
+    }, [onBackPress, router]);
 
-          {/* --- الزر الأيمن (على اليسار في RTL) --- */}
-          <View style={styles.buttonPlaceholder}>
-            {rightButton && (
-              <TouchableOpacity
-                onPress={rightButton.onPress}
-                style={styles.iconButton}
-                disabled={rightButton.disabled}
-              >
-                <Ionicons
-                  name={rightButton.icon}
-                  size={scale(22)}
-                  color={rightButton.disabled ? 'rgba(255,255,255,0.5)' : 'white'}
-                />
-              </TouchableOpacity>
-            )}
-            {children}
+    // ✅ معالج زر التحديث
+    const handleRefreshPress = useCallback(() => {
+      if (onRefreshPress) {
+        onRefreshPress();
+      }
+    }, [onRefreshPress]);
+
+    return (
+      <View style={styles.header}>
+        {/* الخلفية الحمراء مع الزوايا المستديرة */}
+        <View style={styles.headerBackground} />
+        
+        {/* محتوى الهيدر */}
+        <View style={[styles.headerContent, { paddingTop: insets.top }]}>
+          <View style={styles.headerTop}>
+            {/* زر الرجوع */}
+            <TouchableOpacity 
+              onPress={handleBackPress} 
+              style={styles.backButton}
+            >
+              <Ionicons name="arrow-back" size={scale(24)} color="white" />
+            </TouchableOpacity>
+
+            {/* العنوان */}
+            <Text style={styles.headerTitle}>{title}</Text>
+
+            {/* زر التحديث */}
+            <TouchableOpacity 
+              onPress={handleRefreshPress}
+              style={styles.refreshButton}
+              disabled={isRefreshing}
+            >
+              <Ionicons 
+                name="refresh" 
+                size={scale(22)} 
+                color={isRefreshing ? "rgba(255,255,255,0.5)" : "white"} 
+              />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
-    </View>
-  );
-};
+    );
+  }
+);
+
+ScreenHeader.displayName = 'ScreenHeader';
+
+// ============================================================
+// ✅ الأنماط (Styles)
+// ============================================================
 
 const styles = StyleSheet.create({
-  // --- التنسيقات المنسوخة والمكيفة من orders.tsx ---
+  // الهيدر الرئيسي
   header: {
-    height: scale(130), // يمكنك تعديل هذه القيمة
+    height: scale(130),
     position: 'relative',
   },
-   headerBackground: {
+
+  // الخلفية الحمراء
+  headerBackground: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -100,40 +116,40 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: scale(30),
     borderBottomRightRadius: scale(30),
   },
+
+  // محتوى الهيدر
   headerContent: {
     paddingHorizontal: scale(20),
-    // paddingTop سيتم تطبيقه من insets
-    flex: 1, // اجعله يملأ المساحة
-    justifyContent: 'center', // قم بتوسيط المحتوى (headerTop) عمودياً
+    flex: 1,
+    justifyContent: 'center',
   },
+
+  // الصف العلوي (يحتوي على الأزرار والعنوان)
   headerTop: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  buttonPlaceholder: {
-    width: scale(40), // عرض ثابت للحاوية لضمان التوسيط
-    alignItems: 'center',
-  },
-  iconButton: {
+
+  // زر الرجوع
+  backButton: {
     padding: scale(8),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: scale(20),
   },
-  titleContainer: {
-    flex: 1, // يأخذ المساحة المتبقية
-    alignItems: 'center', // يوسّط المحتوى الداخلي
-  },
+
+  // العنوان
   headerTitle: {
-    fontSize: fontScale(22), // حجم خط مطابق
-    fontFamily: 'Cairo-Bold',
+    fontSize: fontScale(24),
+    fontWeight: 'bold',
     color: 'white',
   },
-  headerSubtitle: {
-    fontSize: fontScale(14),
-    fontFamily: 'Cairo-Regular',
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 2,
+
+  // زر التحديث
+  refreshButton: {
+    padding: scale(8),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(20),
   },
 });
 

@@ -33,6 +33,7 @@ import {
   AddressSectionProps,
   BranchSectionProps 
 } from '@/lib/types';
+import ScreenHeader from '@/components/ui/ScreenHeader';
 import CustomBottomNav from '@/components/CustomBottomNav';
 
 interface WizardStepProps {
@@ -711,38 +712,9 @@ const renderStepIndicator = () => {
       {/* ✅ 1. إزالة edges={['top']} من هنا */}
       <SafeAreaView style={styles.safeArea} edges={['bottom']}> 
         {/* الهيدر المحدث */}
-        <View style={styles.header}>
-  <View style={[styles.headerContent, { paddingTop: insets.top + 10 }]}>
-    {/* العنصر الأول: زر الرجوع */}
-    <TouchableOpacity 
-      style={styles.backButton}
-      onPress={() => router.back()}
-    >
-      <Ionicons name="arrow-back" size={24} color="#fff" />
-    </TouchableOpacity>
-
-    {/* العنصر الثاني: حاوية العنوان (في المنتصف) */}
-    <View style={styles.headerText}>
-      <Text style={styles.headerTitle}>
-        {isCheckoutModalVisible && checkoutStep === 4 ? 'تأكيد الطلب' : 'الطلب'}
-      </Text>
-      {!isCheckoutModalVisible && items.length > 0 && (
-        <Text style={styles.headerSubtitle}>
-          {items.length} {items.length === 1 ? 'منتج' : 'منتجات'} • {finalTotal.toFixed(2)} ₪
-        </Text>
-      )}
-    </View>
-
-    {/* العنصر الثالث: عنصر نائب أو زر آخر */}
-    <View style={{ width: 40 }}>
-      {isCheckoutModalVisible && checkoutStep < 4 && (
-        <View style={styles.stepBadge}>
-          <Text style={styles.stepBadgeText}>خطوة {checkoutStep} من 3</Text>
-        </View>
-      )}
-    </View>
-  </View>
-</View>
+          <ScreenHeader
+          title="السلة"
+            />
 
         {/* Modal الخطوات */}
         {isCheckoutModalVisible && (
