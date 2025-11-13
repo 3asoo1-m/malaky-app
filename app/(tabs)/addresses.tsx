@@ -18,6 +18,7 @@ import { FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-ico
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Address } from '@/lib/types';
 import { scale, fontScale } from '@/lib/responsive';
+import ScreenHeader from '@/components/ui/ScreenHeader';
 
 // ✅ مكون البطاقة المخصصة
 const Card = ({ children, style }: { children: React.ReactNode; style?: any }) => (
@@ -439,36 +440,24 @@ const getDisplayName = (item: Address): string => {
   return (
     <View style={styles.container}>
       {/* ✅ الهيدر الثابت */}
-      <View style={[styles.stickyHeader, { paddingTop: insets.top }]}>
-        <View style={styles.headerBackground} />
-        <View style={styles.headerContent}>
-          <View style={styles.headerTop}>
-            <TouchableOpacity 
-              onPress={() => {
-                if (isSelectionMode) {
-                  router.navigate('/(tabs)/cart');
-                } else {
-                  router.navigate('/(tabs)/profile');
-                }
-              }} 
-              style={styles.backButton}
-            >
-              <Ionicons name="arrow-back" size={scale(24)} color="white" />
-            </TouchableOpacity>
-            
-            <Text style={styles.headerTitle}>
-              {isSelectionMode ? 'اختر عنوان التوصيل' : 'عناويني'}
-            </Text>
-            
-            <TouchableOpacity 
-              onPress={handleAddNewAddress}
-              style={styles.addButton}
-            >
-              <Ionicons name="add" size={scale(24)} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+<ScreenHeader
+  title={isSelectionMode ? 'اختر عنوان التوصيل' : 'عناويني'}
+  onBackPress={() => {
+    if (isSelectionMode) {
+      router.navigate('/(tabs)/cart');
+    } else {
+      router.navigate('/(tabs)/profile');
+    }
+  }}
+  customButton={
+    <TouchableOpacity 
+      onPress={handleAddNewAddress}
+      style={styles.addButton}
+    >
+      <Ionicons name="add" size={scale(24)} color="white" />
+    </TouchableOpacity>
+  }
+/>
 
       {loading ? (
         <View style={styles.centeredContainer}>
@@ -517,64 +506,20 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: '#F8FAFC' 
   },
-  
-  // ✅ الهيدر الثابت
-  stickyHeader: {
-    height: scale(160),
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-  },
-  headerBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#DC2626',
-    borderBottomLeftRadius: scale(30),
-    borderBottomRightRadius: scale(30),
-  },
-  headerContent: {
-    paddingHorizontal: scale(20),
-    paddingTop: scale(50),
-  },
-  headerTop: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  backButton: {
-    padding: scale(8),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(20),
-  },
-  headerTitle: {
-    fontSize: fontScale(24),
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
-    flex: 1,
-  },
-  addButton: {
-    padding: scale(8),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(20),
-  },
-
   // ✅ FlatList مع مساحة للهيدر الثابت
   flatList: {
     flex: 1,
-    marginTop: scale(160), // مساحة للهيدر الثابت
   },
   
   // ✅ رأس القائمة
   listHeader: {
     marginBottom: scale(16),
   },
-  
+  addButton: {
+    padding: scale(8),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: scale(20),
+  },
   // الإحصائيات
   statsContainer: {
     paddingHorizontal: scale(20),
@@ -991,4 +936,5 @@ const styles = StyleSheet.create({
     fontSize: fontScale(10),
     fontWeight: '600',
   },
+ 
 });

@@ -1,5 +1,4 @@
 // مسار الملف: components/ui/ScreenHeader.tsx
-// مكون الهيدر - نسخة طبق الأصل من شاشة الطلبات
 
 import React, { useCallback } from 'react';
 import {
@@ -22,6 +21,7 @@ interface ScreenHeaderProps {
   onBackPress?: () => void;
   onRefreshPress?: () => void;
   isRefreshing?: boolean;
+  customButton?: React.ReactNode;
 }
 
 // ============================================================
@@ -34,6 +34,7 @@ const ScreenHeader = React.memo(
     onBackPress,
     onRefreshPress,
     isRefreshing = false,
+    customButton,
   }: ScreenHeaderProps) => {
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -54,6 +55,32 @@ const ScreenHeader = React.memo(
       }
     }, [onRefreshPress]);
 
+    // ✅ تحديد ما سيظهر في الجانب الأيسر
+    const renderLeftAction = () => {
+      if (customButton) {
+        // ✅ إذا كان هناك زر مخصص، نعرضه
+        return customButton;
+      } else if (onRefreshPress) {
+        // ✅ إذا كان هناك زر تحديث، نعرضه
+        return (
+          <TouchableOpacity 
+            onPress={handleRefreshPress}
+            style={styles.refreshButton}
+            disabled={isRefreshing}
+          >
+            <Ionicons 
+              name="refresh" 
+              size={scale(22)} 
+              color={isRefreshing ? "rgba(255,255,255,0.5)" : "white"} 
+            />
+          </TouchableOpacity>
+        );
+      } else {
+        // ✅ إذا لم يكن هناك شيء، نعرض مساحة فارغة
+        return <View style={styles.emptyButton} />;
+      }
+    };
+
     return (
       <View style={styles.header}>
         {/* الخلفية الحمراء مع الزوايا المستديرة */}
@@ -73,18 +100,8 @@ const ScreenHeader = React.memo(
             {/* العنوان */}
             <Text style={styles.headerTitle}>{title}</Text>
 
-            {/* زر التحديث */}
-            <TouchableOpacity 
-              onPress={handleRefreshPress}
-              style={styles.refreshButton}
-              disabled={isRefreshing}
-            >
-              <Ionicons 
-                name="refresh" 
-                size={scale(22)} 
-                color={isRefreshing ? "rgba(255,255,255,0.5)" : "white"} 
-              />
-            </TouchableOpacity>
+            {/* ✅ عرض العنصر المناسب في الجانب الأيسر */}
+            {renderLeftAction()}
           </View>
         </View>
       </View>
@@ -150,6 +167,13 @@ const styles = StyleSheet.create({
     padding: scale(8),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: scale(20),
+  },
+  
+  // مساحة فارغة للحفاظ على التوازن
+  emptyButton: {
+    padding: scale(8),
+    width: scale(40),
+    height: scale(40),
   },
 });
 
