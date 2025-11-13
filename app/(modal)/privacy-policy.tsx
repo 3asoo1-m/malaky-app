@@ -173,7 +173,7 @@ export default function PrivacyPolicyScreen() {
         <View style={styles.section}>
           <View style={styles.welcomeCard}>
             <View style={styles.welcomeContent}>
-              <Text style={styles.welcomeTitle}>حماية خصوصيتك أولوية لدينا 🔒</Text>
+              <Text style={styles.welcomeTitle}>حماية خصوصيتك أولوية لدينا</Text>
               <Text style={styles.welcomeText}>
                 نعتبر ثقتك بنا شرفاً كبيراً. تشرح هذه السياسة كيف نحمي معلوماتك 
                 ونضمن استخدامها بشكل مسؤول وشفاف.
@@ -214,11 +214,11 @@ export default function PrivacyPolicyScreen() {
               <View style={styles.contactDetails}>
                 <View style={styles.contactItem}>
                   <Ionicons name="mail-outline" size={scale(16)} color="#2563EB" />
-                  <Text style={styles.contactText}>privacy@almalaky.co</Text>
+                  <Text style={styles.contactText}>support@almalaky.co</Text>
                 </View>
                 <View style={styles.contactItem}>
                   <Ionicons name="call-outline" size={scale(16)} color="#2563EB" />
-                  <Text style={styles.contactText}>9200XXXXX</Text>
+                  <Text style={styles.contactText}>1700 250 250</Text>
                 </View>
               </View>
               <Text style={styles.contactNote}>
@@ -238,10 +238,10 @@ export default function PrivacyPolicyScreen() {
               <View style={styles.updateIcon}>
                 <Ionicons name="time-outline" size={scale(20)} color="#FFF" />
               </View>
-              <View>
+              <View style={styles.updateTextContainer}>
                 <Text style={styles.updateTitle}>التحديثات المستقبلية</Text>
                 <Text style={styles.updateText}>
-                  قد نقوم بتحديث هذه السياسة periodically. سنخطرك بأي تغييرات جوهرية 
+                  قد نقوم بتحديث هذه السياسة بشكل دوري. سنخطرك بأي تغييرات جوهرية 
                   عبر التطبيق أو البريد الإلكتروني.
                 </Text>
               </View>
@@ -282,12 +282,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: scale(12),
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // بطاقة الترحيب
   welcomeCard: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#FFF',
     padding: scale(16),
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#DBEAFE',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: scale(12),
+    marginRight: scale(12),
   },
   welcomeContent: {
     flex: 1,
@@ -318,13 +318,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: scale(8),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   welcomeText: {
     fontSize: fontScale(14),
     color: '#6B7280',
     lineHeight: scale(20),
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // الأقسام
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     padding: scale(16),
   },
   sectionTitleContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     color: '#6B7280',
     lineHeight: scale(20),
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // أنواع البيانات
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     marginBottom: scale(8),
   },
   dataTypeHeader: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: scale(4),
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     fontWeight: '600',
     color: '#1F2937',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   retentionBadge: {
     backgroundColor: '#FEF3C7',
@@ -441,13 +441,13 @@ const styles = StyleSheet.create({
   dataTypePurpose: {
     fontSize: fontScale(12),
     color: '#6B7280',
-    textAlign: 'right',
+    textAlign: 'left',
     lineHeight: scale(16),
   },
 
   // بطاقة الاتصال
   contactCard: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#FFF',
     padding: scale(16),
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: scale(12),
+    marginRight: scale(12),
   },
   contactInfo: {
     flex: 1,
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: scale(12),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   contactDetails: {
     gap: scale(8),
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   contactNote: {
     fontSize: fontScale(12),
     color: '#9CA3AF',
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // بطاقة التحديثات
@@ -515,10 +515,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   updateContent: {
-    flexDirection: 'row-reverse',
+   flexDirection: 'row',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
     padding: scale(20),
-    gap: scale(12),
+
   },
   updateIcon: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -527,19 +528,23 @@ const styles = StyleSheet.create({
     borderRadius: scale(22),
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: scale(12), // ✅ إضافة marginLeft لفصل الأيقونة عن النص
     flexShrink: 0,
   },
+  updateTextContainer: {
+   flex: 1,
+ },
   updateTitle: {
     fontSize: fontScale(18),
     fontWeight: 'bold',
     color: '#FFF',
     marginBottom: scale(8),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   updateText: {
     fontSize: fontScale(14),
     color: 'rgba(255,255,255,0.9)',
-    textAlign: 'right',
+    textAlign: 'left',
     lineHeight: scale(20),
   },
 
@@ -553,6 +558,7 @@ const styles = StyleSheet.create({
     fontSize: fontScale(12),
     color: '#9CA3AF',
     marginBottom: scale(4),
+    
   },
   updateDate: {
     fontSize: fontScale(10),

@@ -161,7 +161,7 @@ export default function CommunityGuidelinesScreen() {
         <View style={styles.section}>
           <View style={styles.welcomeCard}>
             <View style={styles.welcomeContent}>
-              <Text style={styles.welcomeTitle}>مرحباً بك في عائلة الدجاج الملكي بروست 👑</Text>
+              <Text style={styles.welcomeTitle}>مرحباً بك في عائلة الدجاج الملكي بروست</Text>
               <Text style={styles.welcomeText}>
                 إرشادات المجتمع تساعدنا في الحفاظ على بيئة آمنة ومحترمة للجميع، 
                 وضمان تجربة طعام استثنائية لكل عضو في عائلتنا.

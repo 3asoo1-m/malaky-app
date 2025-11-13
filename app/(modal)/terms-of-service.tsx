@@ -209,7 +209,7 @@ export default function TermsOfServiceScreen() {
         <View style={styles.section}>
           <View style={styles.welcomeCard}>
             <View style={styles.welcomeContent}>
-              <Text style={styles.welcomeTitle}>شروط استخدام تطبيق الدجاج الملكي بروست 📝</Text>
+              <Text style={styles.welcomeTitle}>شروط استخدام تطبيق الدجاج الملكي بروست</Text>
               <Text style={styles.welcomeText}>
                 هذه الشروط والأحكام تنظم استخدامك لتطبيقنا وخدماتنا. 
                 نرجو قراءتها بعناية قبل استخدام التطبيق.
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: scale(12),
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // بطاقة الترحيب
@@ -355,13 +355,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: scale(8),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   welcomeText: {
     fontSize: fontScale(14),
     color: '#6B7280',
     lineHeight: scale(20),
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // الأقسام
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
     padding: scale(16),
   },
   sectionTitleContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   paragraphItem: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: scale(12),
   },
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     color: '#6B7280',
     lineHeight: scale(20),
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // المسؤوليات المتبادلة
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
     marginHorizontal: scale(12),
   },
   responsibilityHeader: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: scale(6),
     marginBottom: scale(6),
@@ -487,18 +487,18 @@ const styles = StyleSheet.create({
   responsibilityTitle: {
     fontSize: fontScale(12),
     fontWeight: '600',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   responsibilityText: {
     fontSize: fontScale(12),
     color: '#6B7280',
-    textAlign: 'right',
+    textAlign: 'left',
     lineHeight: scale(16),
   },
 
   // بطاقة البنود الهامة
   importantCard: {
-    backgroundColor: '#D97706',
+    backgroundColor: '#2563EB',
     borderRadius: scale(16),
     overflow: 'hidden',
     shadowColor: '#000',
@@ -511,10 +511,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   importantContent: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
     padding: scale(20),
-    gap: scale(12),
+
   },
   importantIcon: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -523,6 +524,7 @@ const styles = StyleSheet.create({
     borderRadius: scale(22),
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: scale(12), // ✅ إضافة marginLeft لفصل الأيقونة عن النص
     flexShrink: 0,
   },
   importantTitle: {
@@ -530,18 +532,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFF',
     marginBottom: scale(8),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   importantText: {
     fontSize: fontScale(14),
     color: 'rgba(255,255,255,0.9)',
-    textAlign: 'right',
+    textAlign: 'left',
     lineHeight: scale(20),
   },
 
   // بطاقة سريان الشروط
   effectiveCard: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#FFF',
     padding: scale(16),
@@ -562,7 +564,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#16A34A',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: scale(12),
+    marginRight: scale(12),
   },
   effectiveInfo: {
     flex: 1,
@@ -572,26 +574,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: scale(12),
-    textAlign: 'right',
+    textAlign: 'left',
   },
   effectiveDetails: {
     gap: scale(8),
     marginBottom: scale(12),
   },
   effectiveItem: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: scale(8),
   },
   effectiveText: {
     fontSize: fontScale(14),
     color: '#6B7280',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   effectiveNote: {
     fontSize: fontScale(12),
     color: '#9CA3AF',
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
   // معلومات الإصدار
