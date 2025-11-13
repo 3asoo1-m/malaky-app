@@ -709,13 +709,10 @@ const renderStepIndicator = () => {
 
  return (
     <View style={styles.fullScreen}>
-      {/* ✅ 1. إزالة edges={['top']} من هنا */}
       <SafeAreaView style={styles.safeArea} edges={['bottom']}> 
-        {/* الهيدر المحدث */}
           <ScreenHeader
           title="السلة"
             />
-
         {/* Modal الخطوات */}
         {isCheckoutModalVisible && (
   <Modal
@@ -726,7 +723,6 @@ const renderStepIndicator = () => {
   >
     <View style={styles.modalContainer}>
       <View style={styles.modalContent}>
-        {/* ✅ الهيدر الجديد مع زر الإلغاء فقط */}
         <View style={styles.modalHeader}>
           <View style={styles.modalHeaderContent}>
             <TouchableOpacity 
@@ -758,7 +754,7 @@ const renderStepIndicator = () => {
                'تفاصيل الطلب'}
             </Text>
             
-            <View style={{ width: 40 }} /> {/* عنصر نائب للمساحة */}
+            <View style={{ width: 40 }} />
           </View>
         </View>
                 {/* Step Indicator */}
@@ -967,10 +963,8 @@ const renderStepIndicator = () => {
                   )}
                 </ScrollView>
 
-                {/* أزرار التنقل - تصميم مُصلَح */}
 <View style={styles.modalActions}>
   <View style={styles.navigationButtons}>
-    {/* عرض زر الرجوع فقط إذا كنا بعد الخطوة الأولى */}
     {checkoutStep > 1 && (
       <TouchableOpacity
         style={styles.backButtonModal}
@@ -980,7 +974,6 @@ const renderStepIndicator = () => {
       </TouchableOpacity>
     )}
 
-    {/* زر المتابعة / تأكيد الطلب (يظهر دائماً) */}
     <TouchableOpacity
       style={[
         styles.continueButton,
