@@ -609,7 +609,12 @@ export default function CartScreen() {
     />
   ), [handleUpdateQuantity, handleRemoveFromCart, handleItemPress]);
 
-  const keyExtractor = useCallback((item: CartItem) => item.id, []);
+const keyExtractor = useCallback((item: CartItem, index: number) => {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substr(2, 5);
+  return `cart-${item.id}-${index}-${timestamp}-${random}`;
+}, []);
+
 
   const listEmptyComponent = useMemo(() => (
     <View style={styles.emptyContainer}>

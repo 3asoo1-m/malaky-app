@@ -31,7 +31,7 @@ interface Deal {
 }
 
 const featuredDealsMock: Deal[] = [
-    { id: 1, title: "وجبة + مشروب مجاني", subtitle: "عند طلب أي وجبة عائلية", price: "75", savings: "وفر 15 ريال", image: require('../../assets/images/icon.png'), gradient: ['#EF4444', '#F97316'] },
+    { id: 1, title: "وجبة + مشروب مجاني", subtitle: "عند طلب أي وجبة عائلية", price: "75", savings: "وفر 15 ₪", image: require('../../assets/images/icon.png'), gradient: ['#EF4444', '#F97316'] },
     { id: 2, title: "عرض منتصف الأسبوع", subtitle: "خصم 25% على جميع الوجبات", price: "من 18", savings: "عروض حصرية", image: require('../../assets/images/icon.png'), gradient: ['#8B5CF6', '#EC4899'] },
 ];
 
