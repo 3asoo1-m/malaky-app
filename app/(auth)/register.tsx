@@ -100,7 +100,6 @@ const FOOD_ICONS = [
   { type: 'ionicon', component: 'fish', name: 'fish' },
   { type: 'ionicon', component: 'nutrition', name: 'nutrition' },
   { type: 'ionicon', component: 'restaurant', name: 'restaurant' },
-  { type: 'ionicon', component: 'pizza', name: 'pizza-ionicon' },
   { type: 'ionicon', component: 'beer', name: 'beer' },
   { type: 'ionicon', component: 'water', name: 'water' },
 ];

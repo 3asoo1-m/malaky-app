@@ -32,6 +32,11 @@ interface UserProfile {
   favorites_count: number;
 }
 
+interface UserStats {
+  orders_count: number;
+  favorites_count: number;
+}
+
 // مكون البطاقة المخصصة
 const Card = ({ children, style }: { children: React.ReactNode; style?: any }) => (
   <View style={[styles.card, style]}>{children}</View>
@@ -99,50 +104,49 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
-  // ✅ دالة لجلب الإحصائيات الحقيقية
-  const fetchUserStats = async (userId: string) => {
-    try {
-      // محاولة استخدام دوال RPC أولاً
-      const { data: ordersData, error: ordersError } = await supabase
-        .rpc('get_user_orders_count', { user_id: userId });
+// ✅ دالة محسنة لجلب الإحصائيات الحقيقية بطلب واحد
+const fetchUserStats = async (userId: string): Promise<UserStats> => {
+  try {
+    // استخدام الدالة الشاملة التي ترجع كل الإحصائيات في طلب واحد
+    const { data, error } = await supabase
+      .rpc('get_user_stats', { user_id: userId })
+      .single(); // ⬅️ مهم لأن الدالة ترجع row واحدة
 
-      const { data: favoritesData, error: favoritesError } = await supabase
-        .rpc('get_user_favorites_count', { user_id: userId });
+    if (error) {
+      console.log('استخدام الاستعلامات المباشرة بدلاً من RPC...', error);
+      
+      // استعلامات احتياطية إذا فشلت الدالة الشاملة
+      const { count: ordersCount, error: ordersError } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
 
-      // إذا فشلت دوال RPC، استخدم الاستعلامات المباشرة
-      if (ordersError || favoritesError) {
-        console.log('استخدام الاستعلامات المباشرة بدلاً من RPC...');
-        
-        // جلب عدد الطلبات مباشرة
-        const { count: ordersCount, error: ordersDirectError } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId);
-
-        // جلب عدد المفضلة مباشرة
-        const { count: favoritesCount, error: favoritesDirectError } = await supabase
-          .from('user_favorites')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId);
-
-        return {
-          orders_count: ordersCount || 0,
-          favorites_count: favoritesCount || 0
-        };
-      }
+      const { count: favoritesCount, error: favoritesError } = await supabase
+        .from('user_favorites')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
 
       return {
-        orders_count: ordersData || 0,
-        favorites_count: favoritesData || 0
-      };
-    } catch (error) {
-      console.error('Error in fetchUserStats:', error);
-      return {
-        orders_count: 0,
-        favorites_count: 0
+        orders_count: ordersCount || 0,
+        favorites_count: favoritesCount || 0
       };
     }
-  };
+
+    // البيانات من الدالة الشاملة مع Type Assertion
+    const stats = data as UserStats;
+    
+    return {
+      orders_count: stats?.orders_count || 0,
+      favorites_count: stats?.favorites_count || 0
+    };
+  } catch (error) {
+    console.error('Error in fetchUserStats:', error);
+    return {
+      orders_count: 0,
+      favorites_count: 0
+    };
+  }
+};
 
   // ✅ جلب بيانات المستخدم الكاملة من جدول profiles
   useEffect(() => {
