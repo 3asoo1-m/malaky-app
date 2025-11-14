@@ -52,8 +52,8 @@ serve(async (req: Request) => {
   try {
     // 1. إنشاء عميل Supabase بصلاحيات كاملة
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('PROJECT_URL') ?? '',
+      Deno.env.get('SERVICE_ROLE_KEY') ?? ''
     );
 
     // 2. استخراج بيانات الطلب المحدث
