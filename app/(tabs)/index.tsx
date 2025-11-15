@@ -1,13 +1,13 @@
 // app/(tabs)/index.tsx
 
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, RefreshControl, FlatList, SafeAreaView, StyleSheet, ColorValue } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl, FlatList, SafeAreaView, StyleSheet, ColorValue, Alert } from 'react-native';
 import { useMenuData, usePromotions } from '@/lib/api/queries';
 import { Stack } from 'expo-router';
 import { Colors } from '@/styles';
 
 import { useQueryClient } from '@tanstack/react-query';
-//import Voice, { SpeechResultsEvent } from '@react-native-voice/voice';
+import * as Speech from 'expo-speech'; // ⬅️ التغيير هنا
 
 // --- Components ---
 import Header from '@/components/home/Header';
@@ -41,7 +41,7 @@ export default function HomeScreen() {
     const [showScrollTop, setShowScrollTop] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    //const [isVoiceSearching, setIsVoiceSearching] = useState(false);
+    const [isVoiceSearching, setIsVoiceSearching] = useState(false);
 
     // --- Data Fetching ---
     const { 
@@ -58,43 +58,34 @@ export default function HomeScreen() {
         refetch: refetchPromotions 
     } = usePromotions();
 
-    // --- Voice Search Logic ---
-    /*
-    useEffect(() => {
-        const onSpeechResults = (e: SpeechResultsEvent) => {
-            if (e.value && e.value.length > 0) setSearchQuery(e.value[0]);
-            setIsVoiceSearching(false);
-        };
-        const onSpeechError = (e: any) => {
-            console.error('Voice search error:', e);
-            setIsVoiceSearching(false);
-        };
-        const onSpeechEnd = () => setIsVoiceSearching(false);
-
-        Voice.onSpeechResults = onSpeechResults;
-        Voice.onSpeechError = onSpeechError;
-        Voice.onSpeechEnd = onSpeechEnd;
-
-        return () => { Voice.destroy().then(Voice.removeAllListeners); };
-    }, []);
-
+    // --- Voice Search Logic باستخدام expo-speech ---
+    
     const startVoiceSearch = async () => {
         try {
-           // await Voice.requestSpeechRecognitionPermission();
-            setSearchQuery('');
             setIsVoiceSearching(true);
-            await Voice.start('ar-SA');
+            
+            // ⬅️ التغيير هنا - استخدام التعرف على الكلام من expo-speech
+            // للأسف expo-speech لا تدعم التعرف على الكلام، فقط التحدث
+            // لذلك سنستخدم بديل أو نعطل هذه الميزة مؤقتاً
+            
+            Alert.alert(
+                'البحث الصوتي',
+                'ميزة البحث الصوتي غير متاحة حالياً. جاري العمل على إضافتها قريباً.',
+                [{ text: 'حسناً' }]
+            );
+            
+            setIsVoiceSearching(false);
+            
         } catch (e) {
             console.error('Failed to start voice search', e);
             setIsVoiceSearching(false);
+            Alert.alert('خطأ', 'حدث خطأ في البحث الصوتي');
         }
     };
 
     const stopVoiceSearch = async () => {
-        try { await Voice.stop(); } catch (e) { console.error('Failed to stop voice search', e); }
-        finally { setIsVoiceSearching(false); }
+        setIsVoiceSearching(false);
     };
-    */
 
     // ✅ فلترة البيانات بناءً على البحث والفئة المختارة
     const filteredMeals = useMemo(() => {
@@ -238,8 +229,8 @@ export default function HomeScreen() {
                 searchQuery={searchQuery}
                 setSearchQuery={handleSearch}
                 onClearSearch={handleClearSearch}
-                //onVoiceSearch={() => setIsVoiceSearching(true)}
-                //isVoiceSearching={isVoiceSearching}
+                onVoiceSearch={startVoiceSearch} // ⬅️ التغيير هنا
+                isVoiceSearching={isVoiceSearching}
             />
             
             {/* ✅ استخدام FlatList مع الإعدادات الصحيحة */}

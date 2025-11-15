@@ -2,22 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
-  Image, 
   Dimensions, 
   ActivityIndicator, 
   TouchableOpacity, 
   ColorValue,
   Linking,
-  Alert,
-  ImageBackground
+  Alert
 } from 'react-native';
 import Carousel from 'react-native-reanimated-carousel';
 import { Promotion, getActivePromotions } from '@/lib/promotions';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gift, Percent, Sparkles, TrendingUp, ExternalLink, ShoppingBag } from 'lucide-react-native';
-import { useRouter } from 'expo-router'; // ✅ استخدام useRouter من Expo Router
+import { useRouter } from 'expo-router';
+import { Image } from 'expo-image';
 
 const { width } = Dimensions.get('window');
+
+// 🔧 إعدادات التخزين المؤقت - تفعيل في Development Build
+const DEBUG_CACHE = true;
 
 const iconMap = {
   Percent: Percent,
@@ -60,11 +62,142 @@ const getGradientColors = (actionType: string): [ColorValue, ColorValue, ...Colo
   }
 };
 
+// 🔧 مكون محسن للتخزين المؤقت في Development Build
+const CachedPromotionImage = ({ imageUrl, children }: { imageUrl: string; children: React.ReactNode }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [loadStartTime, setLoadStartTime] = useState<number | null>(null);
+
+  const handleLoadStart = () => {
+    setLoadStartTime(Date.now());
+    if (DEBUG_CACHE) {
+      console.log(`🔄 بدء تحميل الصورة: ${imageUrl}`);
+    }
+  };
+
+  const handleLoad = () => {
+    const loadTime = loadStartTime ? Date.now() - loadStartTime : 0;
+    setImageLoaded(true);
+    
+    if (DEBUG_CACHE) {
+      const cacheStatus = loadTime < 100 ? '💾 مخبأة' : '🌐 شبكة';
+      console.log(`✅ تم تحميل الصورة: ${imageUrl} (${loadTime}ms) - ${cacheStatus}`);
+    }
+  };
+
+  const handleError = (error: any) => {
+    setImageError(true);
+    if (DEBUG_CACHE) {
+      console.log(`❌ خطأ في تحميل الصورة: ${imageUrl}`, error);
+    }
+  };
+
+  if (imageError) {
+    return (
+      <LinearGradient
+        colors={['#6B7280', '#9CA3AF']}
+        style={{
+          height: 150,
+          justifyContent: 'center',
+          borderRadius: 24,
+          padding: 20,
+        }}
+      >
+        {children}
+        {DEBUG_CACHE && (
+          <Text style={{ color: 'white', fontSize: 10, textAlign: 'center', marginTop: 8 }}>
+            ⚠️ فشل التحميل
+          </Text>
+        )}
+      </LinearGradient>
+    );
+  }
+
+  return (
+    <View style={{ position: 'relative', height: 150, borderRadius: 24, overflow: 'hidden' }}>
+      {/* ✅ استخدام expo-image مع إعدادات محسنة للـ Development Build */}
+      <Image
+        source={{ uri: imageUrl }}
+        style={{
+          position: 'absolute',
+          width: '100%',
+          height: '100%',
+        }}
+        contentFit="cover"
+        transition={300}
+        onLoadStart={handleLoadStart}
+        onLoad={handleLoad}
+        onError={handleError}
+        cachePolicy="memory-disk"
+        recyclingKey={imageUrl}
+        // 🔧 إعدادات إضافية للتخزين المؤقت
+        enableLiveTextInteraction={false}
+        autoplay={false}
+      />
+      
+      {/* مؤشر التحميل */}
+      {!imageLoaded && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(0,0,0,0.1)',
+          zIndex: 1,
+        }}>
+          <ActivityIndicator size="small" color="#FFFFFF" />
+          {DEBUG_CACHE && (
+            <Text style={{ color: 'white', fontSize: 10, marginTop: 8 }}>
+              Development Build - جاري التحميل...
+            </Text>
+          )}
+        </View>
+      )}
+      
+      {/* مؤشر التخزين المؤقت */}
+      {DEBUG_CACHE && imageLoaded && loadStartTime && (
+        <View style={{
+          position: 'absolute',
+          top: 8,
+          left: 8,
+          backgroundColor: (Date.now() - loadStartTime) < 100 ? 
+            'rgba(34, 197, 94, 0.8)' : 'rgba(59, 130, 246, 0.8)',
+          padding: 4,
+          borderRadius: 8,
+          zIndex: 2,
+        }}>
+          <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
+            {(Date.now() - loadStartTime) < 100 ? '💾 مخبأة' : '🌐 شبكة'}
+          </Text>
+        </View>
+      )}
+      
+      {/* التدرج اللوني للنص */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.2)', 'rgba(0, 0, 0, 0.2)']}
+        style={{
+          padding: 20,
+          height: '100%',
+          justifyContent: 'center',
+          borderRadius: 24,
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        {children}
+      </LinearGradient>
+    </View>
+  );
+};
+
 const PromotionsCarousel = () => {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reloadCount, setReloadCount] = useState(0);
   
-  // ✅ استخدام useRouter من Expo Router بدلاً من useNavigation
   const router = useRouter();
 
   useEffect(() => {
@@ -73,8 +206,13 @@ const PromotionsCarousel = () => {
 
   const loadPromotions = async () => {
     try {
+      if (DEBUG_CACHE) {
+        console.log(`🔄 (Promotions) جلب البيانات - المحاولة ${reloadCount + 1}`);
+        console.log(`🏗️ Development Build - التخزين المؤقت مفعل`);
+      }
       const data = await getActivePromotions();
       setPromotions(data);
+      setReloadCount(prev => prev + 1);
     } catch (error) {
       console.error('Error loading promotions:', error);
     } finally {
@@ -99,8 +237,6 @@ const PromotionsCarousel = () => {
 
   const handleNavigateToItem = (itemId: string) => {
     try {
-      // ✅ استخدام router.push للانتقال إلى صفحة المنتج
-      // هذا سينتقل إلى app/item/[itemId].tsx
       router.push(`/item/${itemId}`);
       console.log('✅ Navigating to item:', itemId);
     } catch (error) {
@@ -151,54 +287,52 @@ const PromotionsCarousel = () => {
     const IconComponent = getActionIcon(item.action_type, item.action_value);
     const gradientColors = getGradientColors(item.action_type);
 
+    const Content = (
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={{ 
+            color: 'white', 
+            fontSize: 18, 
+            fontWeight: 'bold', 
+            textAlign: 'right', 
+            marginBottom: 8,
+            textShadowColor: 'rgba(0, 0, 0, 0.8)',
+            textShadowOffset: { width: 1, height: 1 },
+            textShadowRadius: 4,
+          }}>
+            {item.title}
+          </Text>
+          <Text style={{ 
+            color: 'white', 
+            fontSize: 14, 
+            textAlign: 'right', 
+            lineHeight: 20,
+            textShadowColor: 'rgba(0, 0, 0, 0.8)',
+            textShadowOffset: { width: 1, height: 1 },
+            textShadowRadius: 4,
+          }}>
+            {item.description}
+          </Text>
+        </View>
+        <View style={{ alignItems: 'center' }}>
+          <IconComponent color="white" size={48} style={{ opacity: 0.5 }} />
+        </View>
+      </View>
+    );
 
     if (item.image_url) {
-      // ⭐️ عرض المكون مع صورة كخلفية
       return (
         <TouchableOpacity
           style={{ padding: 8 }}
           onPress={() => handlePromotionPress(item)}
           activeOpacity={0.8}
         >
-          <ImageBackground
-            source={{ uri: item.image_url }}
-            style={{
-              height: 150,
-              justifyContent: 'center',
-              overflow: 'hidden', // ضروري لتطبيق borderRadius على الصورة
-              borderRadius: 24,
-            }}
-            resizeMode="cover" // لتغطية الصورة للمكون بالكامل
-          >
-            {/* تدرج لوني فوق الصورة لتحسين قراءة النص */}
-            <LinearGradient
-              colors={['rgba(0,0,0,0.2)', 'rgba(0, 0, 0, 0.2)']}
-              style={{
-                padding: 20,
-                height: '100%',
-                justifyContent: 'center',
-                borderRadius: 24,
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold', textAlign: 'right', marginBottom: 8 }}>
-                    {item.title}
-                  </Text>
-                  <Text style={{ color: 'white', opacity: 0.9, fontSize: 14, textAlign: 'right', lineHeight: 20 }}>
-                    {item.description}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                  <IconComponent color="white" size={48} style={{ opacity: 0.5 }} />
-                </View>
-              </View>
-            </LinearGradient>
-          </ImageBackground>
+          <CachedPromotionImage imageUrl={item.image_url}>
+            {Content}
+          </CachedPromotionImage>
         </TouchableOpacity>
       );
     }
-    
     
     return (
       <TouchableOpacity 
@@ -220,49 +354,7 @@ const PromotionsCarousel = () => {
             elevation: 4,
           }}
         >
-          <View style={{ 
-            flexDirection: 'row', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            flex: 1 
-          }}>
-            <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={{ 
-                color: 'white', 
-                fontSize: 18, 
-                fontWeight: 'bold',
-                textAlign: 'right',
-                marginBottom: 8
-              }}>
-                {item.title}
-              </Text>
-              <Text style={{ 
-                color: 'white', 
-                opacity: 0.9, 
-                fontSize: 14,
-                textAlign: 'right',
-                lineHeight: 20
-              }}>
-                {item.description}
-              </Text>
-            </View>
-            
-            <View style={{ alignItems: 'center' }}>
-              <IconComponent color="white" size={48} style={{ opacity: 0.3 }} />
-              {item.image_url && (
-                <Image
-                  source={{ uri: item.image_url }}
-                  style={{
-                    width: 60,
-                    height: 60,
-                    borderRadius: 12,
-                    marginTop: 8,
-                  }}
-                  resizeMode="cover"
-                />
-              )}
-            </View>
-          </View>
+          {Content}
         </LinearGradient>
       </TouchableOpacity>
     );
@@ -272,6 +364,11 @@ const PromotionsCarousel = () => {
     return (
       <View style={{ height: 180, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#EF4444" />
+        {DEBUG_CACHE && (
+          <Text style={{ marginTop: 8, fontSize: 12, color: '#6B7280' }}>
+            Development Build - جاري التحميل...
+          </Text>
+        )}
       </View>
     );
   }
@@ -282,6 +379,13 @@ const PromotionsCarousel = () => {
 
   return (
     <View style={{ height: 180, marginTop: 16 }}>
+      {DEBUG_CACHE && (
+        <View style={{ paddingHorizontal: 8, marginBottom: 8 }}>
+          <Text style={{ fontSize: 12, color: '#6B7280', textAlign: 'center' }}>
+            🔍 Development Build - إعادة التحميل: {reloadCount}
+          </Text>
+        </View>
+      )}
       <Carousel
         loop
         width={width}

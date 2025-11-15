@@ -20,7 +20,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import RNPickerSelect from 'react-native-picker-select';
+import { Picker } from '@react-native-picker/picker';
 import { scale, fontScale } from '@/lib/responsive';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 
@@ -501,18 +501,17 @@ export default function AddressFormScreen() {
                     <Text style={styles.label}>
                       المدينة <Text style={styles.required}>*</Text>
                     </Text>
-                    <RNPickerSelect
-                      onValueChange={(value) => setSelectedCity(value)}
-                      items={cities}
-                      value={selectedCity}
-                      placeholder={{ 
-                        label: selectedCity ? getSelectedCityLabel() : 'اختر مدينتك...', 
-                        value: null 
-                      }}
-                      style={pickerSelectStyles}
-                      useNativeAndroidPickerStyle={false}
-                      Icon={() => <Ionicons name="chevron-down" size={scale(20)} color="#6B7280" />}
-                    />
+                    <Picker
+  selectedValue={selectedCity}
+  onValueChange={(itemValue) => setSelectedCity(itemValue)}
+  style={styles.picker}
+  dropdownIconColor="#6B7280"
+>
+  <Picker.Item label="اختر مدينتك..." value={null} />
+  {cities.map((city) => (
+    <Picker.Item key={city.value} label={city.label} value={city.value} />
+  ))}
+</Picker>
                     {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
                   </View>
 
@@ -521,19 +520,21 @@ export default function AddressFormScreen() {
                     <Text style={styles.label}>
                       المنطقة <Text style={styles.required}>*</Text>
                     </Text>
-                    <RNPickerSelect
-                      onValueChange={(value) => setSelectedZoneId(value)}
-                      items={areas}
-                      value={selectedZoneId}
-                      placeholder={{ 
-                        label: selectedZoneId ? getSelectedAreaLabel() : (selectedCity ? 'اختر منطقتك...' : 'اختر المدينة أولاً...'), 
-                        value: null 
-                      }}
-                      style={pickerSelectStyles}
-                      disabled={!selectedCity}
-                      useNativeAndroidPickerStyle={false}
-                      Icon={() => <Ionicons name="chevron-down" size={scale(20)} color="#6B7280" />}
-                    />
+                    <Picker
+  selectedValue={selectedZoneId}
+  onValueChange={(itemValue) => setSelectedZoneId(itemValue)}
+  style={styles.picker}
+  enabled={!!selectedCity}
+  dropdownIconColor="#6B7280"
+>
+  <Picker.Item 
+    label={selectedCity ? 'اختر منطقتك...' : 'اختر المدينة أولاً...'} 
+    value={null} 
+  />
+  {areas.map((area) => (
+    <Picker.Item key={area.value} label={area.label} value={area.value} />
+  ))}
+</Picker>
                     {errors.area && <Text style={styles.errorText}>{errors.area}</Text>}
                   </View>
 
@@ -930,40 +931,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-});
-
-// تنسيقات خاصة بمكتبة RNPickerSelect
-const pickerSelectStyles = StyleSheet.create({
-  inputIOS: {
-    fontSize: fontScale(16),
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(16),
+  picker: {
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: scale(12),
-    color: '#1F2937',
-    paddingRight: scale(40),
-    backgroundColor: '#F9FAFB',
-    textAlign: 'right',
-  },
-  inputAndroid: {
-    fontSize: fontScale(16),
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(12),
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: scale(12),
-    color: '#1F2937',
-    paddingRight: scale(30),
-    backgroundColor: '#F9FAFB',
-    textAlign: 'right',
-  },
-  iconContainer: {
-    top: scale(15),
-    right: scale(15),
-  },
-  placeholder: {
-    color: '#9CA3AF',
     textAlign: 'right',
   },
 });
