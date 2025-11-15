@@ -120,8 +120,8 @@ export default function SupportScreen() {
       </View>
       <View style={styles.contactInfo}>
         <View style={styles.contactHeader}>
-          <Text style={styles.contactLabel}>{method.label}</Text>
           <View style={[styles.statusDot, { backgroundColor: method.iconColor }]} />
+          <Text style={styles.contactLabel}>{method.label}</Text>
         </View>
         <Text style={styles.contactDescription}>{method.description}</Text>
         <Text style={styles.contactStatus}>{method.status}</Text>
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginLeft: 8,
+    marginRight: 8,
   },
   statusDot: {
     width: 8,

@@ -218,7 +218,7 @@ export default function CommunityGuidelinesScreen() {
                 </View>
               </View>
               <Text style={styles.supportContact}>
-                للاستفسارات: support@almalaky.co • 9200XXXXX
+                للاستفسارات: info@almalaky.co • 1700 250 250
               </Text>
             </View>
             <View style={styles.supportIcon}>
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   guidelineItem: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: scale(12),
   },
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   prohibitedItem: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: scale(8),
   },
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
   },
   penaltyLevelText: {
     color: '#FFF',
-    fontSize: fontScale(12),
+    fontSize: fontScale(10),
     fontWeight: 'bold',
   },
   penaltyDescription: {

@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
   // التبويبات
   tabsContainer: {
     backgroundColor: 'white',
-    paddingHorizontal: scale(20),
+    paddingHorizontal: scale(16),
     paddingVertical: scale(16),
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
