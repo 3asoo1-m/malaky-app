@@ -3,11 +3,12 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CartItem } from '@/lib/types';
+import { OptimizedImage } from '@/components/OptimizedImage';
+import { ImagePresets } from '@/lib/utils';
 
 interface CartItemProps {
   item: CartItem;
@@ -82,7 +83,16 @@ export const CartItemComponent: React.FC<CartItemProps> = React.memo(({
       </TouchableOpacity>
       
       <TouchableOpacity onPress={() => onPress(item)}> 
-        <Image source={{ uri: imageUrl }} style={styles.itemImage} />
+        {/* ✅ التعديل هنا: استبدال Image بـ OptimizedImage */}
+        <OptimizedImage 
+          uri={imageUrl}
+          width={70}
+          height={70}
+          borderRadius={12}
+          preset="cartItem" // ✅ استخدام الـ preset المخصص لصور السلة
+          priority="high"   // ✅ أولوية عالية لأنها في السلة
+          style={styles.itemImage}
+        />
       </TouchableOpacity>
       
       <View style={styles.itemDetails}>
@@ -147,12 +157,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // ✅ إزالة backgroundColor من هنا لأن OptimizedImage يدير الخلفية
   itemImage: {
     width: 70,
     height: 70,
     borderRadius: 12,
     marginRight: 12,
-    backgroundColor: '#f3f4f6',
   },
   itemDetails: {
     flex: 1,

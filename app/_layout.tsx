@@ -11,6 +11,11 @@ import { useAppConfig } from '@/hooks/useAppConfig';
 import MaintenanceScreen from './maintenance';
 import ForceUpdateScreen from './force-update';
 import * as NavigationBar from 'expo-navigation-bar';
+import { useGlobalImagePerformance } from '@/hooks/useImagePerformance';
+
+import { useDataPerformance } from '@/hooks/useDataPerformance';
+import { PerformanceMonitor } from '@/components/PerformanceMonitor';
+import { setQueryTracker } from '@/lib/query-client';
 
 // ✅ إضافة TanStack Query Provider
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -75,6 +80,7 @@ const initializeI18n = async () => {
 
 const InitializationWrapper = () => {
   const [isI18nInitialized, setIsI18nInitialized] = useState(false);
+  const { setupGlobalImageTracking } = useGlobalImagePerformance();
 
   useEffect(() => {
     initializeArabicRTL();
@@ -82,10 +88,13 @@ const InitializationWrapper = () => {
     const init = async () => {
       await initializeI18n();
       setIsI18nInitialized(true);
+      
+      // ✅ تفعيل تتبع أداء الصور عالمياً
+      setupGlobalImageTracking();
     };
     
     init();
-  }, []);
+  }, [setupGlobalImageTracking]);
 
   if (!isI18nInitialized) {
     return (
@@ -119,12 +128,15 @@ const AuthGuard = () => {
     handleUpdate 
   } = useAppConfig();
 
+  // ✅ استخدام hook أداء الصور للحصول على التقارير
+  const { getPerformanceReport } = useGlobalImagePerformance();
+
   // ✅ التأكد من تطبيق إعدادات RTL
   useEffect(() => {
     initializeArabicRTL();
   }, []);
 
-  // ✅ كود التحديث التلقائي OTA
+  // ✅ كود التحديث التلقائي OTA محسن
   useEffect(() => {
     const checkForOTAUpdates = async () => {
       if (__DEV__) {
@@ -152,7 +164,37 @@ const AuthGuard = () => {
     checkForOTAUpdates();
   }, []);
 
-  // ✅ الحل الأفضل
+  // ✅ مراقبة أداء الصور في development
+  useEffect(() => {
+    if (__DEV__) {
+      const interval = setInterval(() => {
+        const report = getPerformanceReport();
+        if (report.totalImages > 0) {
+          console.log('📈 Image Performance Report:', {
+            totalImages: report.totalImages,
+            successRate: `${report.successRate.toFixed(1)}%`,
+            averageLoadTime: `${report.averageLoadTime.toFixed(0)}ms`,
+            recentErrors: report.recentErrors.length,
+          });
+        }
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [getPerformanceReport]);
+
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('🧪 TEST MODE ACTIVE');
+      console.log('📱 Access tests at: /test');
+      
+      if (process.env.EXPO_PUBLIC_TEST_MODE === 'true') {
+        console.log('🔧 Test mode enabled via environment variable');
+      }
+    }
+  }, []);
+
+  // ✅ الحل الأفضل مع تحسين الأداء
   useEffect(() => {
     if (initialLoading || configLoading) return;
 
@@ -160,7 +202,6 @@ const AuthGuard = () => {
       return;
     }
 
-    // ✅ تحسين التحقق من segments
     if (!segments || !Array.isArray(segments) || segments.length < 1) {
       return;
     }
@@ -171,7 +212,9 @@ const AuthGuard = () => {
       if (inAuthGroup) {
         router.replace('/');
       }
-      registerForPushNotificationsAsync();
+      registerForPushNotificationsAsync().catch(error => {
+        console.warn('Failed to register for push notifications:', error);
+      });
     } else {
       if (!inAuthGroup) {
         router.replace('/(auth)/login'); 
@@ -214,48 +257,133 @@ const AuthGuard = () => {
   return <Slot />;
 };
 
-export default function RootLayout() {
+// ✅ مكون منفصل لتهيئة نظام مراقبة البيانات
+function DataPerformanceInitializer() {
+  const dataPerformance = useDataPerformance();
+  
   useEffect(() => {
-    const hideNavigationBar = async () => {
-      try {
-        await NavigationBar.setVisibilityAsync('hidden');
-        await NavigationBar.setBehaviorAsync('overlay-swipe');
-        await NavigationBar.setBackgroundColorAsync('transparent');
-        console.log('✅ تم إخفاء شريط التنقل بنجاح');
-      } catch (error) {
-        console.error('❌ فشل في إخفاء شريط التنقل:', error);
+    setQueryTracker(dataPerformance);
+    console.log('🔧 تم ربط نظام مراقبة البيانات');
+
+    // فحص إضافي بعد ثانيتين
+    setTimeout(() => {
+      const report = dataPerformance.getPerformanceReport();
+      console.log('🔍 [INIT CHECK] نظام المراقبة جاهز:', {
+        trackQuery: !!dataPerformance.trackQuery,
+        totalQueries: report.totalQueries,
+        systemReady: true
+      });
+    }, 2000);
+  }, [dataPerformance]);
+
+  useEffect(() => {
+    if (!__DEV__) return;
+
+    const logDataPerformance = () => {
+      const report = dataPerformance.getPerformanceReport();
+      
+      if (report.totalQueries > 0) {
+        console.log(
+          `%c📊 أداء البيانات - ${new Date().toLocaleTimeString()}`,
+          'background: #1D3557; color: white; padding: 4px; border-radius: 4px; font-weight: bold;'
+        );
+
+        console.log(
+          `%c📈 الاستعلامات:%c ${report.totalQueries} total | ${report.cachedQueries} cached | ${report.failedQueries} failed`,
+          'color: #2196F3; font-weight: bold;', 'color: #666;'
+        );
+
+        console.log(
+          `%c⚡ الكاش:%c ${report.cacheHitRate.toFixed(1)}% hit rate | ⏱ ${report.averageQueryTime.toFixed(0)}ms avg`,
+          'color: #4CAF50; font-weight: bold;', 'color: #666;'
+        );
+
+        console.log(
+          `%c💾 البيانات:%c ${(report.totalDataSize / 1024).toFixed(1)}KB total transferred`,
+          'color: #FF9800; font-weight: bold;', 'color: #666;'
+        );
+
+        if (report.cacheHitRate < 60) {
+          console.warn('🚨 انتبه: معدل الكاش منخفض! هذا يستهلك cached egress.');
+        }
+
+        if (report.totalDataSize > 100 * 1024) {
+          console.warn('📦 كمية البيانات كبيرة! فكر في pagination أو تقليل الحقول.');
+        }
+
+        console.log('---');
       }
     };
 
-    hideNavigationBar();
+    const interval = setInterval(logDataPerformance, 8000);
+    return () => clearInterval(interval);
+  }, [dataPerformance]);
+
+  return null; // هذا المكون ما بعرض أي واجهة
+}
+
+export default function RootLayout() {
+  const hideNavigationBar = React.useCallback(async () => {
+    try {
+      await NavigationBar.setVisibilityAsync('hidden');
+      await NavigationBar.setBehaviorAsync('overlay-swipe');
+      await NavigationBar.setBackgroundColorAsync('transparent');
+      console.log('✅ تم إخفاء شريط التنقل بنجاح');
+    } catch (error) {
+      console.error('❌ فشل في إخفاء شريط التنقل:', error);
+    }
   }, []);
 
   useEffect(() => {
-    const { removeReceivedListener, removeResponseListener } = setupNotificationHandlers();
+    hideNavigationBar();
+  }, [hideNavigationBar]);
 
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        console.log('App has come to the foreground, clearing badge count.');
-        clearBadgeCount();
+  // ✅ تحسين إدارة الإشعارات
+  useEffect(() => {
+    let isMounted = true;
+
+    const setupNotifications = async () => {
+      if (!isMounted) return;
+      
+      try {
+        const { removeReceivedListener, removeResponseListener } = setupNotificationHandlers();
+
+        const subscription = AppState.addEventListener('change', (nextAppState) => {
+          if (nextAppState === 'active' && isMounted) {
+            console.log('App has come to the foreground, clearing badge count.');
+            clearBadgeCount();
+          }
+        });
+
+        return () => {
+          removeReceivedListener?.();
+          removeResponseListener?.();
+          subscription?.remove();
+        };
+      } catch (error) {
+        console.error('Failed to setup notifications:', error);
       }
-    });
+    };
+
+    const cleanupPromise = setupNotifications();
 
     return () => {
-      removeReceivedListener();
-      removeResponseListener();
-      subscription.remove();
+      isMounted = false;
+      cleanupPromise.then(cleanup => cleanup?.());
     };
   }, []);
 
   return (
     <SafeAreaProvider>
-      {/* ✅ إضافة QueryClientProvider في المستوى الأعلى */}
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <FavoritesProvider>
             <CartProvider>
               <View style={{ flex: 1, direction: 'rtl' }}>
                 <InitializationWrapper />
+                {__DEV__ && <PerformanceMonitor />}
+                {/* ✅ إضافة مكون مراقبة البيانات هنا */}
+                <DataPerformanceInitializer />
               </View>
             </CartProvider>
           </FavoritesProvider>

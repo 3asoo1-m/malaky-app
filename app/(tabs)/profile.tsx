@@ -19,6 +19,7 @@ import { useRouter } from 'expo-router';
 import { unregisterForPushNotificationsAsync } from '@/lib/notifications';
 import { scale, fontScale } from '@/lib/responsive';
 
+
 // ✅ تحديث واجهة Profile لتشمل بيانات الولاء والإحصائيات
 interface UserProfile {
   first_name: string;
@@ -412,6 +413,24 @@ const fetchUserStats = async (userId: string): Promise<UserStats> => {
           <Text style={styles.logoutText}>تسجيل الخروج</Text>
           <Ionicons name="log-out-outline" size={scale(20)} color="#DC2626" />
         </TouchableOpacity>
+        
+{__DEV__ && (
+  <TouchableOpacity
+    onPress={() => router.push('/test' as any)}
+    style={{
+      position: 'absolute',
+      top: 50,
+      right: 20,
+      backgroundColor: '#ff4757',
+      padding: 10,
+      borderRadius: 20,
+      zIndex: 9999
+    }}
+  >
+    <Text style={{ color: 'white', fontSize: 12 }}>🧪 Tests</Text>
+  </TouchableOpacity>
+)}
+
 
         <View style={styles.versionInfo}>
           <Text style={styles.versionText}>تطبيق الدجاج الملكي بروست • الإصدار 1.0.0</Text>
