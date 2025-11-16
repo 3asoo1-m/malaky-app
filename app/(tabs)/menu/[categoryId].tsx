@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -140,14 +141,16 @@ export default function MenuItemsScreen() {
   }, [fetchMenuItems]);
 
   // ✅ useCallback لـ renderItem و keyExtractor
-  const renderMenuItem = useCallback(({ item }: { item: MenuItem }) => (
-    <View style={styles.cardWrapper}>
-      <MenuItemCard
-        item={item}
-        onPress={() => handleItemPress(item.id)}
-      />
-    </View>
-  ), [handleItemPress]);
+const renderMenuItem = useCallback(({ item }: { item: MenuItem }) => (
+  <View style={styles.cardWrapper}>
+    <MenuItemCard
+      item={item}
+      onPress={() => handleItemPress(item.id)}
+      isFavorite={false} // ✅ إضافة الخاصية المطلوبة
+      onToggleFavorite={() => {}} // ✅ إضافة الخاصية المطلوبة
+    />
+  </View>
+), [handleItemPress]);
 
   const keyExtractor = useCallback((item: MenuItem) => item.id.toString(), []);
 
@@ -225,7 +228,7 @@ export default function MenuItemsScreen() {
   );
 }
 
-// ✅ 4. تحديث التنسيقات بالكامل لتناسب العرض بعمودين
+// ✅ التنسيقات المحسنة
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -287,6 +290,3 @@ const styles = StyleSheet.create({
     height: 20,
   },
 });
-
-// ✅ إضافة TouchableOpacity المستورد
-import { TouchableOpacity } from 'react-native';

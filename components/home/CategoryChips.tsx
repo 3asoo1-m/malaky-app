@@ -99,24 +99,17 @@ function CategoryChips({
   loading = false,
   sectionsWithItems = [] // ✅ الخاصية الجديدة
 }: CategoryChipsProps) { // ✅ استخدام النوع الجديد
-  // ✅ ترتيب ثابت مع فلترة الفئات الفارغة
+  // ✅ الحل: عرض كل الفئات دائماً بدون فلترة
   const allCategories = useMemo(() => {
-    const baseCategories = [{ id: 'all' as const, name: 'الكل' }, ...categories];
-    
-    // ✅ إذا تم توفير sectionsWithItems، قم بفلترة الفئات الفارغة
-    if (sectionsWithItems.length > 0) {
-      return baseCategories.filter(cat => 
-        cat.id === 'all' || sectionsWithItems.includes(cat.id)
-      );
-    }
-    
-    return baseCategories;
-  }, [categories, sectionsWithItems]);
+    return [{ id: 'all' as const, name: 'الكل' }, ...categories];
+  }, [categories]);
 
   // ✅ دالة مساعدة للتحقق من وجود عناصر في الفئة
   const categoryHasItems = useCallback((categoryId: ActiveCategory): boolean => {
     if (categoryId === 'all') return true;
-    return sectionsWithItems.length === 0 || sectionsWithItems.includes(categoryId);
+    // ✅ إذا لم يتم توفير البيانات، افترض أن هناك عناصر (لا تخفي الفئات)
+    if (sectionsWithItems.length === 0) return true;
+    return sectionsWithItems.includes(categoryId);
   }, [sectionsWithItems]);
 
   // ✅ اختيار الفئة
@@ -190,6 +183,7 @@ function CategoryChips({
 
 export default memo(CategoryChips);
 
+// ✅ التنسيقات تبقى كما هي...
 const styles = StyleSheet.create({
   container: {
     height: 75,

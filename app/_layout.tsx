@@ -285,22 +285,18 @@ function DataPerformanceInitializer() {
       if (report.totalQueries > 0) {
         console.log(
           `%c📊 أداء البيانات - ${new Date().toLocaleTimeString()}`,
-          'background: #1D3557; color: white; padding: 4px; border-radius: 4px; font-weight: bold;'
         );
 
         console.log(
           `%c📈 الاستعلامات:%c ${report.totalQueries} total | ${report.cachedQueries} cached | ${report.failedQueries} failed`,
-          'color: #2196F3; font-weight: bold;', 'color: #666;'
         );
 
         console.log(
           `%c⚡ الكاش:%c ${report.cacheHitRate.toFixed(1)}% hit rate | ⏱ ${report.averageQueryTime.toFixed(0)}ms avg`,
-          'color: #4CAF50; font-weight: bold;', 'color: #666;'
         );
 
         console.log(
           `%c💾 البيانات:%c ${(report.totalDataSize / 1024).toFixed(1)}KB total transferred`,
-          'color: #FF9800; font-weight: bold;', 'color: #666;'
         );
 
         if (report.cacheHitRate < 60) {

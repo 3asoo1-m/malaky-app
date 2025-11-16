@@ -10,23 +10,23 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFavorites } from '@/lib/useFavorites';
 import { MenuItem } from '@/lib/types';
 
 type MenuItemCardProps = {
   item: MenuItem;
+  isFavorite: boolean; // ✅ تلقي الحالة كـ prop
+  onToggleFavorite: () => void; // ✅ تلقي الدالة كـ prop
   onPress?: (event: GestureResponderEvent) => void;
 };
 
-export default function MenuItemCard({ item, onPress }: MenuItemCardProps) {
-  const { favoriteIds, toggleFavorite } = useFavorites();
-  const isFavorite = favoriteIds.has(item.id);
-
+// ✅ لاحظ أننا لم نعد نستدعي useFavorites هنا
+function MenuItemCard({ item, isFavorite, onToggleFavorite, onPress }: MenuItemCardProps) {
   const defaultImageSource = require('@/assets/images/icon.png');
+  console.log(`[LOG 3] 🟢 MenuItemCard RENDER - Item: ${item.id}, isFavorite: ${isFavorite}`);
 
   const handleHeartPress = (e: GestureResponderEvent) => {
     e.stopPropagation();
-    toggleFavorite(item.id);
+    onToggleFavorite(); // ✅ استدعاء الدالة من الـ props
   };
 
   const imageSource =
@@ -43,8 +43,8 @@ export default function MenuItemCard({ item, onPress }: MenuItemCardProps) {
           onPress={handleHeartPress}
         >
           <Ionicons
-            name={isFavorite ? 'heart' : 'heart-outline'}
-            size={24} // تكبير الأيقونة قليلاً
+            name={isFavorite ? 'heart' : 'heart-outline'} // ✅ استخدام isFavorite من الـ props
+            size={24}
             color={isFavorite ? '#E53935' : '#333'}
           />
         </TouchableOpacity>
@@ -63,6 +63,8 @@ export default function MenuItemCard({ item, onPress }: MenuItemCardProps) {
     </View>
   );
 }
+export default React.memo(MenuItemCard);
+
 
 // ✅✅✅ 3. إعادة تطبيق التنسيقات الأصلية مع تحسينات ✅✅✅
 const styles = StyleSheet.create({
