@@ -20,6 +20,9 @@ const { width } = Dimensions.get('window');
 
 // 🔧 إعدادات التخزين المؤقت - تفعيل في Development Build
 const DEBUG_CACHE = true;
+interface PromotionsCarouselProps {
+  promotions?: Promotion[]; // جعلها اختيارية للتوافق مع الاستخدام الحالي
+}
 
 const iconMap = {
   Percent: Percent,

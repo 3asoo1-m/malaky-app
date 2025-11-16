@@ -111,6 +111,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 5,
     overflow: 'hidden',
+    marginBottom: 11,
   },
   gradientHeader: {
     padding: 16,

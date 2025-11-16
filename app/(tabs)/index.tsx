@@ -173,7 +173,7 @@ export default function HomeScreen() {
             case 'header':
                 return searchQuery.trim() === '' ? (
                     <View>
-                        <PromotionsCarousel promotions={promotions || []} />
+                        <PromotionsCarousel />
                         <FeaturedDeals deals={featuredDealsMock} />
                     </View>
                 ) : (
@@ -224,7 +224,8 @@ export default function HomeScreen() {
     return (
         <SafeAreaView style={styles.safeArea}>
             <Stack.Screen options={{ headerShown: false }} />
-            
+            <View style={styles.topSpacing} />
+
             <Header
                 searchQuery={searchQuery}
                 setSearchQuery={handleSearch}
@@ -264,7 +265,12 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
     safeArea: { 
         flex: 1, 
-        backgroundColor: '#FFF' 
+        backgroundColor: '#FFF',
+        paddingTop: 10, // ✅ مساحة إضافية
+ 
+    },
+     topSpacing: {
+        height: 10, // ✅ مساحة قابلة للتعديل
     },
     centerContainer: {
         flex: 1,

@@ -154,16 +154,18 @@ const CartItemComponent = React.memo(({ item, onUpdate, onRemove, onPress }: Car
     
     {/* حاوية البطاقات المرنة */}
     <View>
-      {item.additionalPieces.map((piece, index) => (
-        <View key={index}>
-          <Text style={styles.additionalPieceText} numberOfLines={1}>
-            {piece.quantity}x {piece.name}
-          </Text>
-          <Text style={styles.additionalPiecePrice}>
-            +{(piece.price * piece.quantity).toFixed(2)} ₪
-          </Text>
-        </View>
-      ))}
+        {item.additionalPieces.map((piece, index) => (
+            <View key={index} style={styles.pieceRow}>
+                <Text style={styles.additionalPieceText} numberOfLines={1}>
+                     {piece.quantity}
+                      x   
+                     {piece.name}
+                </Text>
+                <Text style={styles.additionalPiecePrice}>
+                    +{(piece.price * piece.quantity).toFixed(2)} ₪
+                </Text>
+            </View>
+        ))}
     </View>
   </View>
 )}
@@ -203,28 +205,28 @@ const OrderTypeSelector = React.memo(({ orderType, onTypeChange }: OrderTypeSele
       style={[styles.orderTypeButton, orderType === 'pickup' && styles.orderTypeActive]} 
       onPress={() => onTypeChange('pickup')}
     >
+      <Text style={[styles.orderTypeText, orderType === 'pickup' && styles.orderTypeTextActive]}>
+        استلام
+      </Text>
       <Ionicons 
         name="storefront-outline" 
         size={24} 
         color={orderType === 'pickup' ? '#fff' : '#666'} 
       />
-      <Text style={[styles.orderTypeText, orderType === 'pickup' && styles.orderTypeTextActive]}>
-        استلام
-      </Text>
     </TouchableOpacity>
     
     <TouchableOpacity 
       style={[styles.orderTypeButton, orderType === 'delivery' && styles.orderTypeActive]} 
       onPress={() => onTypeChange('delivery')}
     >
+      <Text style={[styles.orderTypeText, orderType === 'delivery' && styles.orderTypeTextActive]}>
+        توصيل
+      </Text>
       <Ionicons 
         name="bicycle-outline" 
         size={24} 
         color={orderType === 'delivery' ? '#fff' : '#666'} 
       />
-      <Text style={[styles.orderTypeText, orderType === 'delivery' && styles.orderTypeTextActive]}>
-        توصيل
-      </Text>
     </TouchableOpacity>
   </View>
 ));
@@ -1014,7 +1016,7 @@ const renderStepIndicator = () => {
       ) : (
         <View style={styles.continueContent}>
           <Text style={styles.continueText}>متابعة</Text>
-          <Ionicons name="chevron-forward" size={20} color="#fff" />
+          <Ionicons name="chevron-back" size={20} color="#fff" />
         </View>
       )}
     </TouchableOpacity>
@@ -1062,7 +1064,7 @@ const renderStepIndicator = () => {
                     }}
                   >
                     <Text style={styles.checkoutButtonText}>إتمام الطلب</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#fff" />
+                    <Ionicons name="chevron-back" size={20} color="#fff" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1509,7 +1511,7 @@ additionalPiecesContainer: {
   alignSelf: 'stretch', // تأكد من أنها تمتد
 },
 additionalPiecesHeader: {
-  flexDirection: 'row-reverse', // أيقونة يمين، نص يسار
+  flexDirection: 'row', // أيقونة يمين، نص يسار
   alignItems: 'center',
   marginBottom: 10,
 },
@@ -1540,7 +1542,10 @@ additionalPiecesTitle: {
   },
 
   additionalPieceText: {
+    marginLeft: 8, // مسافة بين النص والسعر
     fontSize: 12,
+    textAlign: 'left',
+
     fontFamily: 'Cairo-Regular',
     color: '#854d0e',
   },
@@ -1549,6 +1554,14 @@ additionalPiecesTitle: {
     fontFamily: 'Cairo-SemiBold',
     color: '#22c55e',
   },
+  pieceRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e9ecef',
+    },
   //-----------------
   
   //-----------------
