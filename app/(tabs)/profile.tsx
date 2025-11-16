@@ -19,6 +19,8 @@ import { useRouter } from 'expo-router';
 import { unregisterForPushNotificationsAsync } from '@/lib/notifications';
 import { scale, fontScale } from '@/lib/responsive';
 
+import CacheTracker from '@/components/CacheTracker';
+
 
 // ✅ تحديث واجهة Profile لتشمل بيانات الولاء والإحصائيات
 interface UserProfile {
@@ -104,10 +106,17 @@ export default function ProfileScreen() {
   const { user, initialLoading } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  
+  
+  const trackFetch = (message: string) => {
+if (__DEV__) console.log('📡', message);
+};
+  
+  // ✅ دالة محسنة لجلب الإحصائيات الحقيقية بطلب واحد
+  const fetchUserStats = async (userId: string): Promise<UserStats> => {
+    try {
+    trackFetch('Fetching profile from Supabase...');
 
-// ✅ دالة محسنة لجلب الإحصائيات الحقيقية بطلب واحد
-const fetchUserStats = async (userId: string): Promise<UserStats> => {
-  try {
     // استخدام الدالة الشاملة التي ترجع كل الإحصائيات في طلب واحد
     const { data, error } = await supabase
       .rpc('get_user_stats', { user_id: userId })
@@ -116,12 +125,14 @@ const fetchUserStats = async (userId: string): Promise<UserStats> => {
     if (error) {
       console.log('استخدام الاستعلامات المباشرة بدلاً من RPC...', error);
       
+      
+      trackFetch('Fetching profile from Supabase...');
       // استعلامات احتياطية إذا فشلت الدالة الشاملة
       const { count: ordersCount, error: ordersError } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId);
-
+trackFetch('Fetching profile from Supabase...');
       const { count: favoritesCount, error: favoritesError } = await supabase
         .from('user_favorites')
         .select('*', { count: 'exact', head: true })
@@ -158,6 +169,7 @@ const fetchUserStats = async (userId: string): Promise<UserStats> => {
       }
 
       try {
+        trackFetch('Fetching profile from Supabase...');
         // جلب البيانات الأساسية أولاً
         const { data, error } = await supabase
           .from('profiles')
