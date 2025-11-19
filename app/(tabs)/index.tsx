@@ -14,10 +14,10 @@ import Header from '@/components/home/Header';
 import PromotionsCarousel from '@/components/home/PromotionsCarousel';
 import FeaturedDeals from '@/components/home/FeaturedDeals';
 import CategoryChips from '@/components/home/CategoryChips';
-import MealCard from '@/components/home/MealCard';
 import FloatingCartButton from '@/components/home/FloatingCartButton';
 import ScrollToTopButton from '@/components/home/ScrollToTopButton';
 import CustomBottomNav from '@/components/CustomBottomNav';
+import MenuItemCard from '@/components/MenuItemCard';
 
 // --- واجهة وأنواع البيانات ---
 interface Deal {
@@ -42,6 +42,19 @@ export default function HomeScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isVoiceSearching, setIsVoiceSearching] = useState(false);
+    const [favorites, setFavorites] = useState<Set<number>>(new Set());
+
+    const toggleFavorite = useCallback((itemId: number) => {
+        setFavorites(prev => {
+            const newFavorites = new Set(prev);
+            if (newFavorites.has(itemId)) {
+                newFavorites.delete(itemId);
+            } else {
+                newFavorites.add(itemId);
+            }
+            return newFavorites;
+        });
+    }, []);
 
     // --- Data Fetching ---
     const { 
@@ -200,7 +213,14 @@ export default function HomeScreen() {
                     <View style={styles.listContainer}>
                         <FlatList
                             data={filteredMeals}
-                            renderItem={({ item: mealItem }) => <MealCard meal={mealItem} />}
+                            renderItem={({ item: mealItem }) => (
+                                <MenuItemCard 
+                                    item={mealItem}
+                                    isFavorite={favorites.has(mealItem.id)}
+                                    onToggleFavorite={() => toggleFavorite(mealItem.id)}
+                                    // يمكنك إضافة onPress هنا إذا أردت
+                                />
+                            )}
                             keyExtractor={(mealItem) => mealItem.id.toString()}
                             numColumns={2}
                             columnWrapperStyle={styles.columnWrapper}
@@ -312,7 +332,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     listContainer: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 8,
         paddingBottom: 20,
     },
     columnWrapper: {

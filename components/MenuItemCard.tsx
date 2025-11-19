@@ -29,13 +29,11 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onPress }: MenuItemC
     onToggleFavorite(); // ✅ استدعاء الدالة من الـ props
   };
 
-  const imageSource =
-    item.images && item.images.length > 0
-      ? { uri: item.images[0].image_url }
-      : defaultImageSource;
+  const imageSource = item.image_url 
+    ? { uri: item.image_url }
+    : defaultImageSource;
 
   return (
-    // ✅ 1. استخدام حاوية خارجية لتطبيق الهو  امش
     <View style={styles.outerContainer}>
       <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.8}>
         <TouchableOpacity
@@ -43,26 +41,32 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onPress }: MenuItemC
           onPress={handleHeartPress}
         >
           <Ionicons
-            name={isFavorite ? 'heart' : 'heart-outline'} // ✅ استخدام isFavorite من الـ props
+            name={isFavorite ? 'heart' : 'heart-outline'}
             size={24}
             color={isFavorite ? '#E53935' : '#333'}
           />
         </TouchableOpacity>
 
         <View style={styles.imageContainer}>
-          <Image source={imageSource} style={styles.cardImage} />
+          <Image 
+            source={imageSource} 
+            style={styles.cardImage} 
+            defaultSource={defaultImageSource} // ✅ إضافة fallback
+          />
         </View>
         
         <View style={styles.textContainer}>
-          {/* ✅ 2. استخدام البيانات من 'item' مع عرض الوصف */}
           <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.cardSubtitle} numberOfLines={2}>{item.description || ' '}</Text>
-          <Text style={styles.cardPrice}>{item.price.toFixed(2)} ₪</Text>
+          <Text style={styles.cardSubtitle} numberOfLines={2}>
+            {item.description || ' '}
+          </Text>
+          <Text style={styles.cardPrice}>{item.price} ₪</Text>
         </View>
       </TouchableOpacity>
     </View>
   );
 }
+
 export default React.memo(MenuItemCard);
 
 
