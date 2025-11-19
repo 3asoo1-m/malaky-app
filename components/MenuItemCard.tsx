@@ -35,7 +35,7 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onPress }: MenuItemC
       : defaultImageSource;
 
   return (
-    // ✅ 1. استخدام حاوية خارجية لتطبيق الهوامش
+    // ✅ 1. استخدام حاوية خارجية لتطبيق الهو  امش
     <View style={styles.outerContainer}>
       <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.8}>
         <TouchableOpacity
