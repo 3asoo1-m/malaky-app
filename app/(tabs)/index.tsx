@@ -1,12 +1,13 @@
+// app/(tabs)/index.tsx
+
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, RefreshControl, FlatList, SafeAreaView, StyleSheet, ColorValue, Alert } from 'react-native';
-import { useMenuData, usePromotions, useMenuTotalCount } from '@/lib/api/queries';
+import { useMenuData, usePromotions } from '@/lib/api/queries';
 import { Stack } from 'expo-router';
 import { Colors } from '@/styles';
-import { useIsFocused } from '@react-navigation/native';
 
 import { useQueryClient } from '@tanstack/react-query';
-import * as Speech from 'expo-speech';
+import * as Speech from 'expo-speech'; // ⬅️ التغيير هنا
 
 // --- Components ---
 import Header from '@/components/home/Header';
@@ -17,7 +18,6 @@ import MealCard from '@/components/home/MealCard';
 import FloatingCartButton from '@/components/home/FloatingCartButton';
 import ScrollToTopButton from '@/components/home/ScrollToTopButton';
 import CustomBottomNav from '@/components/CustomBottomNav';
-import { Category, MenuItem } from '@/lib/types';
 
 // --- واجهة وأنواع البيانات ---
 interface Deal {
@@ -28,16 +28,6 @@ interface Deal {
   savings: string;
   image: any;
   gradient: readonly [ColorValue, ColorValue, ...ColorValue[]];
-}
-
-// ✅ تعريف الأنواع المساعدة
-interface CategoryWithItems extends Category {
-  menu_items?: MenuItem[];
-}
-
-interface CategoryChip {
-  id: number;
-  name: string;
 }
 
 const featuredDealsMock: Deal[] = [
@@ -52,44 +42,14 @@ export default function HomeScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isVoiceSearching, setIsVoiceSearching] = useState(false);
-    const isFocused = useIsFocused(); // ✅ الخطوة 1: استدعاء الـ hook
-    const queryClient = useQueryClient(); // ✅ الخطوة 1: احصل على الـ client
 
-    // ✅ STATE جديد: تتبع أول تحميل
-    const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-
-    // ✅ STATE للـ Pagination
-    const [limit] = useState(10); // 10 وجبات لكل صفحة
-    const [offset, setOffset] = useState(0); // الإزاحة الحالية
-    const [hasMore, setHasMore] = useState(true); // هل يوجد المزيد من البيانات؟
-    const [loadingMore, setLoadingMore] = useState(false); // تحميل المزيد
-
-
-    useEffect(() => {
-        // هذا الكود سيتم تشغيله في كل مرة تتغير فيها isFocused
-        
-        if (!isFocused) {
-            // ✅ إذا لم تعد الشاشة في الواجهة
-            console.log('🚫 [CLEANUP] الشاشة ليست في الواجهة، جاري إلغاء الاستعلامات النشطة...');
-            
-            // قم بإلغاء أي استعلامات نشطة مرتبطة بمفتاح 'menu'
-            queryClient.cancelQueries({ queryKey: ['menu'] });
-            
-            console.log('✅ [CLEANUP] تم إلغاء الاستعلامات بنجاح.');
-        }
-    }, [isFocused, queryClient]);
-    
-    // --- Data Fetching مع Pagination حقيقي ---
+    // --- Data Fetching ---
     const { 
         data: menuData, 
         isLoading: isLoadingMenu, 
         error: menuError,
         refetch: refetchMenu 
-    } = useMenuData(limit, offset);
-    
-    const { 
-        data: totalCount 
-    } = useMenuTotalCount();
+    } = useMenuData();
     
     const { 
         data: promotions, 
@@ -98,96 +58,24 @@ export default function HomeScreen() {
         refetch: refetchPromotions 
     } = usePromotions();
 
-    // ✅ حساب إذا في المزيد من البيانات
-    useEffect(() => {
-        if (totalCount && menuData) {
-            const currentItemCount = menuData.flatMap((cat: CategoryWithItems) => cat.menu_items || []).length;
-            const hasMoreData = currentItemCount < totalCount;
-            setHasMore(hasMoreData);
-            
-            if (!hasMoreData && currentItemCount > 0) {
-                console.log(`🏁 وصلت لنهاية البيانات ${currentItemCount}/${totalCount}`);
-            }
-        }
-    }, [menuData, totalCount]);
-
-    // ✅ تحميل المزيد من البيانات
-    const loadMoreData = useCallback(async () => {
-        // ✅✅✅  الخطوة الأهم: أضف هذا الشرط في البداية  ✅✅✅
-        if (!isFocused || loadingMore || !hasMore || searchQuery.trim() !== '') {
-            if (!isFocused) {
-                console.log('🚫 [SKIPPED] تحميل المزيد تم تخطيه لأن الشاشة ليست في الواجهة.');
-            }
-            return;
-        }
-        
-        setLoadingMore(true);
-        const newOffset = offset + limit;
-        console.log(`📥 [ACTIVE] جاري تحميل المزيد... offset: ${newOffset}`);
-        
-        setOffset(newOffset);
-        setLoadingMore(false);
-    }, [isFocused, loadingMore, hasMore, offset, limit, searchQuery]);
-
-    // ✅ إعادة التعيين عند تغيير الفئة أو البحث
-    useEffect(() => {
-        setOffset(0);
-        setHasMore(true);
-    }, [selectedCategory, searchQuery]);
-
-    // ✅ تحسين: تأجيل تحميل بعض البيانات حتى يكتمل التحميل الأولي
-    useEffect(() => {
-        if (!isLoadingMenu && !isLoadingPromotions && !initialLoadComplete) {
-            setInitialLoadComplete(true);
-            console.log('✅ التحميل الأولي اكتمل - البيانات جاهزة للتقديم');
-        }
-    }, [isLoadingMenu, isLoadingPromotions, initialLoadComplete]);
-
-    // ✅ تحسين: استخدام useMemo بشكل أكثر فعالية مع الأنواع الصحيحة
-    const filteredMeals = useMemo(() => {
-        if (!menuData || !initialLoadComplete) return [];
-        
-        const allMeals = menuData.flatMap((cat: CategoryWithItems) => cat.menu_items || []);
-        
-        const mealsByCategory = selectedCategory === 'all'
-            ? allMeals
-            : menuData.find((cat: CategoryWithItems) => cat.id === selectedCategory)?.menu_items || [];
-
-        if (!searchQuery.trim()) return mealsByCategory;
-
-        return mealsByCategory.filter((meal: MenuItem) =>
-            meal.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            meal.description?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    }, [menuData, selectedCategory, searchQuery, initialLoadComplete]);
-
-    // ✅ تحسين: تقليل إعادة التحميل غير الضرورية مع الأنواع الصحيحة
-    const categories = useMemo((): CategoryChip[] => {
-        return menuData?.map((cat: Category) => ({ id: cat.id, name: cat.name })) || [];
-    }, [menuData]);
-
-    const sectionsWithItems = useMemo(() => {
-        return menuData?.filter((cat: CategoryWithItems) => cat.menu_items && cat.menu_items.length > 0).map((cat: { id: any; }) => cat.id) || [];
-    }, [menuData]);
-
-    // ✅ تحسين: تجنب إعادة إنشاء الـ listData في كل render مع إضافة قسم التحميل
-    const listData = useMemo(() => [
-        { type: 'header', id: 'header-section' },
-        { type: 'categories', id: 'categories' },
-        { type: 'meals', id: 'meals' },
-        { type: 'loading', id: 'loading-more' } // ✅ إضافة قسم التحميل
-    ], []);
-
-    // --- Voice Search Logic ---
+    // --- Voice Search Logic باستخدام expo-speech ---
+    
     const startVoiceSearch = async () => {
         try {
             setIsVoiceSearching(true);
+            
+            // ⬅️ التغيير هنا - استخدام التعرف على الكلام من expo-speech
+            // للأسف expo-speech لا تدعم التعرف على الكلام، فقط التحدث
+            // لذلك سنستخدم بديل أو نعطل هذه الميزة مؤقتاً
+            
             Alert.alert(
                 'البحث الصوتي',
                 'ميزة البحث الصوتي غير متاحة حالياً. جاري العمل على إضافتها قريباً.',
                 [{ text: 'حسناً' }]
             );
+            
             setIsVoiceSearching(false);
+            
         } catch (e) {
             console.error('Failed to start voice search', e);
             setIsVoiceSearching(false);
@@ -195,12 +83,34 @@ export default function HomeScreen() {
         }
     };
 
-    // --- Handlers مع تحسينات الأداء ---
+    const stopVoiceSearch = async () => {
+        setIsVoiceSearching(false);
+    };
+
+    // ✅ فلترة البيانات بناءً على البحث والفئة المختارة
+    const filteredMeals = useMemo(() => {
+        const allMeals = menuData?.flatMap(cat => cat.menu_items || []) || [];
+        
+        // الفلترة حسب الفئة أولاً
+        const mealsByCategory = selectedCategory === 'all'
+            ? allMeals
+            : menuData?.find(cat => cat.id === selectedCategory)?.menu_items || [];
+
+        // ثم الفلترة حسب نص البحث
+        if (!searchQuery.trim()) {
+            return mealsByCategory;
+        }
+        
+        return mealsByCategory.filter(meal =>
+            meal.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            meal.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [menuData, selectedCategory, searchQuery]);
+
+    // --- Handlers ---
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            setOffset(0); // ✅ إعادة التعيين عند التحديث
-            setHasMore(true);
             await Promise.all([refetchMenu(), refetchPromotions()]);
         } catch (error) {
             console.error('Error refreshing:', error);
@@ -209,31 +119,56 @@ export default function HomeScreen() {
         }
     }, [refetchMenu, refetchPromotions]);
 
-    const handleScroll = useCallback((event: any) => {
+    const handleScroll = (event: any) => {
         setShowScrollTop(event.nativeEvent.contentOffset.y > 400);
-    }, []);
+    };
 
-    const scrollToTop = useCallback(() => {
+    const scrollToTop = () => {
         flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-    }, []);
+    };
 
-    const handleSearch = useCallback((query: string) => {
+    const handleSearch = (query: string) => {
         setSearchQuery(query);
-    }, []);
+    };
 
-    const handleClearSearch = useCallback(() => {
+    const handleClearSearch = () => {
         setSearchQuery('');
-    }, []);
+    };
 
-    // ✅ دالة للسحب لتحميل المزيد (Pull to Refresh)
-    const handleEndReached = useCallback(() => {
-        if (hasMore && !loadingMore && searchQuery.trim() === '') {
-            loadMoreData();
-        }
-    }, [hasMore, loadingMore, searchQuery, loadMoreData]);
+    const categories = menuData?.map(cat => ({ id: cat.id, name: cat.name })) || [];
+    
+    const sectionsWithItems = useMemo(() => {
+        return menuData?.filter(cat => cat.menu_items && cat.menu_items.length > 0).map(cat => cat.id) || [];
+    }, [menuData]);
 
-    // ✅ تحسين: تجنب إعادة إنشاء renderItem في كل render مع الأنواع الصحيحة
-    const renderItem = useCallback(({ item }: { item: { type: string; id: string } }) => {
+
+    // --- Render Logic ---
+    if (isLoadingMenu || isLoadingPromotions) {
+        return (
+            <SafeAreaView style={styles.centerContainer}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.loadingText}>جاري تحميل البيانات...</Text>
+            </SafeAreaView>
+        );
+    }
+
+    if (menuError || promotionsError) {
+        return (
+            <SafeAreaView style={styles.centerContainer}>
+                <Text style={styles.errorText}>حدث خطأ في تحميل البيانات</Text>
+            </SafeAreaView>
+        );
+    }
+
+
+    const listData = [
+        { type: 'header', id: 'header-section' },      // ✅ استخدام id فريد
+        { type: 'categories', id: 'categories' },  // العنصر 1: قائمة الفئات (سيصبح لاصقًا)
+        { type: 'meals', id: 'meals' }        // العنصر 2: شبكة الوجبات
+    ];
+
+    // ✅ دالة العرض الرئيسية
+    const renderItem = ({ item }: { item: { type: string; id: string } }) => {
         switch (item.type) {
             case 'header':
                 return searchQuery.trim() === '' ? (
@@ -265,10 +200,8 @@ export default function HomeScreen() {
                     <View style={styles.listContainer}>
                         <FlatList
                             data={filteredMeals}
-                            renderItem={({ item: mealItem }: { item: MenuItem }) => (
-                                <MealCard meal={mealItem} />
-                            )}
-                            keyExtractor={(mealItem: MenuItem) => mealItem.id.toString()}
+                            renderItem={({ item: mealItem }) => <MealCard meal={mealItem} />}
+                            keyExtractor={(mealItem) => mealItem.id.toString()}
                             numColumns={2}
                             columnWrapperStyle={styles.columnWrapper}
                             ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -283,39 +216,10 @@ export default function HomeScreen() {
                         />
                     </View>
                 );
-            case 'loading':
-                return loadingMore ? (
-                    <View style={styles.loadingMoreContainer}>
-                        <ActivityIndicator size="small" color={Colors.primary} />
-                        <Text style={styles.loadingMoreText}>جاري تحميل المزيد...</Text>
-                    </View>
-                ) : !hasMore && filteredMeals.length > 0 ? (
-                    <View style={styles.endOfListContainer}>
-                        <Text style={styles.endOfListText}>🏁 وصلت لنهاية القائمة</Text>
-                    </View>
-                ) : null;
             default:
                 return null;
         }
-    }, [searchQuery, filteredMeals, categories, selectedCategory, isLoadingMenu, sectionsWithItems, loadingMore, hasMore]);
-
-    // --- Render Logic مع تحسينات الأداء ---
-    if ((isLoadingMenu || isLoadingPromotions) && !initialLoadComplete) {
-        return (
-            <SafeAreaView style={styles.centerContainer}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.loadingText}>جاري تحميل البيانات...</Text>
-            </SafeAreaView>
-        );
-    }
-
-    if (menuError || promotionsError) {
-        return (
-            <SafeAreaView style={styles.centerContainer}>
-                <Text style={styles.errorText}>حدث خطأ في تحميل البيانات</Text>
-            </SafeAreaView>
-        );
-    }
+    };
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -326,21 +230,19 @@ export default function HomeScreen() {
                 searchQuery={searchQuery}
                 setSearchQuery={handleSearch}
                 onClearSearch={handleClearSearch}
-                onVoiceSearch={startVoiceSearch}
+                onVoiceSearch={startVoiceSearch} // ⬅️ التغيير هنا
                 isVoiceSearching={isVoiceSearching}
             />
             
-            {/* ✅ FlatList مع Pagination */}
+            {/* ✅ استخدام FlatList مع الإعدادات الصحيحة */}
             <FlatList
                 ref={flatListRef}
                 data={listData}
                 renderItem={renderItem}
                 keyExtractor={(item) => item.id}
-                stickyHeaderIndices={[1]}
+                stickyHeaderIndices={[1]} // استهداف العنصر 'categories'
                 showsVerticalScrollIndicator={false}
                 onScroll={handleScroll}
-                onEndReached={handleEndReached} // ✅ تحميل المزيد عند الوصول للنهاية
-                onEndReachedThreshold={0.3} // ✅ عندما يصل لـ 30% من النهاية
                 scrollEventThrottle={16}
                 refreshControl={
                     <RefreshControl
@@ -351,10 +253,6 @@ export default function HomeScreen() {
                     />
                 }
                 contentContainerStyle={styles.contentContainer}
-                initialNumToRender={3}
-                maxToRenderPerBatch={5}
-                windowSize={5}
-                removeClippedSubviews={true}
             />
 
             {showScrollTop && <ScrollToTopButton onPress={scrollToTop} />}
@@ -364,21 +262,22 @@ export default function HomeScreen() {
     );
 }
 
-// ✅ إضافة الـ styles الجديدة
 const styles = StyleSheet.create({
     safeArea: { 
         flex: 1, 
         backgroundColor: '#FFF',
-        paddingTop: 10,
+        paddingTop: 10, // ✅ مساحة إضافية
+ 
     },
-    topSpacing: {
-        height: 10,
+     topSpacing: {
+        height: 10, // ✅ مساحة قابلة للتعديل
     },
     centerContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#FFF',
+        
     },
     loadingText: {
         marginTop: 10,
@@ -393,6 +292,7 @@ const styles = StyleSheet.create({
     contentContainer: {
         flexGrow: 1,
         paddingBottom: 80,
+
     },
     resultsHeader: {
         paddingHorizontal: 16,
@@ -431,26 +331,5 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: Colors.textSecondary,
         textAlign: 'center',
-    },
-    loadingMoreContainer: {
-        padding: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-    },
-    loadingMoreText: {
-        marginLeft: 10,
-        color: Colors.textSecondary,
-        fontSize: 14,
-    },
-    endOfListContainer: {
-        padding: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    endOfListText: {
-        color: Colors.textSecondary,
-        fontSize: 14,
-        fontStyle: 'italic',
     },
 });
