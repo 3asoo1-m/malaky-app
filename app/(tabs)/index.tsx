@@ -17,7 +17,8 @@ import CategoryChips from '@/components/home/CategoryChips';
 import FloatingCartButton from '@/components/home/FloatingCartButton';
 import ScrollToTopButton from '@/components/home/ScrollToTopButton';
 import CustomBottomNav from '@/components/CustomBottomNav';
-import MenuItemCard from '@/components/MenuItemCard';
+//import MenuItemCard from '@/components/MenuItemCard';
+import MealCard from '@/components/home/MealCard';
 
 // --- واجهة وأنواع البيانات ---
 interface Deal {
@@ -209,33 +210,26 @@ export default function HomeScreen() {
                     </View>
                 );
             case 'meals':
-                return (
-                    <View style={styles.listContainer}>
-                        <FlatList
-                            data={filteredMeals}
-                            renderItem={({ item: mealItem }) => (
-                                <MenuItemCard 
-                                    item={mealItem}
-                                    isFavorite={favorites.has(mealItem.id)}
-                                    onToggleFavorite={() => toggleFavorite(mealItem.id)}
-                                    // يمكنك إضافة onPress هنا إذا أردت
-                                />
-                            )}
-                            keyExtractor={(mealItem) => mealItem.id.toString()}
-                            numColumns={2}
-                            columnWrapperStyle={styles.columnWrapper}
-                            ItemSeparatorComponent={() => <View style={styles.separator} />}
-                            scrollEnabled={false}
-                            ListEmptyComponent={() => (
-                                <View style={styles.emptyResults}>
-                                    <Text style={styles.emptyResultsText}>
-                                        {searchQuery.trim() ? 'لا توجد وجبات تطابق بحثك.' : 'لا توجد وجبات متاحة.'}
-                                    </Text>
-                                </View>
-                            )}
-                        />
-                    </View>
-                );
+  return (
+    <View style={styles.listContainer}>
+      <FlatList
+        data={filteredMeals}
+        renderItem={({ item: mealItem }) => <MealCard meal={mealItem} />}
+        keyExtractor={(mealItem) => mealItem.id.toString()}
+        numColumns={2}
+        columnWrapperStyle={styles.columnWrapper}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        scrollEnabled={false}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyResults}>
+            <Text style={styles.emptyResultsText}>
+              {searchQuery.trim() ? 'لا توجد وجبات تطابق بحثك.' : 'لا توجد وجبات متاحة.'}
+            </Text>
+          </View>
+        )}
+      />
+    </View>
+  );
             default:
                 return null;
         }
